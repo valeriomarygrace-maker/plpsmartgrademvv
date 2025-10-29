@@ -15,9 +15,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && !isset($_
     if (!isValidPLPEmail($email)) {
         $error = 'Please use your valid @plpasig.edu.ph email address.';
     } else {
-        // Ensure student exists (auto-create if not for testing)
-        ensureTestStudentExists($email);
-        
         // Check if email exists in students table using Supabase
         $student = getStudentByEmail($email);
         
@@ -43,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && !isset($_
                 $error = 'Failed to send OTP. Please try again.';
             }
         } else {
-            $error = 'Email not found in our system.';
+            $error = 'Email not found in our system. Please sign up first.';
         }
     }
 }
