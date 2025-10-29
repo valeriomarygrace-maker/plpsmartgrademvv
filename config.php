@@ -19,7 +19,6 @@ if ($connection_method === 'pgsql') {
         $pdo = new PDO("pgsql:host=$db_host;port=$db_port;dbname=$db_name", $db_user, $db_pass);
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     } catch(PDOException $e) {
-        error_log("Supabase PostgreSQL connection failed: " . $e->getMessage());
         $pdo = null;
     }
 } else {
@@ -42,12 +41,6 @@ function supabaseFetch($table, $query = '', $method = 'GET', $data = null) {
     
     $url = $supabase_url . "/rest/v1/$table";
     if ($query) $url .= "?$query";
-    
-    // Log the request for debugging
-    error_log("Supabase Request: $method $url");
-    if ($data) {
-        error_log("Request Data: " . json_encode($data));
-    }
     
     $ch = curl_init();
     $headers = [
@@ -80,23 +73,13 @@ function supabaseFetch($table, $query = '', $method = 'GET', $data = null) {
     $error = curl_error($ch);
     curl_close($ch);
     
-    // Log the response for debugging
-    error_log("Supabase Response: HTTP $httpCode - $response");
-    if ($error) {
-        error_log("CURL Error: " . $error);
-    }
-    
-    if ($error) {
-        return false;
-    }
-    
-    if ($httpCode >= 400) {
-        error_log("Supabase API Error: HTTP $httpCode - $response");
+    if ($error || $httpCode >= 400) {
         return false;
     }
     
     return json_decode($response, true);
 }
+
 // Helper function to insert data
 function supabaseInsert($table, $data) {
     return supabaseFetch($table, '', 'POST', $data);
@@ -108,8 +91,6 @@ function supabaseUpdate($table, $data, $condition) {
 }
 
 function sendOTP($email, $otp) {
-    error_log("🚀 Attempting to send OTP to: $email");
-    
     $userType = '';
     $fullname = '';
     
@@ -118,9 +99,7 @@ function sendOTP($email, $otp) {
     if ($student && count($student) > 0) {
         $userType = 'Student';
         $fullname = $student[0]['fullname'];
-        error_log("✅ Student found: $fullname");
     } else {
-        error_log("❌ Student not found for email: $email");
         return false;
     }
 
@@ -132,21 +111,13 @@ function sendOTP($email, $otp) {
         'is_used' => false
     ];
     
-    error_log("📝 Storing OTP data: " . json_encode($otpData));
-    
     $result = supabaseInsert('otp_verification', $otpData);
     
     if (!$result) {
-        error_log("❌ FAILED to store OTP in Supabase");
         return false;
     }
-    
-    error_log("✅ OTP stored successfully in database");
-    
-    // TEMPORARY: Return true without sending email for testing
-    error_log("📧 [TEMPORARY] Skipping email sending for testing");
-    return true;
 
+    // Send email
     $mail = new PHPMailer(true);
     
     try {
@@ -182,13 +153,10 @@ function sendOTP($email, $otp) {
         ";
 
         $mail->send();
-        error_log('✅ Email sent successfully to: ' . $email);
         return true;
     } catch (Exception $e) {
-        error_log('❌ PHPMailer Error: ' . $mail->ErrorInfo);
         return false;
     }
-
 }
 
 function generateOTP() {
