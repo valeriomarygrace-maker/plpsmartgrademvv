@@ -40,6 +40,7 @@ if ($_POST) {
             }
         }
     }
+}
     
 // Handle signup
 if (isset($_POST['signup'])) {
