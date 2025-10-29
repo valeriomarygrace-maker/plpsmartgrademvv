@@ -24,7 +24,6 @@ if ($_POST) {
             $_SESSION['user_name'] = $student['fullname'];
         }
         
-        // Redirect to student dashboard
         header('Location: student-dashboard.php');
         exit;
     } else {
