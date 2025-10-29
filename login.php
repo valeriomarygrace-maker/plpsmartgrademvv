@@ -7,9 +7,6 @@ $showSignupModal = false;
 $showOTPModal = false;
 $otpError = '';
 
-// TEST MODE - Set to false in production
-$TEST_MODE = true;
-
 // Handle login
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && !isset($_POST['signup'])) {
     $email = trim($_POST['email']);
@@ -27,42 +24,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && !isset($_
             
             $otp = generateOTP();
             
-            if ($TEST_MODE) {
-                // TEST MODE: Always succeed and store OTP
-                $otpData = [
-                    'email' => $email,
-                    'otp_code' => $otp,
-                    'expires_at' => date('Y-m-d H:i:s', strtotime('+10 minutes')),
-                    'is_used' => false
-                ];
+            if (sendOTP($email, $otp)) {
+                $_SESSION['verify_email'] = $email;
+                $_SESSION['user_type'] = 'student';
+                $_SESSION['temp_user_id'] = $userId;
+                $_SESSION['temp_user_name'] = $userName;
                 
-                $result = supabaseInsert('otp_verification', $otpData);
+                // Show the OTP modal
+                $showOTPModal = true;
                 
-                if ($result) {
-                    $_SESSION['verify_email'] = $email;
-                    $_SESSION['user_type'] = 'student';
-                    $_SESSION['temp_user_id'] = $userId;
-                    $_SESSION['temp_user_name'] = $userName;
-                    $_SESSION['debug_otp'] = $otp; // Store for display
-                    
-                    $showOTPModal = true;
-                    $success = "OTP generated for testing: <strong>$otp</strong> - In production, this would be sent to your email.";
-                } else {
-                    $error = 'Failed to generate OTP. Please try again.';
-                }
+                // SUCCESS MESSAGE - No OTP displayed
+                $success = "OTP sent to your email! Please check your inbox.";
+                
             } else {
-                // PRODUCTION MODE: Actually send email
-                if (sendOTP($email, $otp)) {
-                    $_SESSION['verify_email'] = $email;
-                    $_SESSION['user_type'] = 'student';
-                    $_SESSION['temp_user_id'] = $userId;
-                    $_SESSION['temp_user_name'] = $userName;
-                    
-                    $showOTPModal = true;
-                    $success = "OTP sent to your email! Please check your inbox (and spam folder).";
-                } else {
-                    $error = 'Failed to send OTP. Please try again.';
-                }
+                $error = 'Failed to send OTP. Please try again.';
             }
         } else {
             $error = 'Email not found in our system. Please make sure you are registered as a student.';
@@ -89,19 +64,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['otp'])) {
         unset($_SESSION['verify_email']);
         unset($_SESSION['temp_user_id']);
         unset($_SESSION['temp_user_name']);
-        unset($_SESSION['debug_otp']);
         
         // Redirect to student dashboard
         header('Location: student-dashboard.php');
         exit;
     } else {
-        $otpError = 'Invalid OTP code or OTP has expired. Please check and try again.';
+        $otpError = 'Invalid OTP code or OTP has expired. Please check your email and try again.';
         $showOTPModal = true;
-        
-        // Show debug OTP in test mode
-        if ($TEST_MODE && isset($_SESSION['debug_otp'])) {
-            $otpError .= ' (Test OTP: ' . $_SESSION['debug_otp'] . ')';
-        }
     }
 }
     
@@ -788,52 +757,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             <p style="text-align: center; margin-top: 1rem; color: var(--text-medium); font-size: 0.9rem;">
                 Didn't receive the OTP? Check your spam folder or <a href="#" onclick="document.getElementById('loginForm').submit(); return false;" style="color: var(--plp-green); text-decoration: none; font-weight: 500;">resend OTP</a>
             </p>
-            
-            <button type="button" class="back-to-login-btn" id="backToLogin">
-                <i class="fas fa-arrow-left"></i>
-                Back to Login
-            </button>
-        </div>
-    </div>
-
-    <!-- OTP Verification Modal -->
-    <div class="modal-overlay <?php echo $showOTPModal ? 'active' : ''; ?>" id="otpModal">
-        <div class="otp-modal">
-            <button type="button" class="close-modal" id="closeOtpModal">
-                <i class="fas fa-times"></i>
-            </button>
-            
-            <div class="modal-logo">
-                <i class="fas fa-shield-alt"></i>
-            </div>
-            <h1>OTP Verification</h1>
-            <p class="otp-subtitle">Enter the 6-digit verification code sent to<br>
-                <span class="email-display"><?php echo isset($_SESSION['verify_email']) ? htmlspecialchars($_SESSION['verify_email']) : ''; ?></span>
-            </p>
-            
-            <?php if (isset($otpError)): ?>
-                <div class="modal-alert-error">
-                    <i class="fas fa-exclamation-circle"></i>
-                    <span><?php echo $otpError; ?></span>
-                </div>
-            <?php endif; ?>
-            
-            <form method="POST" id="otpForm">
-                <div class="otp-inputs">
-                    <input type="text" class="otp-input" maxlength="1" pattern="\d" inputmode="numeric" autofocus>
-                    <input type="text" class="otp-input" maxlength="1" pattern="\d" inputmode="numeric">
-                    <input type="text" class="otp-input" maxlength="1" pattern="\d" inputmode="numeric">
-                    <input type="text" class="otp-input" maxlength="1" pattern="\d" inputmode="numeric">
-                    <input type="text" class="otp-input" maxlength="1" pattern="\d" inputmode="numeric">
-                    <input type="text" class="otp-input" maxlength="1" pattern="\d" inputmode="numeric">
-                </div>
-                <input type="hidden" id="otp" name="otp">
-                
-                <button type="submit" class="verify-btn">
-                    <i class="fas fa-check-circle"></i>
-                    Verify & Continue
-                </button>
-            </form>
             
             <button type="button" class="back-to-login-btn" id="backToLogin">
                 <i class="fas fa-arrow-left"></i>
