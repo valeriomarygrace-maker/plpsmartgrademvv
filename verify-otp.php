@@ -12,37 +12,23 @@ if ($_POST) {
     $otp = trim($_POST['otp']);
     $email = $_SESSION['verify_email'];
     
-    $stmt = $pdo->prepare("SELECT * FROM otp_verification WHERE email = ? AND otp_code = ? AND is_used = FALSE ORDER BY created_at DESC LIMIT 1");
-    $stmt->execute([$email, $otp]);
-    
-    if ($stmt->rowCount() > 0) {
-        $otp_record = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (verifyOTP($email, $otp)) {
+        $_SESSION['logged_in'] = true;
+        $_SESSION['user_email'] = $email;
+        $_SESSION['user_type'] = 'student';
         
-        if (strtotime($otp_record['expires_at']) > time()) {
-            $update_stmt = $pdo->prepare("UPDATE otp_verification SET is_used = TRUE WHERE email = ? AND otp_code = ?");
-            $update_stmt->execute([$email, $otp]);
-            
-            $_SESSION['logged_in'] = true;
-            $_SESSION['user_email'] = $email;
-            $_SESSION['user_type'] = 'student';
-            
-            // Get student ID
-            $student_stmt = $pdo->prepare("SELECT id FROM students WHERE email = ?");
-            $student_stmt->execute([$email]);
-            $student = $student_stmt->fetch(PDO::FETCH_ASSOC);
-            
-            if ($student) {
-                $_SESSION['user_id'] = $student['id'];
-            }
-            
-            // Redirect to student dashboard
-            header('Location: student-dashboard.php');
-            exit;
-        } else {
-            $error = 'OTP has expired. Please request a new one.';
+        // Get student info
+        $student = getStudentByEmail($email);
+        if ($student) {
+            $_SESSION['user_id'] = $student['id'];
+            $_SESSION['user_name'] = $student['fullname'];
         }
+        
+        // Redirect to student dashboard
+        header('Location: student-dashboard.php');
+        exit;
     } else {
-        $error = 'Invalid OTP code. Please check and try again.';
+        $error = 'Invalid OTP code or OTP has expired. Please check and try again.';
     }
 }
 ?>
@@ -54,6 +40,7 @@ if ($_POST) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Verify OTP - PLP SmartGrade</title>
     <style>
+        /* Keep all your existing CSS styles from verify-otp.php */
         :root {
             --plp-green: #006341;
             --plp-green-light: #008856;
