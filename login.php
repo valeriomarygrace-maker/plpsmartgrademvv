@@ -41,45 +41,54 @@ if ($_POST) {
         }
     }
     
-    // Handle signup
-    if (isset($_POST['signup'])) {
-        $student_number = trim($_POST['student_number']);
-        $fullname = trim($_POST['fullname']);
-        $email = trim($_POST['email']);
-        $year_level = 2; // Automatically set to 2nd year
-        $semester = trim($_POST['semester']);
-        $section = trim($_POST['section']);
-        $course = 'BS Information Technology'; // Automatically set to BSIT
+// Handle signup
+if (isset($_POST['signup'])) {
+    $student_number = trim($_POST['student_number']);
+    $fullname = trim($_POST['fullname']);
+    $email = trim($_POST['email']);
+    $year_level = 2;
+    $semester = trim($_POST['semester']);
+    $section = trim($_POST['section']);
+    $course = 'BS Information Technology';
+    
+    // Validate email domain
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL) || !str_ends_with($email, '@plpasig.edu.ph')) {
+        $error = 'Please use your @plpasig.edu.ph email address.';
+        $showSignupModal = true;
+    } else {
+        // Check if email or student number already exists
+        $existingByEmail = supabaseFetch('students', "email=eq.$email", 'GET');
+        $existingByStudentNumber = supabaseFetch('students', "student_number=eq.$student_number", 'GET');
         
-        // Validate email domain
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL) || !str_ends_with($email, '@plpasig.edu.ph')) {
-            $error = 'Please use your @plpasig.edu.ph email address.';
+        if ($existingByEmail && count($existingByEmail) > 0) {
+            $error = 'Email already exists. Please use login instead.';
+            $showSignupModal = true;
+        } elseif ($existingByStudentNumber && count($existingByStudentNumber) > 0) {
+            $error = 'Student number already exists. Please use login instead.';
             $showSignupModal = true;
         } else {
-            // Check if email already exists using Supabase
-            if (studentExists($email, $student_number)) {
-                $error = 'Email or student number already exists. Please use login instead.';
-                $showSignupModal = true;
+            // Insert new student
+            $studentData = [
+                'student_number' => $student_number,
+                'fullname' => $fullname,
+                'email' => $email,
+                'year_level' => $year_level,
+                'semester' => $semester,
+                'section' => $section,
+                'course' => $course
+            ];
+            
+            error_log("Attempting to insert student: " . json_encode($studentData));
+            
+            $result = supabaseInsert('students', $studentData);
+            
+            if ($result !== false) {
+                $success = 'Registration successful! You can now login with your credentials.';
+                error_log("Registration successful for: " . $email);
             } else {
-                // Insert new student using Supabase
-                $studentData = [
-                    'student_number' => $student_number,
-                    'fullname' => $fullname,
-                    'email' => $email,
-                    'year_level' => $year_level,
-                    'semester' => $semester,
-                    'section' => $section,
-                    'course' => $course
-                ];
-                
-                $result = supabaseInsert('students', $studentData);
-                
-                if ($result) {
-                    $success = 'Registration successful! You can now login with your credentials.';
-                } else {
-                    $error = 'Registration failed. Please try again.';
-                    $showSignupModal = true;
-                }
+                $error = 'Registration failed. Please try again.';
+                $showSignupModal = true;
+                error_log("Registration failed for: " . $email);
             }
         }
     }

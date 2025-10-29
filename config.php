@@ -37,7 +37,6 @@ use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\SMTP;
 use PHPMailer\PHPMailer\Exception;
 
-// Supabase REST API helper functions
 function supabaseFetch($table, $query = '', $method = 'GET', $data = null) {
     global $supabase_url, $supabase_key;
     
@@ -48,7 +47,7 @@ function supabaseFetch($table, $query = '', $method = 'GET', $data = null) {
     $headers = [
         'apikey: ' . $supabase_key,
         'Authorization: Bearer ' . $supabase_key,
-        'Content-Type: ' . ($method !== 'GET' ? 'application/json' : ''),
+        'Content-Type: application/json',
         'Prefer: return=representation'
     ];
     
@@ -56,6 +55,8 @@ function supabaseFetch($table, $query = '', $method = 'GET', $data = null) {
         CURLOPT_URL => $url,
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_HTTPHEADER => $headers,
+        CURLOPT_SSL_VERIFYPEER => false, // Add this for debugging
+        CURLOPT_TIMEOUT => 30,
     ]);
     
     if ($method === 'POST') {
@@ -70,7 +71,13 @@ function supabaseFetch($table, $query = '', $method = 'GET', $data = null) {
     
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $error = curl_error($ch);
     curl_close($ch);
+    
+    if ($error) {
+        error_log("CURL Error: " . $error);
+        return false;
+    }
     
     if ($httpCode >= 400) {
         error_log("Supabase API Error: HTTP $httpCode - $response");
