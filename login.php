@@ -51,49 +51,32 @@ if (isset($_POST['signup'])) {
     $section = trim($_POST['section']);
     $course = 'BS Information Technology';
     
-    // Validate email domain
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL) || !str_ends_with($email, '@plpasig.edu.ph')) {
-        $error = 'Please use your @plpasig.edu.ph email address.';
+    // Basic validation
+    if (empty($student_number) || empty($fullname) || empty($email) || empty($semester) || empty($section)) {
+        $error = 'All fields are required.';
         $showSignupModal = true;
     } else {
-        // Check if email or student number already exists
-        $existingByEmail = supabaseFetch('students', "email=eq.$email", 'GET');
-        $existingByStudentNumber = supabaseFetch('students', "student_number=eq.$student_number", 'GET');
+        // Insert directly without checking for duplicates (for testing)
+        $studentData = [
+            'student_number' => $student_number,
+            'fullname' => $fullname,
+            'email' => $email,
+            'year_level' => (int)$year_level, // Ensure it's integer
+            'semester' => $semester,
+            'section' => $section,
+            'course' => $course
+        ];
         
-        if ($existingByEmail && count($existingByEmail) > 0) {
-            $error = 'Email already exists. Please use login instead.';
-            $showSignupModal = true;
-        } elseif ($existingByStudentNumber && count($existingByStudentNumber) > 0) {
-            $error = 'Student number already exists. Please use login instead.';
-            $showSignupModal = true;
+        $result = supabaseInsert('students', $studentData);
+        
+        if ($result !== false) {
+            $success = 'Registration successful! You can now login with your credentials.';
         } else {
-            // Insert new student
-            $studentData = [
-                'student_number' => $student_number,
-                'fullname' => $fullname,
-                'email' => $email,
-                'year_level' => $year_level,
-                'semester' => $semester,
-                'section' => $section,
-                'course' => $course
-            ];
-            
-            error_log("Attempting to insert student: " . json_encode($studentData));
-            
-            $result = supabaseInsert('students', $studentData);
-            
-            if ($result !== false) {
-                $success = 'Registration successful! You can now login with your credentials.';
-                error_log("Registration successful for: " . $email);
-            } else {
-                $error = 'Registration failed. Please try again.';
-                $showSignupModal = true;
-                error_log("Registration failed for: " . $email);
-            }
+            $error = 'Registration failed. Please check if student number or email already exists.';
+            $showSignupModal = true;
         }
     }
 }
-
 // Check if we're processing OTP verification
 if (isset($_POST['otp'])) {
     $otp = trim($_POST['otp']);

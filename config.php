@@ -43,6 +43,12 @@ function supabaseFetch($table, $query = '', $method = 'GET', $data = null) {
     $url = $supabase_url . "/rest/v1/$table";
     if ($query) $url .= "?$query";
     
+    // Log the request for debugging
+    error_log("Supabase Request: $method $url");
+    if ($data) {
+        error_log("Request Data: " . json_encode($data));
+    }
+    
     $ch = curl_init();
     $headers = [
         'apikey: ' . $supabase_key,
@@ -55,7 +61,7 @@ function supabaseFetch($table, $query = '', $method = 'GET', $data = null) {
         CURLOPT_URL => $url,
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_HTTPHEADER => $headers,
-        CURLOPT_SSL_VERIFYPEER => false, // Add this for debugging
+        CURLOPT_SSL_VERIFYPEER => false,
         CURLOPT_TIMEOUT => 30,
     ]);
     
@@ -74,8 +80,13 @@ function supabaseFetch($table, $query = '', $method = 'GET', $data = null) {
     $error = curl_error($ch);
     curl_close($ch);
     
+    // Log the response for debugging
+    error_log("Supabase Response: HTTP $httpCode - $response");
     if ($error) {
         error_log("CURL Error: " . $error);
+    }
+    
+    if ($error) {
         return false;
     }
     
@@ -86,7 +97,6 @@ function supabaseFetch($table, $query = '', $method = 'GET', $data = null) {
     
     return json_decode($response, true);
 }
-
 // Helper function to insert data
 function supabaseInsert($table, $data) {
     return supabaseFetch($table, '', 'POST', $data);
