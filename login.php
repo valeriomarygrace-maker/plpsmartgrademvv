@@ -7,37 +7,40 @@ $showSignupModal = false;
 $showOTPModal = false;
 $otpError = '';
 
-if ($_POST) {
-    // Handle login
-    if (isset($_POST['email']) && !isset($_POST['signup'])) {
-        $email = trim($_POST['email']);
+// Handle login
+if (isset($_POST['email']) && !isset($_POST['signup'])) {
+    $email = trim($_POST['email']);
+    
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL) || !str_ends_with($email, '@plpasig.edu.ph')) {
+        $error = 'Please use your @plpasig.edu.ph email address.';
+    } else {
+        // Check if email exists in students table using Supabase
+        $student = getStudentByEmail($email);
         
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL) || !str_ends_with($email, '@plpasig.edu.ph')) {
-            $error = 'Please use your @plpasig.edu.ph email address.';
-        } else {
-            // Check if email exists in students table using Supabase
-            $student = getStudentByEmail($email);
+        if ($student) {
+            $userId = $student['id'];
+            $userName = $student['fullname'];
             
-            if ($student) {
-                $userId = $student['id'];
-                $userName = $student['fullname'];
+            $otp = generateOTP();
+            
+            if (sendOTP($email, $otp)) {
+                $_SESSION['verify_email'] = $email;
+                $_SESSION['user_type'] = 'student';
+                $_SESSION['user_id'] = $userId;
+                $_SESSION['user_name'] = $userName;
+                $_SESSION['debug_otp'] = $otp; // Store OTP in session for debugging
                 
-                $otp = generateOTP();
+                // Show the OTP modal
+                $showOTPModal = true;
                 
-                if (sendOTP($email, $otp)) {
-                    $_SESSION['verify_email'] = $email;
-                    $_SESSION['user_type'] = 'student';
-                    $_SESSION['user_id'] = $userId;
-                    $_SESSION['user_name'] = $userName;
-                    
-                    // Show the OTP modal
-                    $showOTPModal = true;
-                } else {
-                    $error = 'Failed to send OTP. Please try again.';
-                }
+                // Also show OTP on screen for testing
+                $success = "OTP generated: <strong>$otp</strong> - Check your email or use this code to verify.";
+                error_log("DEBUG OTP for $email: $otp");
             } else {
-                $error = 'Email not found in our system. Please make sure you are registered as a student.';
+                $error = 'Failed to send OTP. Please try again.';
             }
+        } else {
+            $error = 'Email not found in our system. Please make sure you are registered as a student.';
         }
     }
 }

@@ -108,7 +108,7 @@ function supabaseUpdate($table, $data, $condition) {
 }
 
 function sendOTP($email, $otp) {
-    error_log("Attempting to send OTP to: $email");
+    error_log("🚀 Attempting to send OTP to: $email");
     
     $userType = '';
     $fullname = '';
@@ -118,9 +118,9 @@ function sendOTP($email, $otp) {
     if ($student && count($student) > 0) {
         $userType = 'Student';
         $fullname = $student[0]['fullname'];
-        error_log("Student found: $fullname");
+        error_log("✅ Student found: $fullname");
     } else {
-        error_log("Student not found for email: $email");
+        error_log("❌ Student not found for email: $email");
         return false;
     }
 
@@ -132,7 +132,7 @@ function sendOTP($email, $otp) {
         'is_used' => false
     ];
     
-    error_log("Storing OTP data: " . json_encode($otpData));
+    error_log("📝 Storing OTP data: " . json_encode($otpData));
     
     $result = supabaseInsert('otp_verification', $otpData);
     
@@ -142,7 +142,12 @@ function sendOTP($email, $otp) {
     }
     
     error_log("✅ OTP stored successfully in database");
+    
+    // TEMPORARY: Return true without sending email for testing
+    error_log("📧 [TEMPORARY] Skipping email sending for testing");
+    return true;
 
+    /* COMMENT OUT THE EMAIL PART FOR NOW
     // Send email
     $mail = new PHPMailer(true);
     
@@ -154,10 +159,6 @@ function sendOTP($email, $otp) {
         $mail->Password   = getenv('SMTP_PASSWORD') ?: 'swjx bwoj taxq tjdv';
         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port       = 587;
-        $mail->SMTPDebug  = 2; // Enable verbose debug output
-        $mail->Debugoutput = function($str, $level) {
-            error_log("PHPMailer Debug: $str");
-        };
 
         $mail->setFrom('marygracevalerio177@gmail.com', 'PLP SmartGrade');
         $mail->addAddress($email);
@@ -183,12 +184,13 @@ function sendOTP($email, $otp) {
         ";
 
         $mail->send();
-        error_log("✅ Email sent successfully to: $email");
+        error_log(' Email sent successfully to: ' . $email);
         return true;
     } catch (Exception $e) {
-        error_log("❌ PHPMailer Error: " . $mail->ErrorInfo);
+        error_log(' PHPMailer Error: ' . $mail->ErrorInfo);
         return false;
     }
+    */
 }
 
 function generateOTP() {
