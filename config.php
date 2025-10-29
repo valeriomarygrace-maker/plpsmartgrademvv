@@ -85,13 +85,14 @@ function sendOTP($email, $otp) {
     // Get student data
     $student = getStudentByEmail($email);
     if (!$student) {
+        error_log("Student not found for email: $email");
         return false;
     }
 
     $userType = 'Student';
     $fullname = $student['fullname'];
 
-    // Store OTP in Supabase FIRST
+    // Store OTP in Supabase FIRST - Use the exact same structure as your MySQL system
     $otpData = [
         'email' => $email,
         'otp_code' => $otp,
@@ -102,14 +103,15 @@ function sendOTP($email, $otp) {
     $result = supabaseInsert('otp_verification', $otpData);
     
     if (!$result) {
+        error_log("Failed to store OTP in Supabase for email: $email");
         return false;
     }
 
-    // Gmail SMTP Configuration for Render
+    // Send OTP email
     $mail = new PHPMailer(true);
     
     try {
-        // Server settings for Render compatibility
+        // Server settings
         $mail->isSMTP();
         $mail->Host       = 'smtp.gmail.com';
         $mail->SMTPAuth   = true;
@@ -118,7 +120,7 @@ function sendOTP($email, $otp) {
         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port       = 587;
         
-        // Important: Render-specific settings
+        // SSL settings for Render
         $mail->SMTPOptions = array(
             'ssl' => array(
                 'verify_peer' => false,
@@ -127,7 +129,6 @@ function sendOTP($email, $otp) {
             )
         );
         
-        // Timeout settings for Render
         $mail->Timeout = 30;
 
         // Recipients
@@ -160,55 +161,16 @@ function sendOTP($email, $otp) {
         
         $mail->AltBody = "PLP SmartGrade OTP Verification\n\nHello $fullname,\n\nYour OTP code is: $otp\n\nThis OTP will expire in 10 minutes.\n\nIf you didn't request this OTP, please ignore this email.";
 
-        $mail->send();
-        return true;
-        
-    } catch (Exception $e) {
-        return false;
-    }
-}
-function sendOTPWithPHPMailer($email, $otp, $fullname, $userType) {
-    $mail = new PHPMailer(true);
-    
-    try {
-        // Server settings - SIMPLIFIED
-        $mail->isSMTP();
-        $mail->Host       = 'smtp.gmail.com';
-        $mail->SMTPAuth   = true;
-        $mail->Username   = 'marygracevalerio177@gmail.com';
-        $mail->Password   = 'swjx bwoj taxq tjdv';
-        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-        $mail->Port       = 587;
-        
-        // Disable strict SSL verification
-        $mail->SMTPOptions = array(
-            'ssl' => array(
-                'verify_peer' => false,
-                'verify_peer_name' => false,
-                'allow_self_signed' => true
-            )
-        );
-
-        // Recipients
-        $mail->setFrom('marygracevalerio177@gmail.com', 'PLP SmartGrade');
-        $mail->addAddress($email);
-        $mail->addReplyTo('marygracevalerio177@gmail.com', 'PLP SmartGrade');
-
-        // Simple content
-        $mail->isHTML(false); // Use plain text
-        $mail->Subject = 'PLP SmartGrade - OTP Verification Code';
-        
-        $mail->Body = "PLP SmartGrade - OTP Verification\n\nHello $fullname,\n\nYour OTP code is: $otp\n\nThis OTP will expire in 10 minutes.\n\nIf you didn't request this OTP, please ignore this email.";
-
         if ($mail->send()) {
-            error_log("OTP email sent via PHPMailer to: $email");
+            error_log("OTP sent successfully to: $email");
             return true;
+        } else {
+            error_log("Failed to send OTP email to: $email");
+            return false;
         }
         
-        return false;
-        
     } catch (Exception $e) {
-        error_log("PHPMailer also failed: " . $e->getMessage());
+        error_log("PHPMailer Exception for $email: " . $e->getMessage());
         return false;
     }
 }
@@ -217,42 +179,48 @@ function generateOTP() {
     return sprintf("%06d", mt_rand(1, 999999));
 }
 
-// OTP verification function for Supabase
+// OTP verification function for Supabase - FIXED VERSION
 function verifyOTP($email, $otp) {
-    $currentTime = date('Y-m-d H:i:s');
+    // Get the most recent valid OTP for this email
+    $otpRecords = supabaseFetch('otp_verification', ['email' => $email]);
     
-    // Find valid OTP using Supabase
-    $otpRecords = supabaseFetch('otp_verification', [
-        'email' => $email, 
-        'otp_code' => $otp
-    ]);
+    if (!$otpRecords || count($otpRecords) === 0) {
+        error_log("No OTP records found for email: $email");
+        return false;
+    }
     
-    if ($otpRecords && count($otpRecords) > 0) {
-        $otpRecord = $otpRecords[0];
-        
-        // Check if OTP is already used
-        if ($otpRecord['is_used']) {
-            error_log("OTP already used for email: $email");
-            return false;
-        }
-        
-        // Check if OTP is expired
-        if (strtotime($otpRecord['expires_at']) < time()) {
-            error_log("OTP expired for email: $email");
-            return false;
-        }
-        
-        // Mark OTP as used
-        $otpId = $otpRecord['id'];
-        $result = supabaseUpdate('otp_verification', ['is_used' => true], ['id' => $otpId]);
-        
-        if ($result !== false) {
-            error_log("OTP verified successfully for email: $email");
-            return true;
+    // Find the most recent unused OTP that matches
+    $validOtp = null;
+    foreach ($otpRecords as $record) {
+        if (!$record['is_used'] && $record['otp_code'] === $otp) {
+            $validOtp = $record;
+            break;
         }
     }
     
-    error_log("OTP verification failed for email: $email");
+    if (!$validOtp) {
+        error_log("No valid unused OTP found for email: $email");
+        return false;
+    }
+    
+    // Check if OTP is expired
+    if (strtotime($validOtp['expires_at']) < time()) {
+        error_log("OTP expired for email: $email");
+        return false;
+    }
+    
+    // Mark OTP as used
+    $updateResult = supabaseUpdate('otp_verification', 
+        ['is_used' => true], 
+        ['id' => $validOtp['id']]
+    );
+    
+    if ($updateResult !== false) {
+        error_log("OTP verified successfully for email: $email");
+        return true;
+    }
+    
+    error_log("Failed to mark OTP as used for email: $email");
     return false;
 }
 
