@@ -1,14 +1,32 @@
 <?php
-$host = getenv('DB_HOST') ?: 'db';
-$dbname = getenv('DB_NAME') ?: 'smartgrade';
-$username = getenv('DB_USER') ?: 'root';
-$password = getenv('DB_PASS') ?: 'rootpassword';
+// Supabase Configuration
+$supabase_url = getenv('SUPABASE_URL') ?: 'https://your-project-ref.supabase.co';
+$supabase_key = getenv('SUPABASE_KEY') ?: 'your-anon-key';
+$supabase_secret = getenv('SUPABASE_SECRET') ?: 'your-service-role-key';
 
-try {
-    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-} catch(PDOException $e) {
-    die("Connection failed: " . $e->getMessage());
+// For direct PostgreSQL connection (optional)
+$db_host = getenv('DB_HOST') ?: 'db.your-project-ref.supabase.co';
+$db_port = getenv('DB_PORT') ?: '5432';
+$db_name = getenv('DB_NAME') ?: 'postgres';
+$db_user = getenv('DB_USER') ?: 'postgres';
+$db_pass = getenv('DB_PASS') ?: 'your-password';
+
+// Choose connection method: 'rest' or 'pgsql'
+$connection_method = getenv('DB_METHOD') ?: 'rest';
+
+// Initialize database connection based on method
+if ($connection_method === 'pgsql') {
+    // PostgreSQL direct connection
+    try {
+        $pdo = new PDO("pgsql:host=$db_host;port=$db_port;dbname=$db_name", $db_user, $db_pass);
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    } catch(PDOException $e) {
+        error_log("Supabase PostgreSQL connection failed: " . $e->getMessage());
+        $pdo = null;
+    }
+} else {
+    // REST API connection (no PDO needed)
+    $pdo = null;
 }
 
 session_start();
@@ -21,21 +39,99 @@ use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\SMTP;
 use PHPMailer\PHPMailer\Exception;
 
-function sendOTP($email, $otp) {
-    global $pdo;
+// Supabase REST API helper functions
+function supabaseFetch($table, $query = '', $method = 'GET', $data = null) {
+    global $supabase_url, $supabase_key;
+    
+    $url = $supabase_url . "/rest/v1/$table";
+    if ($query) $url .= "?$query";
+    
+    $ch = curl_init();
+    $headers = [
+        'apikey: ' . $supabase_key,
+        'Authorization: Bearer ' . $supabase_key,
+        'Content-Type: application/json',
+        'Prefer: return=representation'
+    ];
+    
+    curl_setopt_array($ch, [
+        CURLOPT_URL => $url,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => $headers,
+    ]);
+    
+    if ($method === 'POST') {
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+    } elseif ($method === 'PATCH') {
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PATCH');
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+    } elseif ($method === 'DELETE') {
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
+    }
+    
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    if ($httpCode >= 400) {
+        error_log("Supabase API Error: HTTP $httpCode - $response");
+        return null;
+    }
+    
+    return json_decode($response, true);
+}
 
-    $stmt = $pdo->prepare("SELECT fullname FROM students WHERE email = ?");
-    $stmt->execute([$email]);
-    $fullname = $stmt->fetchColumn() ?: 'User';
+// Helper function to insert data
+function supabaseInsert($table, $data) {
+    return supabaseFetch($table, '', 'POST', $data);
+}
+
+// Helper function to update data
+function supabaseUpdate($table, $data, $condition) {
+    return supabaseFetch($table, $condition, 'PATCH', $data);
+}
+
+// Helper function to delete data
+function supabaseDelete($table, $condition) {
+    return supabaseFetch($table, $condition, 'DELETE');
+}
+
+// Updated sendOTP function for Supabase
+function sendOTP($email, $otp) {
+    $userType = '';
+    $fullname = '';
+    
+    // Check if student exists using Supabase
+    $student = supabaseFetch('students', "email=eq.$email", 'GET');
+    if ($student && count($student) > 0) {
+        $userType = 'Student';
+        $fullname = $student[0]['fullname'];
+    }
+    
+    // Store OTP in Supabase
+    $otpData = [
+        'email' => $email,
+        'otp_code' => $otp,
+        'expires_at' => date('Y-m-d H:i:s', strtotime('+10 minutes')),
+        'is_used' => false
+    ];
+    
+    $result = supabaseInsert('otp_verification', $otpData);
+    
+    if (!$result) {
+        error_log("Failed to store OTP in Supabase");
+        return false;
+    }
 
     $mail = new PHPMailer(true);
-
+    
     try {
         $mail->isSMTP();
         $mail->Host       = 'smtp.gmail.com';
         $mail->SMTPAuth   = true;
         $mail->Username   = 'marygracevalerio177@gmail.com';
-        $mail->Password   = 'swjx bwoj taxq tjdv';
+        $mail->Password   = getenv('SMTP_PASSWORD') ?: 'swjx bwoj taxq tjdv';
         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port       = 587;
 
@@ -45,12 +141,20 @@ function sendOTP($email, $otp) {
         $mail->isHTML(true);
         $mail->Subject = 'PLP SmartGrade - OTP Verification';
         $mail->Body    = "
-            <div>
-                <h2>Email Verification</h2>
-                <p>Hello, <strong>$fullname</strong>!</p>
-                <p>Your OTP code is:</p>
-                <div style='font-size: 24px; font-weight: bold;'>$otp</div>
-                <p>This code will expire in 10 minutes.</p>
+            <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
+                <h2 style='color: #2c3e50;'>Email Verification</h2>
+                <div style='background: #f8f9fa; padding: 20px; border-radius: 5px;'>
+                    <p>Hello, <strong>$fullname</strong>! You are logging in as a <strong>$userType</strong>.</p>
+                    <p>Your OTP code is:</p>
+                    <div style='font-size: 32px; font-weight: bold; color: #e74c3c; text-align: center; letter-spacing: 5px; padding: 15px; background: #fff; border: 2px dashed #bdc3c7; border-radius: 5px; margin: 15px 0;'>
+                        $otp
+                    </div>
+                    <p>This code will expire in 10 minutes.</p>
+                    <p style='font-size: 12px; color: #7f8c8d;'>If you didn't request this OTP, please ignore this email.</p>
+                </div>
+                <div style='margin-top: 20px; padding-top: 20px; border-top: 1px solid #ecf0f1; font-size: 12px; color: #95a5a6;'>
+                    © " . date('Y') . " Pamantasan ng Lungsod ng Pasig. All rights reserved.
+                </div>
             </div>
         ";
 
@@ -65,4 +169,94 @@ function sendOTP($email, $otp) {
 function generateOTP() {
     return sprintf("%06d", mt_rand(1, 999999));
 }
+
+// Student-related functions for Supabase
+function getStudentByEmail($email) {
+    return supabaseFetch('students', "email=eq.$email", 'GET');
+}
+
+function getStudentById($id) {
+    return supabaseFetch('students', "id=eq.$id", 'GET');
+}
+
+function verifyOTP($email, $otp) {
+    $currentTime = date('Y-m-d H:i:s');
+    
+    // Find valid OTP
+    $otpRecords = supabaseFetch('otp_verification', "email=eq.$email&otp_code=eq.$otp&is_used=eq.false&expires_at=gt.$currentTime", 'GET');
+    
+    if ($otpRecords && count($otpRecords) > 0) {
+        // Mark OTP as used
+        $otpId = $otpRecords[0]['id'];
+        supabaseUpdate('otp_verification', ['is_used' => true], "id=eq.$otpId");
+        return true;
+    }
+    
+    return false;
+}
+
+// Subject and grade management functions
+function getStudentSubjects($studentId) {
+    return supabaseFetch('student_subjects', "student_id=eq.$studentId", 'GET');
+}
+
+function getSubjectById($subjectId) {
+    return supabaseFetch('subjects', "id=eq.$subjectId", 'GET');
+}
+
+function getStudentGrades($studentSubjectId) {
+    return supabaseFetch('student_subject_scores', "student_subject_id=eq.$studentSubjectId", 'GET');
+}
+
+// Authentication check function
+function checkAuth() {
+    if (!isset($_SESSION['student_id']) && !isset($_SESSION['admin_logged_in'])) {
+        header('Location: login.php');
+        exit();
+    }
+}
+
+// Admin authentication check
+function checkAdminAuth() {
+    if (!isset($_SESSION['admin_logged_in'])) {
+        header('Location: admin_login.php');
+        exit();
+    }
+}
+
+// Error handling function
+function handleError($message, $redirect = null) {
+    error_log($message);
+    if ($redirect) {
+        header("Location: $redirect");
+        exit();
+    }
+    return false;
+}
+
+// Success response function
+function handleSuccess($message, $redirect = null) {
+    if ($redirect) {
+        $_SESSION['success_message'] = $message;
+        header("Location: $redirect");
+        exit();
+    }
+    return true;
+}
+
+// Initialize required tables (run once)
+function initializeSupabaseTables() {
+    // This function would contain SQL to create tables if they don't exist
+    // Since you've already created tables in Supabase UI, this is optional
+}
+
+// CORS headers for API requests
+header('Access-Control-Allow-Origin: *');
+header('Content-Type: application/json; charset=utf-8');
+
+// Security headers
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: DENY');
+header('X-XSS-Protection: 1; mode=block');
+
 ?>
