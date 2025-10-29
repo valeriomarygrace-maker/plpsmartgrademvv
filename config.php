@@ -1,7 +1,7 @@
 <?php
 // Supabase Configuration
-$supabase_url = getenv('SUPABASE_URL') ?: 'https://your-project-ref.supabase.co';
-$supabase_key = getenv('SUPABASE_KEY') ?: 'your-anon-key';
+$supabase_url = getenv('SUPABASE_URL') ?: 'https://xwvrgpxcceivakzrwwji.supabase.co';
+$supabase_key = getenv('SUPABASE_KEY') ?: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh3dnJncHhjY2VpdmFrenJ3d2ppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE3MjQ0NzQsImV4cCI6MjA3NzMwMDQ3NH0.ovd8v3lqsYtJU78D4iM6CyAyvi6jK4FUbYUjydFi4FM';
 $supabase_secret = getenv('SUPABASE_SECRET') ?: 'your-service-role-key';
 
 // For direct PostgreSQL connection (optional)
@@ -9,7 +9,7 @@ $db_host = getenv('DB_HOST') ?: 'db.your-project-ref.supabase.co';
 $db_port = getenv('DB_PORT') ?: '5432';
 $db_name = getenv('DB_NAME') ?: 'postgres';
 $db_user = getenv('DB_USER') ?: 'postgres';
-$db_pass = getenv('DB_PASS') ?: 'your-password';
+$db_pass = getenv('DB_PASS') ?: '';
 
 // Choose connection method: 'rest' or 'pgsql'
 $connection_method = getenv('DB_METHOD') ?: 'rest';
