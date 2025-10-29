@@ -4,6 +4,8 @@ require_once 'config.php';
 $error = '';
 $success = '';
 $showSignupModal = false;
+$showOTPModal = false;
+$otpError = '';
 
 if ($_POST) {
     // Handle login
@@ -13,20 +15,14 @@ if ($_POST) {
         if (!filter_var($email, FILTER_VALIDATE_EMAIL) || !str_ends_with($email, '@plpasig.edu.ph')) {
             $error = 'Please use your @plpasig.edu.ph email address.';
         } else {
-            // Check if email exists in students table only
-            $stmt = $pdo->prepare("SELECT id, fullname FROM students WHERE email = ?");
-            $stmt->execute([$email]);
+            // Check if email exists in students table using Supabase
+            $student = getStudentByEmail($email);
             
-            if ($stmt->rowCount() > 0) {
-                $student = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($student) {
                 $userId = $student['id'];
                 $userName = $student['fullname'];
                 
                 $otp = generateOTP();
-                $expires = date('Y-m-d H:i:s', strtotime('+10 minutes'));
-                
-                $stmt = $pdo->prepare("INSERT INTO otp_verification (email, otp_code, expires_at) VALUES (?, ?, ?)");
-                $stmt->execute([$email, $otp, $expires]);
                 
                 if (sendOTP($email, $otp)) {
                     $_SESSION['verify_email'] = $email;
@@ -34,7 +30,7 @@ if ($_POST) {
                     $_SESSION['user_id'] = $userId;
                     $_SESSION['user_name'] = $userName;
                     
-                    // Instead of redirecting, we'll show the OTP modal
+                    // Show the OTP modal
                     $showOTPModal = true;
                 } else {
                     $error = 'Failed to send OTP. Please try again.';
@@ -60,21 +56,27 @@ if ($_POST) {
             $error = 'Please use your @plpasig.edu.ph email address.';
             $showSignupModal = true;
         } else {
-            // Check if email already exists
-            $stmt = $pdo->prepare("SELECT id FROM students WHERE email = ? OR student_number = ?");
-            $stmt->execute([$email, $student_number]);
-            
-            if ($stmt->rowCount() > 0) {
+            // Check if email already exists using Supabase
+            if (studentExists($email, $student_number)) {
                 $error = 'Email or student number already exists. Please use login instead.';
                 $showSignupModal = true;
             } else {
-                // Insert new student
-                $stmt = $pdo->prepare("INSERT INTO students (student_number, fullname, email, year_level, semester, section, course) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                // Insert new student using Supabase
+                $studentData = [
+                    'student_number' => $student_number,
+                    'fullname' => $fullname,
+                    'email' => $email,
+                    'year_level' => $year_level,
+                    'semester' => $semester,
+                    'section' => $section,
+                    'course' => $course
+                ];
                 
-                try {
-                    $stmt->execute([$student_number, $fullname, $email, $year_level, $semester, $section, $course]);
+                $result = supabaseInsert('students', $studentData);
+                
+                if ($result) {
                     $success = 'Registration successful! You can now login with your credentials.';
-                } catch (PDOException $e) {
+                } else {
                     $error = 'Registration failed. Please try again.';
                     $showSignupModal = true;
                 }
@@ -88,43 +90,21 @@ if (isset($_POST['otp'])) {
     $otp = trim($_POST['otp']);
     $email = $_SESSION['verify_email'];
     
-    $stmt = $pdo->prepare("SELECT * FROM otp_verification WHERE email = ? AND otp_code = ? AND is_used = FALSE ORDER BY created_at DESC LIMIT 1");
-    $stmt->execute([$email, $otp]);
-    
-    if ($stmt->rowCount() > 0) {
-        $otp_record = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (verifyOTP($email, $otp)) {
+        $_SESSION['logged_in'] = true;
+        $_SESSION['user_email'] = $email;
+        $_SESSION['user_type'] = 'student';
+        $_SESSION['user_id'] = $_SESSION['user_id']; // Already set during login
         
-        if (strtotime($otp_record['expires_at']) > time()) {
-            $update_stmt = $pdo->prepare("UPDATE otp_verification SET is_used = TRUE WHERE email = ? AND otp_code = ?");
-            $update_stmt->execute([$email, $otp]);
-            
-            $_SESSION['logged_in'] = true;
-            $_SESSION['user_email'] = $email;
-            $_SESSION['user_type'] = 'student';
-            
-            // Get student ID
-            $student_stmt = $pdo->prepare("SELECT id FROM students WHERE email = ?");
-            $student_stmt->execute([$email]);
-            $student = $student_stmt->fetch(PDO::FETCH_ASSOC);
-            
-            if ($student) {
-                $_SESSION['user_id'] = $student['id'];
-            }
-            
-            // Redirect to student dashboard
-            header('Location: student-dashboard.php');
-            exit;
-        } else {
-            $otpError = 'OTP has expired. Please request a new one.';
-            $showOTPModal = true;
-        }
+        // Redirect to student dashboard
+        header('Location: student-dashboard.php');
+        exit;
     } else {
-        $otpError = 'Invalid OTP code. Please check and try again.';
+        $otpError = 'Invalid OTP code or OTP has expired. Please check and try again.';
         $showOTPModal = true;
     }
 }
 ?>
-
 
 <!DOCTYPE html>
 <html lang="en">
