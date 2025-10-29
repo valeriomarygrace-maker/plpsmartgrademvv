@@ -1,11 +1,11 @@
 <?php
-$host = 'localhost';
-$dbname = 'smartgrade';
-$username = 'root';
-$password = '';
+$host = getenv('DB_HOST') ?: 'localhost';
+$dbname = getenv('DB_NAME') ?: 'smartgrade';
+$username = getenv('DB_USER') ?: 'root';
+$password = getenv('DB_PASS') ?: '';
 
 try {
-    $pdo = new PDO("mysql:host=$host;dbname=$dbname", $username, $password);
+    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 } catch(PDOException $e) {
     die("Connection failed: " . $e->getMessage());
@@ -41,7 +41,7 @@ function sendOTP($email, $otp) {
         $mail->Host       = 'smtp.gmail.com';
         $mail->SMTPAuth   = true;
         $mail->Username   = 'marygracevalerio177@gmail.com';
-        $mail->Password   = 'swjx bwoj taxq tjdv';
+        $mail->Password   = 'swjx bwoj taxq tjdv'; // ✅ Consider moving this to an environment variable too
         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port       = 587;
 
@@ -52,23 +52,13 @@ function sendOTP($email, $otp) {
         $mail->Subject = 'PLP SmartGrade - OTP Verification';
         $mail->Body    = "
             <div>
-                <div>
-                    <h2>Email Verification</h2>                
-                    <div>
-                        <p style='margin-bottom: 10px;'>Hello, <strong>$fullname</strong>, You are logging in as a <strong>$userType</strong>.</p>
-                        <p style='margin-bottom: 15px;'>Your OTP code is:</p>
-                        <div style='font-size: 24px; font-weight: bold; color: #141414;'><strong>$otp</strong></div>
-                        <p>This code will expire in 10 minutes.</p>
-                    </div>
-                    
-                    <p style='font-size: 12px; color: #777;'>
-                        If you didn't request this OTP, please ignore this email.
-                    </p>
-                </div>
-                
-                <div style='font-size: 12px; color: #666;'>
-                    © " . date('Y') . " Pamantasan ng Lungsod ng Pasig. All rights reserved.
-                </div>
+                <h2>Email Verification</h2>                
+                <p>Hello, <strong>$fullname</strong>! You are logging in as a <strong>$userType</strong>.</p>
+                <p>Your OTP code is:</p>
+                <div style='font-size: 24px; font-weight: bold; color: #141414;'><strong>$otp</strong></div>
+                <p>This code will expire in 10 minutes.</p>
+                <p style='font-size: 12px; color: #777;'>If you didn't request this OTP, please ignore this email.</p>
+                <div style='font-size: 12px; color: #666;'>© " . date('Y') . " Pamantasan ng Lungsod ng Pasig. All rights reserved.</div>
             </div>
         ";
 
