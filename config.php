@@ -26,7 +26,10 @@ if ($connection_method === 'pgsql') {
     $pdo = null;
 }
 
-session_start();
+// Start session only if not already started
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 require_once 'PHPMailer/src/Exception.php';
 require_once 'PHPMailer/src/PHPMailer.php';
@@ -36,11 +39,20 @@ use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\SMTP;
 use PHPMailer\PHPMailer\Exception;
 
-function supabaseFetch($table, $query = '', $method = 'GET', $data = null) {
+function supabaseFetch($table, $filters = [], $method = 'GET', $data = null) {
     global $supabase_url, $supabase_key;
     
     $url = $supabase_url . "/rest/v1/$table";
-    if ($query) $url .= "?$query";
+    
+    // Build query string from filters
+    $queryParams = [];
+    foreach ($filters as $key => $value) {
+        $queryParams[] = "$key=eq.$value";
+    }
+    
+    if (!empty($queryParams)) {
+        $url .= "?" . implode('&', $queryParams);
+    }
     
     $ch = curl_init();
     $headers = [
@@ -74,6 +86,7 @@ function supabaseFetch($table, $query = '', $method = 'GET', $data = null) {
     curl_close($ch);
     
     if ($error || $httpCode >= 400) {
+        error_log("Supabase API Error: $error, HTTP Code: $httpCode, Response: $response");
         return false;
     }
     
@@ -82,12 +95,12 @@ function supabaseFetch($table, $query = '', $method = 'GET', $data = null) {
 
 // Helper function to insert data
 function supabaseInsert($table, $data) {
-    return supabaseFetch($table, '', 'POST', $data);
+    return supabaseFetch($table, [], 'POST', $data);
 }
 
 // Helper function to update data
-function supabaseUpdate($table, $data, $condition) {
-    return supabaseFetch($table, $condition, 'PATCH', $data);
+function supabaseUpdate($table, $data, $filters) {
+    return supabaseFetch($table, $filters, 'PATCH', $data);
 }
 
 function sendOTP($email, $otp) {
@@ -95,7 +108,7 @@ function sendOTP($email, $otp) {
     $fullname = '';
     
     // Check if student exists using Supabase
-    $student = supabaseFetch('students', "email=eq.$email", 'GET');
+    $student = supabaseFetch('students', ['email' => $email]);
     if ($student && count($student) > 0) {
         $userType = 'Student';
         $fullname = $student[0]['fullname'];
@@ -155,6 +168,7 @@ function sendOTP($email, $otp) {
         $mail->send();
         return true;
     } catch (Exception $e) {
+        error_log("Mailer Error: " . $mail->ErrorInfo);
         return false;
     }
 }
@@ -168,12 +182,23 @@ function verifyOTP($email, $otp) {
     $currentTime = date('Y-m-d H:i:s');
     
     // Find valid OTP using Supabase
-    $otpRecords = supabaseFetch('otp_verification', "email=eq.$email&otp_code=eq.$otp&is_used=eq.false&expires_at=gt.$currentTime", 'GET');
+    $otpRecords = supabaseFetch('otp_verification', [
+        'email' => $email, 
+        'otp_code' => $otp, 
+        'is_used' => 'false'
+    ]);
     
     if ($otpRecords && count($otpRecords) > 0) {
+        $otpRecord = $otpRecords[0];
+        
+        // Check if OTP is expired
+        if (strtotime($otpRecord['expires_at']) < strtotime($currentTime)) {
+            return false;
+        }
+        
         // Mark OTP as used
-        $otpId = $otpRecords[0]['id'];
-        $result = supabaseUpdate('otp_verification', ['is_used' => true], "id=eq.$otpId");
+        $otpId = $otpRecord['id'];
+        $result = supabaseUpdate('otp_verification', ['is_used' => true], ['id' => $otpId]);
         return $result !== false;
     }
     
@@ -183,16 +208,24 @@ function verifyOTP($email, $otp) {
 // Check if student exists
 function studentExists($email, $student_number = null) {
     if ($student_number) {
-        $students = supabaseFetch('students', "email=eq.$email,student_number=eq.$student_number", 'GET');
+        $students = supabaseFetch('students', ['email' => $email]);
+        // Note: Supabase doesn't support OR conditions easily in REST API
+        // You might need to handle this differently
     } else {
-        $students = supabaseFetch('students', "email=eq.$email", 'GET');
+        $students = supabaseFetch('students', ['email' => $email]);
     }
     return $students && count($students) > 0;
 }
 
 // Get student by email
 function getStudentByEmail($email) {
-    $students = supabaseFetch('students', "email=eq.$email", 'GET');
+    $students = supabaseFetch('students', ['email' => $email]);
+    return $students && count($students) > 0 ? $students[0] : null;
+}
+
+// Get student by ID
+function getStudentById($id) {
+    $students = supabaseFetch('students', ['id' => $id]);
     return $students && count($students) > 0 ? $students[0] : null;
 }
 ?>

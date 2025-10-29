@@ -8,7 +8,7 @@ $showOTPModal = false;
 $otpError = '';
 
 // Handle login
-if (isset($_POST['email']) && !isset($_POST['signup'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && !isset($_POST['signup'])) {
     $email = trim($_POST['email']);
     
     if (!filter_var($email, FILTER_VALIDATE_EMAIL) || !str_ends_with($email, '@plpasig.edu.ph')) {
@@ -26,8 +26,8 @@ if (isset($_POST['email']) && !isset($_POST['signup'])) {
             if (sendOTP($email, $otp)) {
                 $_SESSION['verify_email'] = $email;
                 $_SESSION['user_type'] = 'student';
-                $_SESSION['user_id'] = $userId;
-                $_SESSION['user_name'] = $userName;
+                $_SESSION['temp_user_id'] = $userId;
+                $_SESSION['temp_user_name'] = $userName;
                 $_SESSION['debug_otp'] = $otp; // Store OTP in session for debugging
                 
                 // Show the OTP modal
@@ -46,7 +46,7 @@ if (isset($_POST['email']) && !isset($_POST['signup'])) {
 }
     
 // Handle signup
-if (isset($_POST['signup'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
     $student_number = trim($_POST['student_number']);
     $fullname = trim($_POST['fullname']);
     $email = trim($_POST['email']);
@@ -59,38 +59,57 @@ if (isset($_POST['signup'])) {
     if (empty($student_number) || empty($fullname) || empty($email) || empty($semester) || empty($section)) {
         $error = 'All fields are required.';
         $showSignupModal = true;
+    } elseif (!str_ends_with($email, '@plpasig.edu.ph')) {
+        $error = 'Please use your @plpasig.edu.ph email address.';
+        $showSignupModal = true;
     } else {
-        // Insert directly without checking for duplicates (for testing)
-        $studentData = [
-            'student_number' => $student_number,
-            'fullname' => $fullname,
-            'email' => $email,
-            'year_level' => (int)$year_level, // Ensure it's integer
-            'semester' => $semester,
-            'section' => $section,
-            'course' => $course
-        ];
-        
-        $result = supabaseInsert('students', $studentData);
-        
-        if ($result !== false) {
-            $success = 'Registration successful! You can now login with your credentials.';
-        } else {
-            $error = 'Registration failed. Please check if student number or email already exists.';
+        // Check if student already exists
+        $existingStudent = getStudentByEmail($email);
+        if ($existingStudent) {
+            $error = 'A student with this email already exists.';
             $showSignupModal = true;
+        } else {
+            // Insert new student
+            $studentData = [
+                'student_number' => $student_number,
+                'fullname' => $fullname,
+                'email' => $email,
+                'year_level' => $year_level,
+                'semester' => $semester,
+                'section' => $section,
+                'course' => $course
+            ];
+            
+            $result = supabaseInsert('students', $studentData);
+            
+            if ($result !== false) {
+                $success = 'Registration successful! You can now login with your credentials.';
+                $showSignupModal = false;
+            } else {
+                $error = 'Registration failed. Please try again.';
+                $showSignupModal = true;
+            }
         }
     }
 }
+
 // Check if we're processing OTP verification
-if (isset($_POST['otp'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['otp'])) {
     $otp = trim($_POST['otp']);
-    $email = $_SESSION['verify_email'];
+    $email = $_SESSION['verify_email'] ?? '';
     
-    if (verifyOTP($email, $otp)) {
+    if (!empty($email) && verifyOTP($email, $otp)) {
         $_SESSION['logged_in'] = true;
         $_SESSION['user_email'] = $email;
         $_SESSION['user_type'] = 'student';
-        $_SESSION['user_id'] = $_SESSION['user_id']; // Already set during login
+        $_SESSION['user_id'] = $_SESSION['temp_user_id'] ?? null;
+        $_SESSION['user_name'] = $_SESSION['temp_user_name'] ?? '';
+        
+        // Clean up temporary session data
+        unset($_SESSION['verify_email']);
+        unset($_SESSION['temp_user_id']);
+        unset($_SESSION['temp_user_name']);
+        unset($_SESSION['debug_otp']);
         
         // Redirect to student dashboard
         header('Location: student-dashboard.php');
@@ -646,7 +665,7 @@ if (isset($_POST['otp'])) {
 <body>
     <div class="header">
         <h1>PLP SMARTGRADE</h1>
-        <p>An Intelligent System for Academic Performance Rrediction and Risk Assessement<br>across Major Subjects of Second Year BSIT College Students</p>
+        <p>An Intelligent System for Academic Performance Prediction and Risk Assessment<br>across Major Subjects of Second Year BSIT College Students</p>
 
         <div class="main-content-wrapper">
             <div class="main-content">
@@ -694,7 +713,7 @@ if (isset($_POST['otp'])) {
     </div>
 
     <!-- OTP Verification Modal -->
-    <div class="modal-overlay <?php echo isset($showOTPModal) && $showOTPModal ? 'active' : ''; ?>" id="otpModal">
+    <div class="modal-overlay <?php echo $showOTPModal ? 'active' : ''; ?>" id="otpModal">
         <div class="otp-modal">
             <button type="button" class="close-modal" id="closeOtpModal">
                 <i class="fas fa-times"></i>
@@ -705,7 +724,7 @@ if (isset($_POST['otp'])) {
             </div>
             <h1>OTP Verification</h1>
             <p class="otp-subtitle">Enter the 6-digit verification code sent to<br>
-                <span class="email-display"><?php echo isset($_SESSION['verify_email']) ? $_SESSION['verify_email'] : ''; ?></span>
+                <span class="email-display"><?php echo isset($_SESSION['verify_email']) ? htmlspecialchars($_SESSION['verify_email']) : ''; ?></span>
             </p>
             
             <?php if (isset($otpError)): ?>
@@ -837,38 +856,6 @@ if (isset($_POST['otp'])) {
         const otpInputs = document.querySelectorAll('.otp-input');
         const otpHiddenInput = document.getElementById('otp');
         
-        otpInputs.forEach((input, index) => {
-            // Handle paste event
-            input.addEventListener('paste', (e) => {
-                e.preventDefault();
-                const pasteData = e.clipboardData.getData('text');
-                if (/^\d{6}$/.test(pasteData)) {
-                    pasteData.split('').forEach((char, i) => {
-                        if (otpInputs[i]) {
-                            otpInputs[i].value = char;
-                        }
-                    });
-                    updateHiddenInput();
-                    otpInputs[5].focus();
-                }
-            });
-            
-            // Handle input
-            input.addEventListener('input', (e) => {
-                if (e.target.value.length === 1 && index < otpInputs.length - 1) {
-                    otpInputs[index + 1].focus();
-                }
-                updateHiddenInput();
-            });
-            
-            // Handle backspace
-            input.addEventListener('keydown', (e) => {
-                if (e.key === 'Backspace' && e.target.value.length === 0 && index > 0) {
-                    otpInputs[index - 1].focus();
-                }
-            });
-        });
-        
         function updateHiddenInput() {
             let otpValue = '';
             otpInputs.forEach(input => {
@@ -877,10 +864,46 @@ if (isset($_POST['otp'])) {
             otpHiddenInput.value = otpValue;
         }
         
-        // Focus first input when modal opens
-        const otpModal = document.getElementById('otpModal');
-        if (otpModal.classList.contains('active')) {
-            otpInputs[0].focus();
+        if (otpInputs.length > 0) {
+            otpInputs.forEach((input, index) => {
+                // Handle paste event
+                input.addEventListener('paste', (e) => {
+                    e.preventDefault();
+                    const pasteData = e.clipboardData.getData('text');
+                    if (/^\d{6}$/.test(pasteData)) {
+                        pasteData.split('').forEach((char, i) => {
+                            if (otpInputs[i]) {
+                                otpInputs[i].value = char;
+                            }
+                        });
+                        updateHiddenInput();
+                        if (otpInputs[5]) {
+                            otpInputs[5].focus();
+                        }
+                    }
+                });
+                
+                // Handle input
+                input.addEventListener('input', (e) => {
+                    if (e.target.value.length === 1 && index < otpInputs.length - 1) {
+                        otpInputs[index + 1].focus();
+                    }
+                    updateHiddenInput();
+                });
+                
+                // Handle backspace
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Backspace' && e.target.value.length === 0 && index > 0) {
+                        otpInputs[index - 1].focus();
+                    }
+                });
+            });
+            
+            // Focus first input when modal opens
+            const otpModal = document.getElementById('otpModal');
+            if (otpModal.classList.contains('active')) {
+                otpInputs[0].focus();
+            }
         }
         
         // Modal functionality
@@ -891,26 +914,36 @@ if (isset($_POST['otp'])) {
         const showLogin = document.getElementById('showLogin');
         const backToLogin = document.getElementById('backToLogin');
         
-        showSignupModalBtn.addEventListener('click', function() {
-            signupModal.classList.add('active');
-        });
+        if (showSignupModalBtn) {
+            showSignupModalBtn.addEventListener('click', function() {
+                signupModal.classList.add('active');
+            });
+        }
         
-        closeSignupModal.addEventListener('click', function() {
-            signupModal.classList.remove('active');
-        });
+        if (closeSignupModal) {
+            closeSignupModal.addEventListener('click', function() {
+                signupModal.classList.remove('active');
+            });
+        }
         
-        closeOtpModal.addEventListener('click', function() {
-            otpModal.classList.remove('active');
-        });
+        if (closeOtpModal) {
+            closeOtpModal.addEventListener('click', function() {
+                otpModal.classList.remove('active');
+            });
+        }
         
-        showLogin.addEventListener('click', function(e) {
-            e.preventDefault();
-            signupModal.classList.remove('active');
-        });
+        if (showLogin) {
+            showLogin.addEventListener('click', function(e) {
+                e.preventDefault();
+                signupModal.classList.remove('active');
+            });
+        }
         
-        backToLogin.addEventListener('click', function() {
-            otpModal.classList.remove('active');
-        });
+        if (backToLogin) {
+            backToLogin.addEventListener('click', function() {
+                otpModal.classList.remove('active');
+            });
+        }
         
         // Close modal when clicking outside
         document.addEventListener('click', function(e) {
