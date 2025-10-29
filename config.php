@@ -90,14 +90,13 @@ function sendOTP($email, $otp) {
     // Get student data
     $student = getStudentByEmail($email);
     if (!$student) {
-        error_log("Student not found for email: $email");
         return false;
     }
 
     $userType = 'Student';
     $fullname = $student['fullname'];
 
-    // Store OTP in Supabase FIRST
+    // Store OTP in Supabase
     $otpData = [
         'email' => $email,
         'otp_code' => $otp,
@@ -108,14 +107,31 @@ function sendOTP($email, $otp) {
     $result = supabaseInsert('otp_verification', $otpData);
     
     if (!$result) {
-        error_log("Failed to store OTP in Supabase for email: $email");
         return false;
     }
 
-    error_log("OTP stored successfully in Supabase for: $email");
+    // Simple email sending that works on Render
+    $subject = "PLP SmartGrade - OTP Verification Code";
+    
+    $message = "
+PLP SmartGrade - OTP Verification
 
-    // Send OTP email using PHP's native mail() function as fallback
-    return sendOTPEmailSimple($email, $otp, $fullname, $userType);
+Hello $fullname,
+
+Your One-Time Password (OTP) is: $otp
+
+This OTP will expire in 10 minutes.
+
+If you didn't request this OTP, please ignore this email.
+
+--
+Pamantasan ng Lungsod ng Pasig
+    ";
+    
+    $headers = "From: PLP SmartGrade <noreply@plpsmartgrade.com>\r\n";
+    $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
+    
+    return mail($email, $subject, $message, $headers);
 }
 
 function sendOTPEmailSimple($email, $otp, $fullname, $userType) {
