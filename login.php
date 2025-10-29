@@ -29,22 +29,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && !isset($_
                 $_SESSION['user_type'] = 'student';
                 $_SESSION['temp_user_id'] = $userId;
                 $_SESSION['temp_user_name'] = $userName;
-                $_SESSION['debug_otp'] = $otp; // Store OTP in session for debugging
                 
                 // Show the OTP modal
                 $showOTPModal = true;
                 
-                // Show success message with debug OTP
-                $success = "OTP sent to your email! ";
-                if (isset($_SESSION['debug_otp'])) {
-                    $success .= "Debug OTP: <strong>" . $_SESSION['debug_otp'] . "</strong>";
-                }
+                // SUCCESS MESSAGE - No OTP displayed
+                $success = "OTP sent to your email! Please check your inbox.";
+                
             } else {
                 $error = 'Failed to send OTP. Please try again.';
             }
         } else {
             $error = 'Email not found in our system. Please make sure you are registered as a student.';
         }
+    }
+}
+
+// Handle OTP verification
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['otp'])) {
+    $otp = trim($_POST['otp']);
+    $email = $_SESSION['verify_email'] ?? '';
+    
+    if (empty($email)) {
+        $otpError = 'Session expired. Please login again.';
+        $showOTPModal = true;
+    } elseif (verifyOTP($email, $otp)) {
+        $_SESSION['logged_in'] = true;
+        $_SESSION['user_email'] = $email;
+        $_SESSION['user_type'] = 'student';
+        $_SESSION['user_id'] = $_SESSION['temp_user_id'] ?? null;
+        $_SESSION['user_name'] = $_SESSION['temp_user_name'] ?? '';
+        
+        // Clean up temporary session data
+        unset($_SESSION['verify_email']);
+        unset($_SESSION['temp_user_id']);
+        unset($_SESSION['temp_user_name']);
+        
+        // Redirect to student dashboard
+        header('Location: student-dashboard.php');
+        exit;
+    } else {
+        $otpError = 'Invalid OTP code or OTP has expired. Please check your email and try again.';
+        $showOTPModal = true;
+        
+        // NO DEBUG OTP SHOWN - Student must check their email
     }
 }
     
@@ -92,41 +120,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
                 $error = 'Registration failed. Please try again.';
                 $showSignupModal = true;
             }
-        }
-    }
-}
-
-// Handle OTP verification
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['otp'])) {
-    $otp = trim($_POST['otp']);
-    $email = $_SESSION['verify_email'] ?? '';
-    
-    if (empty($email)) {
-        $otpError = 'Session expired. Please login again.';
-        $showOTPModal = true;
-    } elseif (verifyOTP($email, $otp)) {
-        $_SESSION['logged_in'] = true;
-        $_SESSION['user_email'] = $email;
-        $_SESSION['user_type'] = 'student';
-        $_SESSION['user_id'] = $_SESSION['temp_user_id'] ?? null;
-        $_SESSION['user_name'] = $_SESSION['temp_user_name'] ?? '';
-        
-        // Clean up temporary session data
-        unset($_SESSION['verify_email']);
-        unset($_SESSION['temp_user_id']);
-        unset($_SESSION['temp_user_name']);
-        unset($_SESSION['debug_otp']);
-        
-        // Redirect to student dashboard
-        header('Location: student-dashboard.php');
-        exit;
-    } else {
-        $otpError = 'Invalid OTP code or OTP has expired. Please check and try again.';
-        $showOTPModal = true;
-        
-        // Show debug OTP in development
-        if (isset($_SESSION['debug_otp'])) {
-            $otpError .= ' (Debug OTP: ' . $_SESSION['debug_otp'] . ')';
         }
     }
 }
@@ -673,10 +666,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['otp'])) {
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<body>
-    <div class="header">
-        <h1>PLP SMARTGRADE</h1>
-        <p>An Intelligent System for Academic Performance Prediction and Risk Assessment<br>across Major Subjects of Second Year BSIT College Students</p>
 
         <div class="main-content-wrapper">
             <div class="main-content">
@@ -762,13 +751,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['otp'])) {
                 </button>
             </form>
             
+            <p style="text-align: center; margin-top: 1rem; color: var(--text-medium); font-size: 0.9rem;">
+                Didn't receive the OTP? Check your spam folder or <a href="#" onclick="document.getElementById('loginForm').submit(); return false;" style="color: var(--plp-green); text-decoration: none; font-weight: 500;">resend OTP</a>
+            </p>
+            
             <button type="button" class="back-to-login-btn" id="backToLogin">
                 <i class="fas fa-arrow-left"></i>
                 Back to Login
             </button>
         </div>
     </div>
-
+    
     <!-- Sign Up Modal -->
     <div class="modal-overlay <?php echo $showSignupModal ? 'active' : ''; ?>" id="signupModal">
         <div class="signup-modal">

@@ -119,8 +119,9 @@ function sendOTP($email, $otp) {
         $mail->Password   = 'swjx bwoj taxq tjdv';
         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port       = 587;
+        $mail->SMTPDebug  = 0; // Set to 0 to disable debug output
         
-        // Disable SSL verification for better compatibility
+        // Better SSL options
         $mail->SMTPOptions = array(
             'ssl' => array(
                 'verify_peer' => false,
@@ -129,9 +130,9 @@ function sendOTP($email, $otp) {
             )
         );
 
-        // Recipients
+        // Recipients - THIS SENDS TO THE EMAIL THEY LOGGED IN WITH
         $mail->setFrom('marygracevalerio177@gmail.com', 'PLP SmartGrade');
-        $mail->addAddress($email);
+        $mail->addAddress($email); // This sends to the student's @plpasig.edu.ph email
         $mail->addReplyTo('marygracevalerio177@gmail.com', 'PLP SmartGrade');
 
         // Content
@@ -160,17 +161,21 @@ function sendOTP($email, $otp) {
         // Simple text version
         $mail->AltBody = "PLP SmartGrade OTP Verification\n\nHello $fullname,\n\nYour OTP code is: $otp\n\nThis OTP will expire in 10 minutes.\n\nIf you didn't request this OTP, please ignore this email.";
 
-        $mail->send();
-        error_log("OTP email sent successfully to: $email");
-        return true;
+        // Actually send the email
+        if ($mail->send()) {
+            error_log("OTP email sent successfully to: $email");
+            return true;
+        } else {
+            error_log("Email sending failed for: $email");
+            return false;
+        }
         
     } catch (Exception $e) {
         error_log("Mailer Error: " . $e->getMessage());
         error_log("Mailer Error Info: " . $mail->ErrorInfo);
         
-        // Fallback: Store OTP anyway and show it on screen for testing
-        $_SESSION['debug_otp'] = $otp;
-        return true; // Return true even if email fails for testing
+        // DON'T fall back to showing OTP on screen - return false
+        return false;
     }
 }
 
