@@ -666,7 +666,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
+<body>
+    <div class="header">
+        <h1>PLP SMARTGRADE</h1>
+        <p>An Intelligent System for Academic Performance Prediction and Risk Assessment<br>across Major Subjects of Second Year BSIT College Students</p>
 
+        
         <div class="main-content-wrapper">
             <div class="main-content">
                 <div class="logo-container">
@@ -762,6 +767,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
         </div>
     </div>
     
+    <!-- OTP Verification Modal -->
+    <div class="modal-overlay <?php echo $showOTPModal ? 'active' : ''; ?>" id="otpModal">
+        <div class="otp-modal">
+            <button type="button" class="close-modal" id="closeOtpModal">
+                <i class="fas fa-times"></i>
+            </button>
+            
+            <div class="modal-logo">
+                <i class="fas fa-shield-alt"></i>
+            </div>
+            <h1>OTP Verification</h1>
+            <p class="otp-subtitle">Enter the 6-digit verification code sent to<br>
+                <span class="email-display"><?php echo isset($_SESSION['verify_email']) ? htmlspecialchars($_SESSION['verify_email']) : ''; ?></span>
+            </p>
+            
+            <?php if (isset($otpError)): ?>
+                <div class="modal-alert-error">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <span><?php echo $otpError; ?></span>
+                </div>
+            <?php endif; ?>
+            
+            <form method="POST" id="otpForm">
+                <div class="otp-inputs">
+                    <input type="text" class="otp-input" maxlength="1" pattern="\d" inputmode="numeric" autofocus>
+                    <input type="text" class="otp-input" maxlength="1" pattern="\d" inputmode="numeric">
+                    <input type="text" class="otp-input" maxlength="1" pattern="\d" inputmode="numeric">
+                    <input type="text" class="otp-input" maxlength="1" pattern="\d" inputmode="numeric">
+                    <input type="text" class="otp-input" maxlength="1" pattern="\d" inputmode="numeric">
+                    <input type="text" class="otp-input" maxlength="1" pattern="\d" inputmode="numeric">
+                </div>
+                <input type="hidden" id="otp" name="otp">
+                
+                <button type="submit" class="verify-btn">
+                    <i class="fas fa-check-circle"></i>
+                    Verify & Continue
+                </button>
+            </form>
+            
+            <button type="button" class="back-to-login-btn" id="backToLogin">
+                <i class="fas fa-arrow-left"></i>
+                Back to Login
+            </button>
+        </div>
+    </div>
+
     <!-- Sign Up Modal -->
     <div class="modal-overlay <?php echo $showSignupModal ? 'active' : ''; ?>" id="signupModal">
         <div class="signup-modal">
