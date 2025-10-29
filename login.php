@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && !isset($_
                 $showOTPModal = true;
                 
                 // Also show OTP on screen for testing
-                $success = "OTP generated: <strong>$otp</strong> - Check your email or use this code to verify.";
+                $success = "OTP sent to your email! Check your inbox for the verification code.";
                 error_log("DEBUG OTP for $email: $otp");
             } else {
                 $error = 'Failed to send OTP. Please try again.';
@@ -93,12 +93,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
     }
 }
 
-// Check if we're processing OTP verification
+// Handle OTP verification
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['otp'])) {
     $otp = trim($_POST['otp']);
     $email = $_SESSION['verify_email'] ?? '';
     
-    if (!empty($email) && verifyOTP($email, $otp)) {
+    if (empty($email)) {
+        $otpError = 'Session expired. Please login again.';
+        $showOTPModal = true;
+    } elseif (verifyOTP($email, $otp)) {
         $_SESSION['logged_in'] = true;
         $_SESSION['user_email'] = $email;
         $_SESSION['user_type'] = 'student';
@@ -117,6 +120,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['otp'])) {
     } else {
         $otpError = 'Invalid OTP code or OTP has expired. Please check and try again.';
         $showOTPModal = true;
+        
+        // Show debug OTP in development
+        if (isset($_SESSION['debug_otp'])) {
+            $otpError .= ' (Debug: ' . $_SESSION['debug_otp'] . ')';
+        }
     }
 }
 ?>
@@ -297,11 +305,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['otp'])) {
         }
         
         .login-form input {
-            padding: 0.9rem 1rem 0.5rem 45px;
+            padding: 0.9rem 1rem 0.9rem 45px;
             border: 1px solid rgba(0, 99, 65, 0.2);
             border-radius: var(--border-radius);
             font-size: 1rem;
-            width: 105%;
+            width: 100%;
             transition: var(--transition);
             background-color: white;
             color: var(--text-dark);
@@ -346,9 +354,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['otp'])) {
             background: transparent;
             color: var(--plp-green);
             border: 2px solid var(--plp-green);
-            padding: 0.50rem;
+            padding: 0.85rem;
             border-radius: var(--border-radius);
-            font-size: 0.85rem;
+            font-size: 1rem;
             font-weight: 600;
             cursor: pointer;
             transition: var(--transition);

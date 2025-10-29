@@ -3,29 +3,6 @@
 $supabase_url = getenv('SUPABASE_URL') ?: 'https://xwvrgpxcceivakzrwwji.supabase.co';
 $supabase_key = getenv('SUPABASE_KEY') ?: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh3dnJncHhjY2VpdmFrenJ3d2ppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE3MjQ0NzQsImV4cCI6MjA3NzMwMDQ3NH0.ovd8v3lqsYtJU78D4iM6CyAyvi6jK4FUbYUjydFi4FM';
 
-// Choose connection method: 'rest' or 'pgsql'
-$connection_method = getenv('DB_METHOD') ?: 'rest';
-
-// Initialize database connection based on method
-if ($connection_method === 'pgsql') {
-    // PostgreSQL direct connection
-    $db_host = getenv('DB_HOST') ?: 'db.xwvrgpxcceivakzrwwji.supabase.co';
-    $db_port = getenv('DB_PORT') ?: '5432';
-    $db_name = getenv('DB_NAME') ?: 'postgres';
-    $db_user = getenv('DB_USER') ?: 'postgres';
-    $db_pass = getenv('DB_PASS') ?: 'your-password';
-    
-    try {
-        $pdo = new PDO("pgsql:host=$db_host;port=$db_port;dbname=$db_name", $db_user, $db_pass);
-        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    } catch(PDOException $e) {
-        $pdo = null;
-    }
-} else {
-    // REST API connection (no PDO needed)
-    $pdo = null;
-}
-
 // Start session only if not already started
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -90,7 +67,8 @@ function supabaseFetch($table, $filters = [], $method = 'GET', $data = null) {
         return false;
     }
     
-    return json_decode($response, true);
+    $result = json_decode($response, true);
+    return $result;
 }
 
 // Helper function to insert data
@@ -104,17 +82,15 @@ function supabaseUpdate($table, $data, $filters) {
 }
 
 function sendOTP($email, $otp) {
-    $userType = '';
-    $fullname = '';
-    
-    // Check if student exists using Supabase
-    $student = supabaseFetch('students', ['email' => $email]);
-    if ($student && count($student) > 0) {
-        $userType = 'Student';
-        $fullname = $student[0]['fullname'];
-    } else {
+    // Get student data
+    $student = getStudentByEmail($email);
+    if (!$student) {
+        error_log("Student not found for email: $email");
         return false;
     }
+
+    $userType = 'Student';
+    $fullname = $student['fullname'];
 
     // Store OTP in Supabase
     $otpData = [
@@ -127,6 +103,7 @@ function sendOTP($email, $otp) {
     $result = supabaseInsert('otp_verification', $otpData);
     
     if (!$result) {
+        error_log("Failed to store OTP in database for email: $email");
         return false;
     }
 
@@ -138,9 +115,11 @@ function sendOTP($email, $otp) {
         $mail->Host       = 'smtp.gmail.com';
         $mail->SMTPAuth   = true;
         $mail->Username   = 'marygracevalerio177@gmail.com';
-        $mail->Password   = getenv('SMTP_PASSWORD') ?: 'swjx bwoj taxq tjdv';
+        $mail->Password   = 'swjx bwoj taxq tjdv'; // Your Gmail App Password
         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port       = 587;
+        $mail->SMTPDebug  = 2; // Enable verbose debug output
+        $mail->Debugoutput = 'error_log'; // Send debug output to error log
 
         $mail->setFrom('marygracevalerio177@gmail.com', 'PLP SmartGrade');
         $mail->addAddress($email);
@@ -166,6 +145,7 @@ function sendOTP($email, $otp) {
         ";
 
         $mail->send();
+        error_log("OTP email sent successfully to: $email");
         return true;
     } catch (Exception $e) {
         error_log("Mailer Error: " . $mail->ErrorInfo);
@@ -184,36 +164,41 @@ function verifyOTP($email, $otp) {
     // Find valid OTP using Supabase
     $otpRecords = supabaseFetch('otp_verification', [
         'email' => $email, 
-        'otp_code' => $otp, 
-        'is_used' => 'false'
+        'otp_code' => $otp
     ]);
     
     if ($otpRecords && count($otpRecords) > 0) {
         $otpRecord = $otpRecords[0];
         
+        // Check if OTP is already used
+        if ($otpRecord['is_used']) {
+            error_log("OTP already used for email: $email");
+            return false;
+        }
+        
         // Check if OTP is expired
-        if (strtotime($otpRecord['expires_at']) < strtotime($currentTime)) {
+        if (strtotime($otpRecord['expires_at']) < time()) {
+            error_log("OTP expired for email: $email");
             return false;
         }
         
         // Mark OTP as used
         $otpId = $otpRecord['id'];
         $result = supabaseUpdate('otp_verification', ['is_used' => true], ['id' => $otpId]);
-        return $result !== false;
+        
+        if ($result !== false) {
+            error_log("OTP verified successfully for email: $email");
+            return true;
+        }
     }
     
+    error_log("OTP verification failed for email: $email");
     return false;
 }
 
 // Check if student exists
-function studentExists($email, $student_number = null) {
-    if ($student_number) {
-        $students = supabaseFetch('students', ['email' => $email]);
-        // Note: Supabase doesn't support OR conditions easily in REST API
-        // You might need to handle this differently
-    } else {
-        $students = supabaseFetch('students', ['email' => $email]);
-    }
+function studentExists($email) {
+    $students = supabaseFetch('students', ['email' => $email]);
     return $students && count($students) > 0;
 }
 
