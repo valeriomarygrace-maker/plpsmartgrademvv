@@ -2,7 +2,7 @@
 require_once 'config.php';
 
 if (!isset($_SESSION['verify_email'])) {
-    header('Location: index.php');
+    header('Location: login.php');
     exit;
 }
 
@@ -40,7 +40,6 @@ if ($_POST) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Verify OTP - PLP SmartGrade</title>
     <style>
-        /* Keep all your existing CSS styles from verify-otp.php */
         :root {
             --plp-green: #006341;
             --plp-green-light: #008856;

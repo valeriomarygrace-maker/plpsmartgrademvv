@@ -147,8 +147,6 @@ function sendOTP($email, $otp) {
     error_log("📧 [TEMPORARY] Skipping email sending for testing");
     return true;
 
-    /* COMMENT OUT THE EMAIL PART FOR NOW
-    // Send email
     $mail = new PHPMailer(true);
     
     try {
@@ -184,13 +182,13 @@ function sendOTP($email, $otp) {
         ";
 
         $mail->send();
-        error_log(' Email sent successfully to: ' . $email);
+        error_log('✅ Email sent successfully to: ' . $email);
         return true;
     } catch (Exception $e) {
-        error_log(' PHPMailer Error: ' . $mail->ErrorInfo);
+        error_log('❌ PHPMailer Error: ' . $mail->ErrorInfo);
         return false;
     }
-    */
+
 }
 
 function generateOTP() {
