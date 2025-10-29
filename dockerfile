@@ -14,6 +14,9 @@ COPY . /var/www/html/
 RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 755 /var/www/html
 
+# 🔹 Add host entry so 'host.docker.internal' works on Linux Docker engine
+RUN echo "host.docker.internal host-gateway" >> /etc/hosts
+
 # Expose port 80 for web traffic
 EXPOSE 80
 
