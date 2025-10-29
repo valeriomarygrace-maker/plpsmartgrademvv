@@ -33,15 +33,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && !isset($_
                 // Show the OTP modal
                 $showOTPModal = true;
                 
-                // SUCCESS MESSAGE - Show OTP directly since email doesn't work on Render
-                $success = "OTP sent! Use this code: " . $otp . " - (Email not available on free hosting)";
+                // SUCCESS MESSAGE
+                $success = "OTP sent to your email! Please check your inbox and spam folder.";
                 
             } else {
                 $error = 'Failed to send OTP. Please try again.';
             }
-                }
-            }
+        } else {
+            $error = 'Email not found in our system. Please sign up first.';
         }
+    }
+}
 
 // Handle OTP verification
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['otp'])) {
@@ -128,6 +130,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PAMANTASAN NG LUNGSOD NG PASIG - SMART GRADE AI</title>
     <style>
+        /* Your existing CSS styles remain exactly the same */
         :root {
             --plp-green: #006341;
             --plp-green-light: #008856;
