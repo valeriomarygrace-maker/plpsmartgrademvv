@@ -1,5 +1,5 @@
 <?php
-$host = getenv('DB_HOST') ?: 'localhost';
+$host = getenv('DB_HOST') ?: 'host.docker.internal';
 $dbname = getenv('DB_NAME') ?: 'smartgrade';
 $username = getenv('DB_USER') ?: 'root';
 $password = getenv('DB_PASS') ?: '';
