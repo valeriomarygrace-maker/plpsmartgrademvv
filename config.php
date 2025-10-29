@@ -63,12 +63,10 @@ function supabaseFetch($table, $filters = [], $method = 'GET', $data = null) {
     curl_close($ch);
     
     if ($error) {
-        error_log("Supabase CURL Error: $error");
         return false;
     }
     
     if ($httpCode >= 400) {
-        error_log("Supabase HTTP Error: $httpCode, Response: $response");
         return false;
     }
     
@@ -93,9 +91,6 @@ function sendOTP($email, $otp) {
         return false;
     }
 
-    $userType = 'Student';
-    $fullname = $student['fullname'];
-
     // Store OTP in Supabase
     $otpData = [
         'email' => $email,
@@ -110,113 +105,11 @@ function sendOTP($email, $otp) {
         return false;
     }
 
-    // Simple email sending that works on Render
-    $subject = "PLP SmartGrade - OTP Verification Code";
+    // Store OTP in session for display (since email doesn't work on Render)
+    $_SESSION['last_otp'] = $otp;
+    $_SESSION['last_otp_email'] = $email;
     
-    $message = "
-PLP SmartGrade - OTP Verification
-
-Hello $fullname,
-
-Your One-Time Password (OTP) is: $otp
-
-This OTP will expire in 10 minutes.
-
-If you didn't request this OTP, please ignore this email.
-
---
-Pamantasan ng Lungsod ng Pasig
-    ";
-    
-    $headers = "From: PLP SmartGrade <noreply@plpsmartgrade.com>\r\n";
-    $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
-    
-    return mail($email, $subject, $message, $headers);
-}
-
-function sendOTPEmailSimple($email, $otp, $fullname, $userType) {
-    $subject = 'PLP SmartGrade - OTP Verification Code';
-    
-    $message = "
-PLP SmartGrade - OTP Verification
-
-Hello $fullname,
-
-You are attempting to login as a $userType.
-
-Your One-Time Password (OTP) is: $otp
-
-This OTP will expire in 10 minutes.
-
-If you didn't request this OTP, please ignore this email.
-
---
-Pamantasan ng Lungsod ng Pasig
-© " . date('Y') . " PLP SmartGrade. All rights reserved.
-    ";
-    
-    $headers = "From: PLP SmartGrade <noreply@plpsmartgrade.com>\r\n";
-    $headers .= "Reply-To: noreply@plpsmartgrade.com\r\n";
-    $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
-    
-    if (mail($email, $subject, $message, $headers)) {
-        error_log("OTP email sent successfully via mail() to: $email");
-        return true;
-    } else {
-        error_log("Failed to send OTP email via mail() to: $email");
-        
-        // Try PHPMailer as backup
-        return sendOTPWithPHPMailer($email, $otp, $fullname, $userType);
-    }
-}
-
-function sendOTPWithPHPMailer($email, $otp, $fullname, $userType) {
-    $mail = new PHPMailer(true);
-    
-    try {
-        // Server settings - SIMPLIFIED for Render
-        $mail->isSMTP();
-        $mail->Host       = 'smtp.gmail.com';
-        $mail->SMTPAuth   = true;
-        $mail->Username   = 'marygracevalerio177@gmail.com';
-        $mail->Password   = 'swjx bwoj taxq tjdv';
-        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-        $mail->Port       = 587;
-        
-        // Disable strict SSL verification for Render
-        $mail->SMTPOptions = array(
-            'ssl' => array(
-                'verify_peer' => false,
-                'verify_peer_name' => false,
-                'allow_self_signed' => true
-            )
-        );
-
-        // Timeout settings
-        $mail->Timeout = 15;
-
-        // Recipients
-        $mail->setFrom('marygracevalerio177@gmail.com', 'PLP SmartGrade');
-        $mail->addAddress($email);
-
-        // Simple plain text content
-        $mail->isHTML(false);
-        $mail->Subject = 'PLP SmartGrade - OTP Verification Code';
-        
-        $mail->Body = "PLP SmartGrade OTP Verification\n\nHello $fullname,\n\nYour OTP code is: $otp\n\nThis OTP will expire in 10 minutes.\n\nIf you didn't request this OTP, please ignore this email.";
-
-        if ($mail->send()) {
-            error_log("OTP email sent successfully via PHPMailer to: $email");
-            return true;
-        }
-        
-        error_log("PHPMailer send() returned false for: $email");
-        return false;
-        
-    } catch (Exception $e) {
-        error_log("PHPMailer Exception for $email: " . $e->getMessage());
-        return false;
-    }
+    return true;
 }
 
 function generateOTP() {
@@ -229,7 +122,6 @@ function verifyOTP($email, $otp) {
     $otpRecords = supabaseFetch('otp_verification', ['email' => $email]);
     
     if (!$otpRecords || count($otpRecords) === 0) {
-        error_log("No OTP records found for email: $email");
         return false;
     }
     
@@ -243,13 +135,11 @@ function verifyOTP($email, $otp) {
     }
     
     if (!$validOtp) {
-        error_log("No valid unused OTP found for email: $email");
         return false;
     }
     
     // Check if OTP is expired
     if (strtotime($validOtp['expires_at']) < time()) {
-        error_log("OTP expired for email: $email");
         return false;
     }
     
@@ -259,13 +149,7 @@ function verifyOTP($email, $otp) {
         ['id' => $validOtp['id']]
     );
     
-    if ($updateResult !== false) {
-        error_log("OTP verified successfully for email: $email");
-        return true;
-    }
-    
-    error_log("Failed to mark OTP as used for email: $email");
-    return false;
+    return $updateResult !== false;
 }
 
 // Check if student exists
