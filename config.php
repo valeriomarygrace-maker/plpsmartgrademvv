@@ -107,9 +107,8 @@ function supabaseUpdate($table, $data, $condition) {
     return supabaseFetch($table, $condition, 'PATCH', $data);
 }
 
-// Email function for Supabase
 function sendOTP($email, $otp) {
-    global $pdo;
+    error_log("Attempting to send OTP to: $email");
     
     $userType = '';
     $fullname = '';
@@ -119,6 +118,10 @@ function sendOTP($email, $otp) {
     if ($student && count($student) > 0) {
         $userType = 'Student';
         $fullname = $student[0]['fullname'];
+        error_log("Student found: $fullname");
+    } else {
+        error_log("Student not found for email: $email");
+        return false;
     }
 
     // Store OTP in Supabase
@@ -129,13 +132,18 @@ function sendOTP($email, $otp) {
         'is_used' => false
     ];
     
+    error_log("Storing OTP data: " . json_encode($otpData));
+    
     $result = supabaseInsert('otp_verification', $otpData);
     
     if (!$result) {
-        error_log("Failed to store OTP in Supabase");
+        error_log("❌ FAILED to store OTP in Supabase");
         return false;
     }
+    
+    error_log("✅ OTP stored successfully in database");
 
+    // Send email
     $mail = new PHPMailer(true);
     
     try {
@@ -146,6 +154,10 @@ function sendOTP($email, $otp) {
         $mail->Password   = getenv('SMTP_PASSWORD') ?: 'swjx bwoj taxq tjdv';
         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port       = 587;
+        $mail->SMTPDebug  = 2; // Enable verbose debug output
+        $mail->Debugoutput = function($str, $level) {
+            error_log("PHPMailer Debug: $str");
+        };
 
         $mail->setFrom('marygracevalerio177@gmail.com', 'PLP SmartGrade');
         $mail->addAddress($email);
@@ -171,9 +183,10 @@ function sendOTP($email, $otp) {
         ";
 
         $mail->send();
+        error_log("✅ Email sent successfully to: $email");
         return true;
     } catch (Exception $e) {
-        error_log("PHPMailer Error: " . $mail->ErrorInfo);
+        error_log("❌ PHPMailer Error: " . $mail->ErrorInfo);
         return false;
     }
 }
