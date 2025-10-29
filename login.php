@@ -7,6 +7,9 @@ $showSignupModal = false;
 $showOTPModal = false;
 $otpError = '';
 
+// TEST MODE - Set to false in production
+$TEST_MODE = true;
+
 // Handle login
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && !isset($_POST['signup'])) {
     $email = trim($_POST['email']);
@@ -24,20 +27,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && !isset($_
             
             $otp = generateOTP();
             
-            if (sendOTP($email, $otp)) {
-                $_SESSION['verify_email'] = $email;
-                $_SESSION['user_type'] = 'student';
-                $_SESSION['temp_user_id'] = $userId;
-                $_SESSION['temp_user_name'] = $userName;
+            if ($TEST_MODE) {
+                // TEST MODE: Always succeed and store OTP
+                $otpData = [
+                    'email' => $email,
+                    'otp_code' => $otp,
+                    'expires_at' => date('Y-m-d H:i:s', strtotime('+10 minutes')),
+                    'is_used' => false
+                ];
                 
-                // Show the OTP modal
-                $showOTPModal = true;
+                $result = supabaseInsert('otp_verification', $otpData);
                 
-                // SUCCESS MESSAGE - No OTP displayed
-                $success = "OTP sent to your email! Please check your inbox.";
-                
+                if ($result) {
+                    $_SESSION['verify_email'] = $email;
+                    $_SESSION['user_type'] = 'student';
+                    $_SESSION['temp_user_id'] = $userId;
+                    $_SESSION['temp_user_name'] = $userName;
+                    $_SESSION['debug_otp'] = $otp; // Store for display
+                    
+                    $showOTPModal = true;
+                    $success = "OTP generated for testing: <strong>$otp</strong> - In production, this would be sent to your email.";
+                } else {
+                    $error = 'Failed to generate OTP. Please try again.';
+                }
             } else {
-                $error = 'Failed to send OTP. Please try again.';
+                // PRODUCTION MODE: Actually send email
+                if (sendOTP($email, $otp)) {
+                    $_SESSION['verify_email'] = $email;
+                    $_SESSION['user_type'] = 'student';
+                    $_SESSION['temp_user_id'] = $userId;
+                    $_SESSION['temp_user_name'] = $userName;
+                    
+                    $showOTPModal = true;
+                    $success = "OTP sent to your email! Please check your inbox (and spam folder).";
+                } else {
+                    $error = 'Failed to send OTP. Please try again.';
+                }
             }
         } else {
             $error = 'Email not found in our system. Please make sure you are registered as a student.';
@@ -64,15 +89,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['otp'])) {
         unset($_SESSION['verify_email']);
         unset($_SESSION['temp_user_id']);
         unset($_SESSION['temp_user_name']);
+        unset($_SESSION['debug_otp']);
         
         // Redirect to student dashboard
         header('Location: student-dashboard.php');
         exit;
     } else {
-        $otpError = 'Invalid OTP code or OTP has expired. Please check your email and try again.';
+        $otpError = 'Invalid OTP code or OTP has expired. Please check and try again.';
         $showOTPModal = true;
         
-        // NO DEBUG OTP SHOWN - Student must check their email
+        // Show debug OTP in test mode
+        if ($TEST_MODE && isset($_SESSION['debug_otp'])) {
+            $otpError .= ' (Test OTP: ' . $_SESSION['debug_otp'] . ')';
+        }
     }
 }
     
@@ -766,7 +795,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             </button>
         </div>
     </div>
-    
+
     <!-- OTP Verification Modal -->
     <div class="modal-overlay <?php echo $showOTPModal ? 'active' : ''; ?>" id="otpModal">
         <div class="otp-modal">
