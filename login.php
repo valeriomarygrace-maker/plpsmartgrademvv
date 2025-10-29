@@ -11,8 +11,9 @@ $otpError = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && !isset($_POST['signup'])) {
     $email = trim($_POST['email']);
     
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL) || !str_ends_with($email, '@plpasig.edu.ph')) {
-        $error = 'Please use your @plpasig.edu.ph email address.';
+    // Validate PLP email
+    if (!isValidPLPEmail($email)) {
+        $error = 'Please use your valid @plpasig.edu.ph email address.';
     } else {
         // Check if email exists in students table using Supabase
         $student = getStudentByEmail($email);
@@ -33,9 +34,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && !isset($_
                 // Show the OTP modal
                 $showOTPModal = true;
                 
-                // Also show OTP on screen for testing
-                $success = "OTP sent to your email! Check your inbox for the verification code.";
-                error_log("DEBUG OTP for $email: $otp");
+                // Show success message with debug OTP
+                $success = "OTP sent to your email! ";
+                if (isset($_SESSION['debug_otp'])) {
+                    $success .= "Debug OTP: <strong>" . $_SESSION['debug_otp'] . "</strong>";
+                }
             } else {
                 $error = 'Failed to send OTP. Please try again.';
             }
@@ -59,8 +62,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
     if (empty($student_number) || empty($fullname) || empty($email) || empty($semester) || empty($section)) {
         $error = 'All fields are required.';
         $showSignupModal = true;
-    } elseif (!str_ends_with($email, '@plpasig.edu.ph')) {
-        $error = 'Please use your @plpasig.edu.ph email address.';
+    } elseif (!isValidPLPEmail($email)) {
+        $error = 'Please use your valid @plpasig.edu.ph email address.';
         $showSignupModal = true;
     } else {
         // Check if student already exists
@@ -123,7 +126,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['otp'])) {
         
         // Show debug OTP in development
         if (isset($_SESSION['debug_otp'])) {
-            $otpError .= ' (Debug: ' . $_SESSION['debug_otp'] . ')';
+            $otpError .= ' (Debug OTP: ' . $_SESSION['debug_otp'] . ')';
         }
     }
 }
