@@ -1,126 +1,468 @@
 <?php
 require_once 'config.php';
+require_once 'ml-helpers.php';
 
-$error = '';
-$success = '';
-$showSignupModal = false;
-$showOTPModal = false;
-$otpError = '';
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-// Handle login
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && !isset($_POST['signup'])) {
-            $email = trim($_POST['email']);
-            
-            // Validate PLP email
-            if (!isValidPLPEmail($email)) {
-                $error = 'Please use your valid @plpasig.edu.ph email address.';
-            } else {
-                // Check if email exists in students table using Supabase
-                $student = getStudentByEmail($email);
+if (!isset($_SESSION['logged_in']) || $_SESSION['user_type'] !== 'student') {
+    header('Location: login.php');
+    exit;
+}
+
+$success_message = '';
+$error_message = '';
+
+try {
+    $stmt = $pdo->prepare("SELECT * FROM students WHERE email = ?");
+    $stmt->execute([$_SESSION['user_email']]);
+    $student = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$student) {
+        $error_message = 'Student record not found.';
+    }
+} catch (PDOException $e) {
+    $error_message = 'Database error: ' . $e->getMessage();
+}
+
+$subject_id = isset($_GET['subject_id']) ? intval($_GET['subject_id']) : 0;
+
+if ($subject_id <= 0) {
+    header('Location: student-subjects.php');
+    exit;
+}
+
+try {
+    $subject_stmt = $pdo->prepare("
+        SELECT ss.*, s.subject_code, s.subject_name, s.credits, s.semester 
+        FROM student_subjects ss 
+        JOIN subjects s ON ss.subject_id = s.id 
+        WHERE ss.id = ? AND ss.student_id = ?
+    ");
+    $subject_stmt->execute([$subject_id, $student['id']]);
+    $subject = $subject_stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$subject) {
+        header('Location: student-subjects.php');
+        exit;
+    }
+} catch (PDOException $e) {
+    $error_message = 'Database error: ' . $e->getMessage();
+}
+
+$categories = [];
+$classStandings = [];
+$midtermExam = [];
+$finalExam = [];
+$allScores = [];
+
+// Get class standing categories for this subject
+try {
+    $categories_stmt = $pdo->prepare("SELECT * FROM student_class_standing_categories WHERE student_subject_id = ? ORDER BY created_at");
+    $categories_stmt->execute([$subject_id]);
+    $categories = $categories_stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $categories = [];
+}
+
+// Calculate total allocated percentage and remaining
+$totalClassStandingPercentage = 0;
+foreach ($categories as $category) {
+    $totalClassStandingPercentage += $category['category_percentage'];
+}
+$remainingAllocation = 60 - $totalClassStandingPercentage;
+$canAddCategory = ($remainingAllocation > 0);
+
+// Get student's scores for this subject
+try {
+    $scores_stmt = $pdo->prepare("
+        SELECT s.*, c.category_name 
+        FROM student_subject_scores s 
+        LEFT JOIN student_class_standing_categories c ON s.category_id = c.id 
+        WHERE s.student_subject_id = ? 
+        ORDER BY s.score_type, s.score_date, s.created_at
+    ");
+    $scores_stmt->execute([$subject_id]);
+    $allScores = $scores_stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    try {
+        $scores_stmt = $pdo->prepare("
+            SELECT * FROM student_subject_scores 
+            WHERE student_subject_id = ? 
+            ORDER BY score_type, score_date, created_at
+        ");
+        $scores_stmt->execute([$subject_id]);
+        $allScores = $scores_stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        foreach ($allScores as &$score) {
+            $score['category_name'] = '';
+        }
+    } catch (PDOException $e2) {
+        $allScores = [];
+    }
+}
+
+// FIXED: Properly filter scores by score_type - ensure exam scores don't appear in class standings
+$classStandings = array_filter($allScores, function($score) {
+    return $score['score_type'] === 'class_standing';
+});
+
+$midtermExam = array_filter($allScores, function($score) {
+    return $score['score_type'] === 'midterm_exam';
+});
+
+$finalExam = array_filter($allScores, function($score) {
+    return $score['score_type'] === 'final_exam';
+});
+
+// Log behavioral data when scores are added/updated
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_POST['add_standing']) || isset($_POST['update_score']) || isset($_POST['add_exam']) || isset($_POST['add_attendance'])) {
+        // Log the activity
+        InterventionSystem::logBehavior(
+            $student['id'], 
+            'grade_update', 
+            [
+                'subject_id' => $subject_id,
+                'subject_name' => $subject['subject_name'],
+                'action' => isset($_POST['add_standing']) ? 'add_score' : 'update_score'
+            ],
+            $pdo
+        );
+    }
+}
+
+$hasScores = !empty($classStandings) || !empty($midtermExam) || !empty($finalExam);
+
+// Initialize variables
+$totalClassStanding = 0;
+$midtermScore = 0;
+$finalScore = 0;
+$overallGrade = 0;
+$gpa = 0;
+$riskLevel = 'no-data';
+$riskDescription = 'No Data Inputted';
+$interventionNeeded = false;
+
+// If no scores are inputted, set everything to 0 and show "No Data"
+if (!$hasScores) {
+    $overallGrade = 0;
+    $gpa = 0;
+    $totalClassStanding = 0;
+    $midtermScore = 0;
+    $finalScore = 0;
+} else {
+    // Calculate category totals and overall class standing (MAX 60%)
+    $categoryTotals = [];
+    foreach ($categories as $category) {
+        $categoryTotals[$category['id']] = [
+            'name' => $category['category_name'],
+            'percentage' => $category['category_percentage'],
+            'scores' => [],
+            'total_score' => 0,
+            'max_possible' => 0,
+            'percentage_score' => 0,
+            'weighted_score' => 0
+        ];
+    }
+
+    // Process class standings - MULTIPLE SCORES THROUGHOUT SEMESTER
+    if (is_array($classStandings)) {
+        foreach ($classStandings as $standing) {
+            if ($standing['category_id'] && isset($categoryTotals[$standing['category_id']])) {
+                $categoryId = $standing['category_id'];
+                $categoryTotals[$categoryId]['scores'][] = $standing;
                 
-                if (true) { // Bypass email for testing
-            // Still store OTP in database
-            $otpData = [
-                'email' => $email,
-                'otp_code' => $otp,
-                'expires_at' => date('Y-m-d H:i:s', strtotime('+10 minutes')),
-                'is_used' => false
-            ];
-            $result = supabaseInsert('otp_verification', $otpData);
-
-            
-        if ($result) {
-            $_SESSION['verify_email'] = $email;
-            $_SESSION['user_type'] = 'student';
-            $_SESSION['user_id'] = $userId;
-            $_SESSION['user_name'] = $userName;
-            $_SESSION['debug_otp'] = $otp; // Store OTP in session for debugging
-            
-            // Show the OTP modal
-            $showOTPModal = true;
-            
-            // Also show OTP on screen for testing
-            $success = "OTP generated: $otp (Check console for debugging)";
-            error_log("DEBUG OTP for $email: $otp");
-        } else {
-            $error = 'Failed to generate OTP. Please try again.';
+                // For attendance, treat "Present" as 1 point and "Absent" as 0
+                if (strtolower($categoryTotals[$categoryId]['name']) === 'attendance') {
+                    $scoreValue = ($standing['score_name'] === 'Present') ? 1 : 0;
+                    $categoryTotals[$categoryId]['total_score'] += $scoreValue;
+                    $categoryTotals[$categoryId]['max_possible'] += 1;
+                } else {
+                    $categoryTotals[$categoryId]['total_score'] += $standing['score_value'];
+                    $categoryTotals[$categoryId]['max_possible'] += $standing['max_score'];
+                }
+            }
         }
     }
-}
 
+    // Calculate weighted scores for each category (MAX 60% TOTAL)
+    foreach ($categoryTotals as $categoryId => $category) {
+        if ($category['max_possible'] > 0) {
+            // Calculate percentage score for this category based on ALL accumulated scores
+            $percentageScore = ($category['total_score'] / $category['max_possible']) * 100;
+            $categoryTotals[$categoryId]['percentage_score'] = $percentageScore;
+            
+            // Calculate weighted contribution based on accumulated performance
+            $categoryTotals[$categoryId]['weighted_score'] = ($percentageScore * $category['percentage']) / 100;
+            $totalClassStanding += $categoryTotals[$categoryId]['weighted_score'];
+        }
+    }
 
-// Handle OTP verification
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['otp'])) {
-    $otp = trim($_POST['otp']);
-    $email = $_SESSION['verify_email'] ?? '';
-    
-    if (empty($email)) {
-        $otpError = 'Session expired. Please login again.';
-        $showOTPModal = true;
-    } elseif (verifyOTP($email, $otp)) {
-        $_SESSION['logged_in'] = true;
-        $_SESSION['user_email'] = $email;
-        $_SESSION['user_type'] = 'student';
-        $_SESSION['user_id'] = $_SESSION['temp_user_id'] ?? null;
-        $_SESSION['user_name'] = $_SESSION['temp_user_name'] ?? '';
-        
-        // Clean up temporary session data
-        unset($_SESSION['verify_email']);
-        unset($_SESSION['temp_user_id']);
-        unset($_SESSION['temp_user_name']);
-        
-        // Redirect to student dashboard
-        header('Location: student-dashboard.php');
-        exit;
+    // Ensure Class Standing doesn't exceed 60%
+    if ($totalClassStanding > 60) {
+        $totalClassStanding = 60;
+    }
+
+    // Calculate exam scores (MAX 40% TOTAL - 20% each)
+    // Students input these ONCE per semester for midterm and final
+    if (!empty($midtermExam)) {
+        $midterm = reset($midtermExam);
+        if ($midterm['max_score'] > 0) {
+            $midtermPercentage = ($midterm['score_value'] / $midterm['max_score']) * 100;
+            $midtermScore = ($midtermPercentage * 20) / 100;
+        }
+    }
+
+    if (!empty($finalExam)) {
+        $final = reset($finalExam);
+        if ($final['max_score'] > 0) {
+            $finalPercentage = ($final['score_value'] / $final['max_score']) * 100;
+            $finalScore = ($finalPercentage * 20) / 100;
+        }
+    }
+
+    // Calculate overall grade: Class Standing (60%) + Exams (40%)
+    $overallGrade = $totalClassStanding + $midtermScore + $finalScore;
+
+    // Ensure overall grade doesn't exceed 100%
+    if ($overallGrade > 100) {
+        $overallGrade = 100;
+    }
+
+    // Calculate GPA based on Final Grade only (1.00-3.00 scale)
+    if ($overallGrade >= 89) {
+        $gpa = 1.00; // Low Risk
+    } elseif ($overallGrade >= 82) {
+        $gpa = 2.00; // Medium Risk  
+    } elseif ($overallGrade >= 79) {
+        $gpa = 2.75; // Medium Risk
     } else {
-        $otpError = 'Invalid OTP code or OTP has expired. Please check your email and try again.';
-        $showOTPModal = true;
+        $gpa = 3.00; // High Risk
+    }
+
+    // Calculate risk level based on GPA
+    if ($gpa == 1.75) {
+        $riskLevel = 'low';
+        $riskDescription = 'Low Risk';
+        $interventionNeeded = false;
+    } elseif ($gpa == 2.00 || $gpa == 2.75) {
+        $riskLevel = 'medium';
+        $riskDescription = 'Medium Risk';
+        $interventionNeeded = false;
+    } elseif ($gpa == 3.00) {
+        $riskLevel = 'high';
+        $riskDescription = 'High Risk';
+        $interventionNeeded = true;
     }
 }
+
+// Get behavioral insights and recommendations
+$behavioralInsights = [];
+$interventions = [];
+$recommendations = [];
+
+if ($hasScores) {
+    // Get behavioral insights
+    $behavioralInsights = InterventionSystem::getBehavioralInsights($student['id'], $subject_id, $pdo);
     
-// Handle signup
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
-    $student_number = trim($_POST['student_number']);
-    $fullname = trim($_POST['fullname']);
-    $email = trim($_POST['email']);
-    $year_level = 2;
-    $semester = trim($_POST['semester']);
-    $section = trim($_POST['section']);
-    $course = 'BS Information Technology';
+    // Get interventions based on risk level
+    $interventions = InterventionSystem::getInterventions($student['id'], $subject_id, $riskLevel, $pdo);
     
-    // Basic validation
-    if (empty($student_number) || empty($fullname) || empty($email) || empty($semester) || empty($section)) {
-        $error = 'All fields are required.';
-        $showSignupModal = true;
-    } elseif (!isValidPLPEmail($email)) {
-        $error = 'Please use your valid @plpasig.edu.ph email address.';
-        $showSignupModal = true;
-    } else {
-        // Check if student already exists
-        $existingStudent = getStudentByEmail($email);
-        if ($existingStudent) {
-            $error = 'A student with this email already exists.';
-            $showSignupModal = true;
+    // Get recommendations based on performance
+    $recommendations = InterventionSystem::getRecommendations($student['id'], $subject_id, $overallGrade, $pdo);
+}
+
+// Handle form submissions
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_POST['add_category'])) {
+        $category_name = trim($_POST['category_name']);
+        $category_percentage = floatval($_POST['category_percentage']);
+        
+        // Validate
+        if (empty($category_name) || $category_percentage <= 0) {
+            $error_message = 'Please fill all fields with valid values.';
+        } elseif ($category_percentage > $remainingAllocation) {
+            $error_message = 'Cannot add category. Remaining allocation is only ' . $remainingAllocation . '%.';
         } else {
-            // Insert new student
-            $studentData = [
-                'student_number' => $student_number,
-                'fullname' => $fullname,
-                'email' => $email,
-                'year_level' => $year_level,
-                'semester' => $semester,
-                'section' => $section,
-                'course' => $course
-            ];
+            try {
+                $insert_stmt = $pdo->prepare("
+                    INSERT INTO student_class_standing_categories (student_subject_id, category_name, category_percentage) 
+                    VALUES (?, ?, ?)
+                ");
+                if ($insert_stmt->execute([$subject_id, $category_name, $category_percentage])) {
+                    $success_message = 'Category added successfully!';
+                    header("Location: subject-management.php?subject_id=$subject_id");
+                    exit;
+                }
+            } catch (PDOException $e) {
+                $error_message = 'Database error: ' . $e->getMessage();
+            }
+        }
+    }
+    
+    elseif (isset($_POST['add_standing'])) {
+        $category_id = intval($_POST['category_id']);
+        $score_name = trim($_POST['score_name']);
+        $score_value = floatval($_POST['score_value']);
+        $max_score = floatval($_POST['max_score']);
+        $score_date = $_POST['score_date'];
+        
+        // Validate
+        if (empty($score_name) || $score_value < 0 || $max_score <= 0 || empty($score_date)) {
+            $error_message = 'Please fill all fields with valid values.';
+        } elseif ($score_value > $max_score) {
+            $error_message = 'Score value cannot exceed maximum score.';
+        } else {
+            try {
+                $insert_stmt = $pdo->prepare("
+                    INSERT INTO student_subject_scores (student_subject_id, category_id, score_type, score_name, score_value, max_score, score_date) 
+                    VALUES (?, ?, 'class_standing', ?, ?, ?, ?)
+                ");
+                if ($insert_stmt->execute([$subject_id, $category_id, $score_name, $score_value, $max_score, $score_date])) {
+                    $success_message = 'Score added successfully!';
+                    header("Location: subject-management.php?subject_id=$subject_id");
+                    exit;
+                }
+            } catch (PDOException $e) {
+                $error_message = 'Database error: ' . $e->getMessage();
+            }
+        }
+    }
+    
+    // Handle attendance submission
+    elseif (isset($_POST['add_attendance'])) {
+        $category_id = intval($_POST['category_id']);
+        $attendance_date = $_POST['attendance_date'];
+        $attendance_status = $_POST['attendance_status'];
+        
+        // Validate
+        if (empty($attendance_date)) {
+            $error_message = 'Please select a date.';
+        } else {
+            try {
+                // Check if attendance already exists for this date
+                $check_stmt = $pdo->prepare("
+                    SELECT id FROM student_subject_scores 
+                    WHERE student_subject_id = ? AND category_id = ? AND score_date = ?
+                ");
+                $check_stmt->execute([$subject_id, $category_id, $attendance_date]);
+                
+                if ($check_stmt->fetch()) {
+                    $error_message = 'Attendance already recorded for this date.';
+                } else {
+                    // For attendance, score_name is the status (Present/Absent)
+                    // score_value is 1 for Present, 0 for Absent
+                    // max_score is always 1
+                    $score_value = ($attendance_status === 'present') ? 1 : 0;
+                    
+                    $insert_stmt = $pdo->prepare("
+                        INSERT INTO student_subject_scores (student_subject_id, category_id, score_type, score_name, score_value, max_score, score_date) 
+                        VALUES (?, ?, 'class_standing', ?, ?, 1, ?)
+                    ");
+                    if ($insert_stmt->execute([$subject_id, $category_id, ucfirst($attendance_status), $score_value, $attendance_date])) {
+                        $success_message = 'Attendance recorded successfully!';
+                        header("Location: subject-management.php?subject_id=$subject_id");
+                        exit;
+                    }
+                }
+            } catch (PDOException $e) {
+                $error_message = 'Database error: ' . $e->getMessage();
+            }
+        }
+    }
+    
+    elseif (isset($_POST['update_score'])) {
+        $score_id = intval($_POST['score_id']);
+        $score_value = floatval($_POST['score_value']);
+        
+        // Get the score to validate against max_score
+        try {
+            $score_stmt = $pdo->prepare("SELECT max_score FROM student_subject_scores WHERE id = ? AND student_subject_id = ?");
+            $score_stmt->execute([$score_id, $subject_id]);
+            $score_data = $score_stmt->fetch(PDO::FETCH_ASSOC);
             
-            $result = supabaseInsert('students', $studentData);
-            
-            if ($result !== false) {
-                $success = 'Registration successful! You can now login with your credentials.';
-                $showSignupModal = false;
+            if ($score_data && $score_value > $score_data['max_score']) {
+                $error_message = 'Score value cannot exceed maximum score of ' . $score_data['max_score'];
             } else {
-                $error = 'Registration failed. Please try again.';
-                $showSignupModal = true;
+                $update_stmt = $pdo->prepare("UPDATE student_subject_scores SET score_value = ? WHERE id = ? AND student_subject_id = ?");
+                if ($update_stmt->execute([$score_value, $score_id, $subject_id])) {
+                    $success_message = 'Score updated successfully!';
+                    header("Location: subject-management.php?subject_id=$subject_id");
+                    exit;
+                }
+            }
+        } catch (PDOException $e) {
+            $error_message = 'Database error: ' . $e->getMessage();
+        }
+    }
+    
+    elseif (isset($_POST['delete_score'])) {
+        $score_id = intval($_POST['score_id']);
+        
+        try {
+            $delete_stmt = $pdo->prepare("DELETE FROM student_subject_scores WHERE id = ? AND student_subject_id = ?");
+            if ($delete_stmt->execute([$score_id, $subject_id])) {
+                $success_message = 'Score deleted successfully!';
+                header("Location: subject-management.php?subject_id=$subject_id");
+                exit;
+            }
+        } catch (PDOException $e) {
+            $error_message = 'Database error: ' . $e->getMessage();
+        }
+    }
+    
+    elseif (isset($_POST['delete_category'])) {
+        $category_id = intval($_POST['category_id']);
+        
+        try {
+            // First delete all scores in this category
+            $delete_scores_stmt = $pdo->prepare("DELETE FROM student_subject_scores WHERE category_id = ?");
+            $delete_scores_stmt->execute([$category_id]);
+            
+            // Then delete the category
+            $delete_category_stmt = $pdo->prepare("DELETE FROM student_class_standing_categories WHERE id = ? AND student_subject_id = ?");
+            if ($delete_category_stmt->execute([$category_id, $subject_id])) {
+                $success_message = 'Category deleted successfully!';
+                header("Location: subject-management.php?subject_id=$subject_id");
+                exit;
+            }
+        } catch (PDOException $e) {
+            $error_message = 'Database error: ' . $e->getMessage();
+        }
+    }
+    
+    elseif (isset($_POST['add_exam'])) {
+        $exam_type = $_POST['exam_type'];
+        $score_value = floatval($_POST['score_value']);
+        $max_score = floatval($_POST['max_score']);
+        
+        // Validate exam score
+        if ($score_value < 0 || $max_score <= 0) {
+            $error_message = 'Score value and maximum score must be positive numbers.';
+        } elseif ($score_value > $max_score) {
+            $error_message = 'Score value cannot exceed maximum score.';
+        } else {
+            $exam_name = $exam_type === 'midterm_exam' ? 'Midterm Exam' : 'Final Exam';
+            
+            try {
+                // Delete existing exam score if any
+                $delete_stmt = $pdo->prepare("DELETE FROM student_subject_scores WHERE student_subject_id = ? AND score_type = ?");
+                $delete_stmt->execute([$subject_id, $exam_type]);
+                
+                // Insert new exam score with custom max_score
+                $insert_stmt = $pdo->prepare("
+                    INSERT INTO student_subject_scores (student_subject_id, score_type, score_name, score_value, max_score) 
+                    VALUES (?, ?, ?, ?, ?)
+                ");
+                if ($insert_stmt->execute([$subject_id, $exam_type, $exam_name, $score_value, $max_score])) {
+                    $success_message = $exam_name . ' score added successfully!';
+                    header("Location: subject-management.php?subject_id=$subject_id");
+                    exit;
+                }
+            } catch (PDOException $e) {
+                $error_message = 'Database error: ' . $e->getMessage();
             }
         }
     }
