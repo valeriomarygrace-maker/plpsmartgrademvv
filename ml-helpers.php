@@ -2,10 +2,6 @@
 // ml-helpers.php
 
 class InterventionSystem {
-    
-    /**
-     * Log student behavior for analysis
-     */
     public static function logBehavior($studentId, $behaviorType, $data, $pdo) {
         try {
             $stmt = $pdo->prepare("
