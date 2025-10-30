@@ -8,26 +8,27 @@ $showOTPModal = false;
 $otpError = '';
 
 // Handle login
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && !isset($_POST['signup'])) {
-    $email = trim($_POST['email']);
-    
-    // Validate PLP email
-    if (!isValidPLPEmail($email)) {
-        $error = 'Please use your valid @plpasig.edu.ph email address.';
-    } else {
-        // Check if email exists in students table using Supabase
-        $student = getStudentByEmail($email);
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && !isset($_POST['signup'])) {
+        $email = trim($_POST['email']);
         
-        if (true) { // Bypass email for testing
-    // Still store OTP in database
-    $otpData = [
-        'email' => $email,
-        'otp_code' => $otp,
-        'expires_at' => date('Y-m-d H:i:s', strtotime('+10 minutes')),
-        'is_used' => false
-    ];
-    $result = supabaseInsert('otp_verification', $otpData);
-    
+        // Validate PLP email
+        if (!isValidPLPEmail($email)) {
+            $error = 'Please use your valid @plpasig.edu.ph email address.';
+        } else {
+            // Check if email exists in students table using Supabase
+            $student = getStudentByEmail($email);
+            
+            if (true) { // Bypass email for testing
+        // Still store OTP in database
+        $otpData = [
+            'email' => $email,
+            'otp_code' => $otp,
+            'expires_at' => date('Y-m-d H:i:s', strtotime('+10 minutes')),
+            'is_used' => false
+        ];
+        $result = supabaseInsert('otp_verification', $otpData);
+    }
+        
     if ($result) {
         $_SESSION['verify_email'] = $email;
         $_SESSION['user_type'] = 'student';
@@ -45,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && !isset($_
         $error = 'Failed to generate OTP. Please try again.';
     }
 }
-}
+
 
 // Handle OTP verification
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['otp'])) {
