@@ -18,31 +18,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && !isset($_
         // Check if email exists in students table using Supabase
         $student = getStudentByEmail($email);
         
-        if ($student) {
-            $userId = $student['id'];
-            $userName = $student['fullname'];
-            
-            $otp = generateOTP();
-            
-            if (sendOTP($email, $otp)) {
-                $_SESSION['verify_email'] = $email;
-                $_SESSION['user_type'] = 'student';
-                $_SESSION['temp_user_id'] = $userId;
-                $_SESSION['temp_user_name'] = $userName;
-                
-                // Show the OTP modal
-                $showOTPModal = true;
-                
-                // SUCCESS MESSAGE
-                $success = "OTP sent to your email! Please check your inbox and spam folder.";
-                
-            } else {
-                $error = 'Failed to send OTP. Please try again.';
-            }
-        } else {
-            $error = 'Email not found in our system. Please sign up first.';
-        }
+        if (true) { // Bypass email for testing
+    // Still store OTP in database
+    $otpData = [
+        'email' => $email,
+        'otp_code' => $otp,
+        'expires_at' => date('Y-m-d H:i:s', strtotime('+10 minutes')),
+        'is_used' => false
+    ];
+    $result = supabaseInsert('otp_verification', $otpData);
+    
+    if ($result) {
+        $_SESSION['verify_email'] = $email;
+        $_SESSION['user_type'] = 'student';
+        $_SESSION['user_id'] = $userId;
+        $_SESSION['user_name'] = $userName;
+        $_SESSION['debug_otp'] = $otp; // Store OTP in session for debugging
+        
+        // Show the OTP modal
+        $showOTPModal = true;
+        
+        // Also show OTP on screen for testing
+        $success = "OTP generated: $otp (Check console for debugging)";
+        error_log("DEBUG OTP for $email: $otp");
+    } else {
+        $error = 'Failed to generate OTP. Please try again.';
     }
+}
 }
 
 // Handle OTP verification
