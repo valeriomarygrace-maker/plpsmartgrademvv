@@ -1,27 +1,30 @@
 <?php
 require_once 'config.php';
 
+// Initialize variables
 $error = '';
 $success = '';
 $showSignupModal = false;
 $showOTPModal = false;
 $otpError = '';
+$email = '';
 
-// Handle login
+// Handle login form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && !isset($_POST['signup'])) {
-    $email = trim($_POST['email']);
+    $email = sanitizeInput($_POST['email']);
     
     // Validate PLP email
     if (!isValidPLPEmail($email)) {
         $error = 'Please use your valid @plpasig.edu.ph email address.';
     } else {
-        // Check if email exists in students table using Supabase
+        // Check if email exists in students table
         $student = getStudentByEmail($email);
         
         if ($student) {
             $userId = $student['id'];
             $userName = $student['fullname'];
             
+            // Generate and send OTP
             $otp = generateOTP();
             
             if (sendOTP($email, $otp)) {
@@ -33,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && !isset($_
                 // Show the OTP modal
                 $showOTPModal = true;
                 
-                // SUCCESS MESSAGE
+                // Success message
                 $success = "OTP sent to your email! Please check your inbox and spam folder.";
                 
             } else {
@@ -41,24 +44,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && !isset($_
             }
         } else {
             $error = 'Email not found in our system. Please sign up first.';
+            $showSignupModal = true;
         }
     }
 }
 
 // Handle OTP verification
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['otp'])) {
-    $otp = trim($_POST['otp']);
+    $otp = sanitizeInput($_POST['otp']);
     $email = $_SESSION['verify_email'] ?? '';
     
     if (empty($email)) {
         $otpError = 'Session expired. Please login again.';
         $showOTPModal = true;
     } elseif (verifyOTP($email, $otp)) {
+        // Regenerate session for security
+        regenerateSession();
+        
         $_SESSION['logged_in'] = true;
         $_SESSION['user_email'] = $email;
         $_SESSION['user_type'] = 'student';
         $_SESSION['user_id'] = $_SESSION['temp_user_id'] ?? null;
         $_SESSION['user_name'] = $_SESSION['temp_user_name'] ?? '';
+        $_SESSION['login_time'] = time();
         
         // Clean up temporary session data
         unset($_SESSION['verify_email']);
@@ -76,12 +84,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['otp'])) {
     
 // Handle signup
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
-    $student_number = trim($_POST['student_number']);
-    $fullname = trim($_POST['fullname']);
-    $email = trim($_POST['email']);
+    $student_number = sanitizeInput($_POST['student_number']);
+    $fullname = sanitizeInput($_POST['fullname']);
+    $email = sanitizeInput($_POST['email']);
     $year_level = 2;
-    $semester = trim($_POST['semester']);
-    $section = trim($_POST['section']);
+    $semester = sanitizeInput($_POST['semester']);
+    $section = sanitizeInput($_POST['section']);
     $course = 'BS Information Technology';
     
     // Basic validation
@@ -114,6 +122,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             if ($result !== false) {
                 $success = 'Registration successful! You can now login with your credentials.';
                 $showSignupModal = false;
+                
+                // Auto-login after successful registration
+                $otp = generateOTP();
+                if (sendOTP($email, $otp)) {
+                    $_SESSION['verify_email'] = $email;
+                    $_SESSION['user_type'] = 'student';
+                    $_SESSION['temp_user_id'] = $result[0]['id'] ?? null;
+                    $_SESSION['temp_user_name'] = $fullname;
+                    $showOTPModal = true;
+                    $success = "Registration successful! OTP sent to your email for verification.";
+                }
             } else {
                 $error = 'Registration failed. Please try again.';
                 $showSignupModal = true;

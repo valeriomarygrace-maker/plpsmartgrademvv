@@ -1,27 +1,38 @@
 <?php
 require_once 'config.php';
 
+// Redirect if no verification email in session
 if (!isset($_SESSION['verify_email'])) {
     header('Location: login.php');
     exit;
 }
 
 $error = '';
+$email = $_SESSION['verify_email'];
 
-if ($_POST) {
-    $otp = trim($_POST['otp']);
-    $email = $_SESSION['verify_email'];
+// Handle OTP verification
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $otp = sanitizeInput($_POST['otp']);
     
     if (verifyOTP($email, $otp)) {
+        // Regenerate session for security
+        regenerateSession();
+        
         $_SESSION['logged_in'] = true;
         $_SESSION['user_email'] = $email;
         $_SESSION['user_type'] = 'student';
+        $_SESSION['login_time'] = time();
         
         // Get student info
         $student = getStudentByEmail($email);
         if ($student) {
             $_SESSION['user_id'] = $student['id'];
             $_SESSION['user_name'] = $student['fullname'];
+        }
+        
+        // Clear OTP attempts
+        if (isset($_SESSION['otp_attempts'][$email])) {
+            unset($_SESSION['otp_attempts'][$email]);
         }
         
         header('Location: student-dashboard.php');
@@ -209,11 +220,17 @@ if ($_POST) {
             text-decoration: none;
             font-weight: 500;
             transition: var(--transition);
+            padding: 0.75rem 1.5rem;
+            border: 2px solid var(--plp-green);
+            border-radius: var(--border-radius);
         }
 
         .back-link:hover {
-            color: var(--plp-dark-green);
-            text-decoration: underline;
+            background: var(--plp-green);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 99, 65, 0.2);
+            text-decoration: none;
         }
 
         .resend-link {
@@ -228,6 +245,16 @@ if ($_POST) {
         .resend-link:hover {
             color: var(--plp-dark-green);
             text-decoration: underline;
+        }
+
+        .attempts-warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+            padding: 0.75rem;
+            border-radius: var(--border-radius);
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
         }
 
         @media (max-width: 480px) {
@@ -252,8 +279,18 @@ if ($_POST) {
         </div>
         <h1>OTP Verification</h1>
         <p class="subtitle">Enter the 6-digit verification code sent to<br>
-            <span class="email-display"><?php echo $_SESSION['verify_email']; ?></span>
+            <span class="email-display"><?php echo htmlspecialchars($email); ?></span>
         </p>
+        
+        <?php 
+        // Show rate limiting warning
+        if (isset($_SESSION['otp_attempts'][$email]) && count($_SESSION['otp_attempts'][$email]) >= 3): 
+        ?>
+            <div class="attempts-warning">
+                <i class="fas fa-exclamation-triangle"></i>
+                Multiple failed attempts. Too many failures may temporarily lock your account.
+            </div>
+        <?php endif; ?>
         
         <?php if ($error): ?>
             <div class="alert-error">
@@ -281,7 +318,12 @@ if ($_POST) {
             </button>
         </form>
         
-        <a href="index.php" class="back-link">
+        <p style="text-align: center; margin-top: 1rem; color: var(--text-medium); font-size: 0.9rem;">
+            Didn't receive the code? 
+            <a href="login.php" class="resend-link">Return to login to resend</a>
+        </p>
+        
+        <a href="login.php" class="back-link">
             <i class="fas fa-arrow-left"></i>
             Back to Login
         </a>
@@ -291,6 +333,14 @@ if ($_POST) {
         // Auto-focus and move between OTP inputs
         const otpInputs = document.querySelectorAll('.otp-input');
         const otpHiddenInput = document.getElementById('otp');
+        
+        function updateHiddenInput() {
+            let otpValue = '';
+            otpInputs.forEach(input => {
+                otpValue += input.value;
+            });
+            otpHiddenInput.value = otpValue;
+        }
         
         otpInputs.forEach((input, index) => {
             // Handle paste event
@@ -324,16 +374,20 @@ if ($_POST) {
             });
         });
         
-        function updateHiddenInput() {
-            let otpValue = '';
-            otpInputs.forEach(input => {
-                otpValue += input.value;
-            });
-            otpHiddenInput.value = otpValue;
+        // Focus first input on page load
+        if (otpInputs.length > 0) {
+            otpInputs[0].focus();
         }
         
-        // Focus first input on page load
-        otpInputs[0].focus();
+        // Auto-submit when all OTP digits are entered
+        otpInputs[5]?.addEventListener('input', function(e) {
+            if (e.target.value.length === 1) {
+                const allFilled = Array.from(otpInputs).every(input => input.value.length === 1);
+                if (allFilled) {
+                    document.getElementById('otpForm').submit();
+                }
+            }
+        });
     </script>
 </body>
 </html>
