@@ -85,21 +85,14 @@ function supabaseUpdate($table, $data, $filters) {
 }
 
 function sendOTP($email, $otp) {
-    error_log("Attempting to send OTP to: $email");
-    
-    $userType = '';
-    $fullname = '';
-    
-    // Check if student exists using Supabase
-    $student = supabaseFetch('students', "email=eq.$email", 'GET');
-    if ($student && count($student) > 0) {
-        $userType = 'Student';
-        $fullname = $student[0]['fullname'];
-        error_log("Student found: $fullname");
-    } else {
-        error_log("Student not found for email: $email");
+    // Get student data
+    $student = getStudentByEmail($email);
+    if (!$student) {
         return false;
     }
+
+    $userType = 'Student';
+    $fullname = $student['fullname'];
 
     // Store OTP in Supabase
     $otpData = [
@@ -109,61 +102,66 @@ function sendOTP($email, $otp) {
         'is_used' => false
     ];
     
-    error_log("Storing OTP data: " . json_encode($otpData));
-    
     $result = supabaseInsert('otp_verification', $otpData);
     
     if (!$result) {
-        error_log("❌ FAILED to store OTP in Supabase");
         return false;
     }
-    
-    error_log("✅ OTP stored successfully in database");
 
-    // Send email
+    // Send OTP email using PHPMailer
     $mail = new PHPMailer(true);
     
     try {
+        // Server settings
         $mail->isSMTP();
         $mail->Host       = 'smtp.gmail.com';
         $mail->SMTPAuth   = true;
         $mail->Username   = 'marygracevalerio177@gmail.com';
-        $mail->Password   = getenv('SMTP_PASSWORD') ?: 'swjx bwoj taxq tjdv';
+        $mail->Password   = 'swjx bwoj taxq tjdv';
         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port       = 587;
-        $mail->SMTPDebug  = 2; // Enable verbose debug output
-        $mail->Debugoutput = function($str, $level) {
-            error_log("PHPMailer Debug: $str");
-        };
+        
+        // SSL settings for Render
+        $mail->SMTPOptions = array(
+            'ssl' => array(
+                'verify_peer' => false,
+                'verify_peer_name' => false,
+                'allow_self_signed' => true
+            )
+        );
 
+        // Recipients
         $mail->setFrom('marygracevalerio177@gmail.com', 'PLP SmartGrade');
         $mail->addAddress($email);
 
+        // Content
         $mail->isHTML(true);
-        $mail->Subject = 'PLP SmartGrade - OTP Verification';
-        $mail->Body    = "
+        $mail->Subject = 'PLP SmartGrade - OTP Verification Code';
+        
+        $mail->Body = "
             <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
-                <h2 style='color: #2c3e50;'>Email Verification</h2>
+                <h2 style='color: #006341;'>PLP SmartGrade - OTP Verification</h2>
                 <div style='background: #f8f9fa; padding: 20px; border-radius: 5px;'>
-                    <p>Hello, <strong>$fullname</strong>! You are logging in as a <strong>$userType</strong>.</p>
-                    <p>Your OTP code is:</p>
+                    <p>Hello <strong>$fullname</strong>,</p>
+                    <p>You are attempting to login as a <strong>$userType</strong>.</p>
+                    <p>Your One-Time Password (OTP) is:</p>
                     <div style='font-size: 32px; font-weight: bold; color: #e74c3c; text-align: center; letter-spacing: 5px; padding: 15px; background: #fff; border: 2px dashed #bdc3c7; border-radius: 5px; margin: 15px 0;'>
                         $otp
                     </div>
-                    <p>This code will expire in 10 minutes.</p>
-                    <p style='font-size: 12px; color: #7f8c8d;'>If you didn't request this OTP, please ignore this email.</p>
+                    <p><strong>This OTP will expire in 10 minutes.</strong></p>
+                    <p>If you didn't request this OTP, please ignore this email.</p>
                 </div>
                 <div style='margin-top: 20px; padding-top: 20px; border-top: 1px solid #ecf0f1; font-size: 12px; color: #95a5a6;'>
-                    © " . date('Y') . " Pamantasan ng Lungsod ng Pasig. All rights reserved.
+                    <p>Pamantasan ng Lungsod ng Pasig<br>© " . date('Y') . " PLP SmartGrade. All rights reserved.</p>
                 </div>
             </div>
         ";
+        
+        $mail->AltBody = "PLP SmartGrade OTP Verification\n\nHello $fullname,\n\nYour OTP code is: $otp\n\nThis OTP will expire in 10 minutes.\n\nIf you didn't request this OTP, please ignore this email.";
 
-        $mail->send();
-        error_log("✅ Email sent successfully to: $email");
-        return true;
+        return $mail->send();
+        
     } catch (Exception $e) {
-        error_log("❌ PHPMailer Error: " . $mail->ErrorInfo);
         return false;
     }
 }
