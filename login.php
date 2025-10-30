@@ -45,7 +45,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && !isset($_
     } else {
         $error = 'Failed to generate OTP. Please try again.';
     }
-}
+    }
+    }
 }
 
 
