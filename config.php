@@ -26,13 +26,10 @@ function sanitizeInput($data) {
     return htmlspecialchars(trim($data), ENT_QUOTES, 'UTF-8');
 }
 
-/**
- * Supabase Magic Link Authentication - FIXED VERSION
- */
 function sendMagicLink($email) {
     global $supabase_url, $supabase_key;
     
-    // IMPORTANT: Replace with your actual Render URL
+    // ⚠️ REPLACE THIS WITH YOUR ACTUAL RENDER URL ⚠️
     $redirect_url = 'https://plpsmartgrademvv.onrender.com/auth-callback.php';
     
     $data = [
@@ -61,8 +58,7 @@ function sendMagicLink($email) {
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
     
-    error_log("🔐 Magic Link attempt for: $email - HTTP Code: $httpCode");
-    error_log("🔐 Redirect URL set to: $redirect_url");
+    error_log("🔐 Magic Link sent to: $email - HTTP: $httpCode - Redirect: $redirect_url");
     
     return $httpCode === 200;
 }

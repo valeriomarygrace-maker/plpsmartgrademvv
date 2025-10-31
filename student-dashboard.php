@@ -1,11 +1,15 @@
 <?php
 require_once 'config.php';
 
-// Check if user is logged in - FIXED VERSION
+// SIMPLE login check
 if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
+    error_log("❌ Dashboard access denied - not logged in");
     header('Location: login.php');
     exit;
 }
+
+error_log("✅ Dashboard access granted for: " . ($_SESSION['user_email'] ?? 'unknown'));
+
 
 // Check if user_type is set and is student
 if (!isset($_SESSION['user_type']) || $_SESSION['user_type'] !== 'student') {
