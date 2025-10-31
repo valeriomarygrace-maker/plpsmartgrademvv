@@ -1,9 +1,4 @@
 <?php
-require_once 'vendor/autoload.php'; // Make sure to include PHPMailer autoload
-
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
-
 // Environment Configuration
 $supabase_url = getenv('SUPABASE_URL') ?: 'https://xwvrgpxcceivakzrwwji.supabase.co';
 $supabase_key = getenv('SUPABASE_KEY') ?: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh3dnJncHhjY2VpdmFrenJ3d2ppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE3MjQ0NzQsImV4cCI6MjA3NzMwMDQ3NH0.ovd8v3lqsYtJU78D4iM6CyAyvi6jK4FUbYUjydFi4FM';
@@ -22,13 +17,72 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 /**
- * Input Sanitization Function
+ * Supabase API Helper Function
  */
-function sanitizeInput($data) {
-    if (is_array($data)) {
-        return array_map('sanitizeInput', $data);
+function supabaseFetch($table, $filters = [], $method = 'GET', $data = null) {
+    global $supabase_url, $supabase_key;
+    
+    $url = $supabase_url . "/rest/v1/$table";
+    
+    // Build query string from filters
+    $queryParams = [];
+    foreach ($filters as $key => $value) {
+        $queryParams[] = "$key=eq.$value";
     }
-    return htmlspecialchars(trim($data), ENT_QUOTES, 'UTF-8');
+    
+    if (!empty($queryParams)) {
+        $url .= "?" . implode('&', $queryParams);
+    }
+    
+    $ch = curl_init();
+    $headers = [
+        'apikey: ' . $supabase_key,
+        'Authorization: Bearer ' . $supabase_key,
+        'Content-Type: application/json',
+        'Prefer: return=representation'
+    ];
+    
+    curl_setopt_array($ch, [
+        CURLOPT_URL => $url,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => $headers,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_TIMEOUT => 30,
+    ]);
+    
+    if ($method === 'POST') {
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+    } elseif ($method === 'PATCH') {
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PATCH');
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+    }
+    
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $error = curl_error($ch);
+    curl_close($ch);
+    
+    if ($error) {
+        error_log("❌ cURL Error: $error");
+        return false;
+    }
+    
+    if ($httpCode >= 400) {
+        error_log("❌ HTTP Error $httpCode for table: $table");
+        return false;
+    }
+    
+    $result = json_decode($response, true);
+    return $result;
+}
+
+function supabaseInsert($table, $data) {
+    return supabaseFetch($table, [], 'POST', $data);
+}
+
+function supabaseUpdate($table, $data, $filters) {
+    return supabaseFetch($table, $filters, 'PATCH', $data);
 }
 
 /**
@@ -39,7 +93,8 @@ function generateOTP() {
 }
 
 /**
- * Send OTP - FIXED VERSION THAT ACTUALLY SENDS EMAILS
+ * Send OTP - SIMPLIFIED VERSION FOR TESTING
+ * This stores the OTP in database and session for display
  */
 function sendOTP($email, $otp) {
     error_log("🔐 Attempting to send OTP to: $email");
@@ -71,99 +126,15 @@ function sendOTP($email, $otp) {
             return false;
         }
         
-        // ✅ ACTUALLY SEND THE EMAIL
-        if (sendOTPEmail($email, $otp, $fullname)) {
-            error_log("✅ OTP email sent successfully to: $email");
-            return true;
-        } else {
-            error_log("❌ FAILED to send OTP email to: $email");
-            return false;
-        }
+        // Store OTP in session for display (instead of sending email)
+        $_SESSION['debug_otp'] = $otp;
+        $_SESSION['debug_email'] = $email;
+        
+        error_log("✅ OTP stored successfully in database and session: $otp");
+        return true; // Always return true for testing
         
     } catch (Exception $e) {
         error_log("❌ OTP sending failed: " . $e->getMessage());
-        return false;
-    }
-}
-
-/**
- * Send OTP Email using PHPMailer
- */
-function sendOTPEmail($email, $otp, $fullname) {
-    $mail = new PHPMailer(true);
-    
-    try {
-        // Enable verbose debugging
-        $mail->SMTPDebug = 0; // Set to 2 for debugging, 0 for production
-        $mail->Debugoutput = 'error_log';
-        
-        // Server settings - Gmail SMTP
-        $mail->isSMTP();
-        $mail->Host = 'smtp.gmail.com';
-        $mail->SMTPAuth = true;
-        $mail->Username = 'marygracevalerio177@gmail.com'; // Your Gmail
-        $mail->Password = 'swjx bwoj taxq tjdv'; // Gmail App Password
-        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-        $mail->Port = 587;
-        
-        // Recipients
-        $mail->setFrom('noreply@plpasig.edu.ph', 'PLP SmartGrade');
-        $mail->addAddress($email, $fullname);
-        
-        // Content
-        $mail->isHTML(true);
-        $mail->Subject = 'Your PLP SmartGrade OTP Code';
-        $mail->Body = "
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <style>
-                    body { font-family: Arial, sans-serif; background-color: #f5f5f5; padding: 20px; }
-                    .container { background: white; padding: 30px; border-radius: 10px; max-width: 600px; margin: 0 auto; }
-                    .header { color: #006341; text-align: center; margin-bottom: 20px; }
-                    .otp-code { font-size: 32px; font-weight: bold; color: #006341; text-align: center; margin: 20px 0; padding: 15px; background: #f0f9f5; border-radius: 8px; }
-                    .footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd; color: #666; font-size: 12px; }
-                </style>
-            </head>
-            <body>
-                <div class='container'>
-                    <div class='header'>
-                        <h2>PLP SmartGrade OTP Verification</h2>
-                    </div>
-                    
-                    <p>Hello <strong>$fullname</strong>,</p>
-                    
-                    <p>Your One-Time Password (OTP) for login is:</p>
-                    
-                    <div class='otp-code'>$otp</div>
-                    
-                    <p>This OTP will expire in <strong>10 minutes</strong>.</p>
-                    
-                    <p>If you didn't request this OTP, please ignore this email.</p>
-                    
-                    <div class='footer'>
-                        <p>PLP - SmartGrade System<br>
-                        Pamantasan ng Lungsod ng Pasig</p>
-                    </div>
-                </div>
-            </body>
-            </html>
-        ";
-        
-        // Plain text version for non-HTML email clients
-        $mail->AltBody = "PLP SmartGrade OTP Code: $otp\n\nThis OTP will expire in 10 minutes.\n\nIf you didn't request this OTP, please ignore this email.";
-        
-        $mail->send();
-        return true;
-        
-    } catch (Exception $e) {
-        error_log("❌ PHPMailer Error: {$mail->ErrorInfo}");
-        
-        // Fallback: Store OTP in session for manual retrieval
-        $_SESSION['debug_otp'] = $otp;
-        $_SESSION['debug_email'] = $email;
-        error_log("✅ OTP stored in session for debugging: $otp");
-        
         return false;
     }
 }
@@ -261,73 +232,11 @@ function regenerateSession() {
     $_SESSION['created'] = time();
 }
 
-/**
- * Supabase API Helper Function
- */
-function supabaseFetch($table, $filters = [], $method = 'GET', $data = null) {
-    global $supabase_url, $supabase_key;
-    
-    $url = $supabase_url . "/rest/v1/$table";
-    
-    // Build query string from filters
-    $queryParams = [];
-    foreach ($filters as $key => $value) {
-        $queryParams[] = "$key=eq.$value";
+function sanitizeInput($data) {
+    if (is_array($data)) {
+        return array_map('sanitizeInput', $data);
     }
-    
-    if (!empty($queryParams)) {
-        $url .= "?" . implode('&', $queryParams);
-    }
-    
-    $ch = curl_init();
-    $headers = [
-        'apikey: ' . $supabase_key,
-        'Authorization: Bearer ' . $supabase_key,
-        'Content-Type: application/json',
-        'Prefer: return=representation'
-    ];
-    
-    curl_setopt_array($ch, [
-        CURLOPT_URL => $url,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER => $headers,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_TIMEOUT => 30,
-    ]);
-    
-    if ($method === 'POST') {
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-    } elseif ($method === 'PATCH') {
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PATCH');
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-    }
-    
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $error = curl_error($ch);
-    curl_close($ch);
-    
-    if ($error) {
-        error_log("❌ cURL Error: $error");
-        return false;
-    }
-    
-    if ($httpCode >= 400) {
-        error_log("❌ HTTP Error $httpCode for table: $table");
-        return false;
-    }
-    
-    $result = json_decode($response, true);
-    return $result;
-}
-
-function supabaseInsert($table, $data) {
-    return supabaseFetch($table, [], 'POST', $data);
-}
-
-function supabaseUpdate($table, $data, $filters) {
-    return supabaseFetch($table, $filters, 'PATCH', $data);
+    return htmlspecialchars(trim($data), ENT_QUOTES, 'UTF-8');
 }
 
 // Check session expiration on every request

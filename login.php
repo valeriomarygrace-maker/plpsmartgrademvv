@@ -9,45 +9,6 @@ $showOTPModal = false;
 $otpError = '';
 $email = '';
 
-// Check if user is already logged in
-if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
-    header('Location: student-dashboard.php');
-    exit;
-}
-
-// Handle OTP verification (THIS MUST COME FIRST)
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['otp'])) {
-    $otp = sanitizeInput($_POST['otp']);
-    $email = $_SESSION['verify_email'] ?? '';
-    
-    if (empty($email)) {
-        $otpError = 'Session expired. Please login again.';
-        $showOTPModal = true;
-    } elseif (verifyOTP($email, $otp)) {
-        // Regenerate session for security
-        regenerateSession();
-        
-        $_SESSION['logged_in'] = true;
-        $_SESSION['user_email'] = $email;
-        $_SESSION['user_type'] = 'student';
-        $_SESSION['user_id'] = $_SESSION['temp_user_id'] ?? null;
-        $_SESSION['user_name'] = $_SESSION['temp_user_name'] ?? '';
-        $_SESSION['login_time'] = time();
-        
-        // Clean up temporary session data
-        unset($_SESSION['verify_email']);
-        unset($_SESSION['temp_user_id']);
-        unset($_SESSION['temp_user_name']);
-        
-        // Redirect to student dashboard
-        header('Location: student-dashboard.php');
-        exit;
-    } else {
-        $otpError = 'Invalid OTP code or OTP has expired. Please check your email and try again.';
-        $showOTPModal = true;
-    }
-}
-
 // Handle login form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && !isset($_POST['signup'])) {
     $email = sanitizeInput($_POST['email']);
@@ -88,6 +49,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && !isset($_
     }
 }
 
+// Handle OTP verification
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['otp'])) {
+    $otp = sanitizeInput($_POST['otp']);
+    $email = $_SESSION['verify_email'] ?? '';
+    
+    if (empty($email)) {
+        $otpError = 'Session expired. Please login again.';
+        $showOTPModal = true;
+    } elseif (verifyOTP($email, $otp)) {
+        // Regenerate session for security
+        regenerateSession();
+        
+        $_SESSION['logged_in'] = true;
+        $_SESSION['user_email'] = $email;
+        $_SESSION['user_type'] = 'student';
+        $_SESSION['user_id'] = $_SESSION['temp_user_id'] ?? null;
+        $_SESSION['user_name'] = $_SESSION['temp_user_name'] ?? '';
+        $_SESSION['login_time'] = time();
+        
+        // Clean up temporary session data
+        unset($_SESSION['verify_email']);
+        unset($_SESSION['temp_user_id']);
+        unset($_SESSION['temp_user_name']);
+        
+        // Redirect to student dashboard
+        header('Location: student-dashboard.php');
+        exit;
+    } else {
+        $otpError = 'Invalid OTP code or OTP has expired. Please check your email and try again.';
+        $showOTPModal = true;
+    }
+}
+    
 // Handle signup
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
     $student_number = sanitizeInput($_POST['student_number']);
@@ -126,6 +120,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             $result = supabaseInsert('students', $studentData);
             
             if ($result !== false) {
+                $success = 'Registration successful! You can now login with your credentials.';
+                $showSignupModal = false;
+                
                 // Auto-login after successful registration
                 $otp = generateOTP();
                 if (sendOTP($email, $otp)) {
@@ -135,25 +132,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
                     $_SESSION['temp_user_name'] = $fullname;
                     $showOTPModal = true;
                     $success = "Registration successful! OTP sent to your email for verification.";
-                    $showSignupModal = false;
-                } else {
-                    $error = 'Registration successful but failed to send OTP. Please try logging in.';
-                    $showSignupModal = false;
                 }
             } else {
                 $error = 'Registration failed. Please try again.';
                 $showSignupModal = true;
             }
         }
-    }
-}
-
-// Check if we should show OTP modal from session (when page reloads)
-if (isset($_SESSION['verify_email']) && !$showOTPModal && !isset($_POST['otp'])) {
-    $showOTPModal = true;
-    $email = $_SESSION['verify_email'];
-    if (empty($success)) {
-        $success = "Please enter the OTP sent to your email.";
     }
 }
 ?>
@@ -164,7 +148,7 @@ if (isset($_SESSION['verify_email']) && !$showOTPModal && !isset($_POST['otp']))
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PAMANTASAN NG LUNGSOD NG PASIG - SMART GRADE AI</title>
-        <style>
+    <style>
         /* Your existing CSS styles remain exactly the same */
         :root {
             --plp-green: #006341;
@@ -704,6 +688,7 @@ if (isset($_SESSION['verify_email']) && !$showOTPModal && !isset($_POST['otp']))
     <div class="header">
         <h1>PLP SMARTGRADE</h1>
         <p>An Intelligent System for Academic Performance Prediction and Risk Assessment<br>across Major Subjects of Second Year BSIT College Students</p>
+
         
         <div class="main-content-wrapper">
             <div class="main-content">
@@ -970,7 +955,7 @@ if (isset($_SESSION['verify_email']) && !$showOTPModal && !isset($_POST['otp']))
         
         if (closeOtpModal) {
             closeOtpModal.addEventListener('click', function() {
-                document.getElementById('otpModal').classList.remove('active');
+                otpModal.classList.remove('active');
             });
         }
         
@@ -983,7 +968,7 @@ if (isset($_SESSION['verify_email']) && !$showOTPModal && !isset($_POST['otp']))
         
         if (backToLogin) {
             backToLogin.addEventListener('click', function() {
-                document.getElementById('otpModal').classList.remove('active');
+                otpModal.classList.remove('active');
             });
         }
         
@@ -992,8 +977,8 @@ if (isset($_SESSION['verify_email']) && !$showOTPModal && !isset($_POST['otp']))
             if (e.target === signupModal) {
                 signupModal.classList.remove('active');
             }
-            if (e.target === document.getElementById('otpModal')) {
-                document.getElementById('otpModal').classList.remove('active');
+            if (e.target === otpModal) {
+                otpModal.classList.remove('active');
             }
         });
     </script>
