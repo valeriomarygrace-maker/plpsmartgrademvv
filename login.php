@@ -251,7 +251,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
         .login-form h3 {
             text-align: center;
             color: var(--plp-green);
-            margin-bottom: 0.85rem;
+            margin-bottom: 0.50rem;
             font-size: 1.5rem;
             font-weight: 700;
             position: relative;
