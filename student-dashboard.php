@@ -1,7 +1,14 @@
 <?php
 require_once 'config.php';
 
-if (!isset($_SESSION['logged_in']) || $_SESSION['user_type'] !== 'student') {
+// Check if user is logged in - FIXED VERSION
+if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
+    header('Location: login.php');
+    exit;
+}
+
+// Check if user_type is set and is student
+if (!isset($_SESSION['user_type']) || $_SESSION['user_type'] !== 'student') {
     header('Location: login.php');
     exit;
 }
@@ -9,9 +16,19 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['user_type'] !== 'student') {
 $userEmail = $_SESSION['user_email'] ?? '';
 $userId = $_SESSION['user_id'] ?? null;
 
+// Debug session (remove this after testing)
+error_log("🔍 Dashboard access - User: $userEmail, ID: $userId, Logged in: " . ($_SESSION['logged_in'] ? 'YES' : 'NO'));
+
+if (empty($userEmail) || empty($userId)) {
+    error_log("❌ Missing session data - redirecting to login");
+    header('Location: login.php');
+    exit;
+}
+
 // Get student data from Supabase
 $student = getStudentById($userId);
 if (!$student) {
+    error_log("❌ Student not found in database for ID: $userId");
     $_SESSION['error_message'] = "Student account not found";
     header('Location: login.php');
     exit;
