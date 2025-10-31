@@ -16,7 +16,6 @@ $error_message = '';
 $student = null;
 $subjects = [];
 $available_subjects = [];
-$subject = null;
 
 // Get student data
 try {
@@ -27,6 +26,43 @@ try {
     }
 } catch (Exception $e) {
     $error_message = 'Database error: ' . $e->getMessage();
+}
+
+// Initialize subjects in database if they don't exist
+try {
+    $existing_subjects = supabaseFetch('subjects', []);
+    $subject_count = $existing_subjects ? count($existing_subjects) : 0;
+    
+    if ($subject_count == 0) {
+        $actual_subjects = [
+            // First Semester
+            ['COMP 104', 'Data Structures and Algorithms', 3, 'First Semester'],
+            ['COMP 105', 'Information Management', 3, 'First Semester'],
+            ['IT 102', 'Quantitative Methods', 3, 'First Semester'],
+            ['IT 201', 'IT Elective: Platform Technologies', 3, 'First Semester'],
+            ['IT 202', 'IT Elective: Object-Oriented Programming (VB.Net)', 3, 'First Semester'],
+            
+            // Second Semester
+            ['IT 103', 'Advanced Database Systems', 3, 'Second Semester'],
+            ['IT 104', 'Integrative Programming and Technologies I', 3, 'Second Semester'],
+            ['IT 105', 'Networking I', 3, 'Second Semester'],
+            ['IT 301', 'Web Programming', 3, 'Second Semester'],
+            ['COMP 106', 'Applications Development and Emerging Technologies', 3, 'Second Semester']
+        ];
+        
+        foreach ($actual_subjects as $subject) {
+            $subject_data = [
+                'subject_code' => $subject[0],
+                'subject_name' => $subject[1],
+                'credits' => $subject[2],
+                'semester' => $subject[3]
+            ];
+            
+            supabaseInsert('subjects', $subject_data);
+        }
+    }
+} catch (Exception $e) {
+    // Silently continue
 }
 
 // Get student's enrolled subjects
@@ -125,6 +161,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_subject'])) {
                 }
                 
                 // Refresh available subjects
+                $all_subjects = supabaseFetch('subjects', ['semester' => $student_semester]);
                 $enrolled_subject_ids = [];
                 if ($subjects && count($subjects) > 0) {
                     foreach ($subjects as $enrolled_subject) {
@@ -162,13 +199,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
         } else {
             $subject_to_archive = $subject_to_archive[0];
             
-            // Get subject details
-            $subject_details = supabaseFetch('subjects', ['id' => $subject_to_archive['subject_id']]);
-            if ($subject_details && count($subject_details) > 0) {
-                $subject_to_archive['subject_code'] = $subject_details[0]['subject_code'] ?? '';
-                $subject_to_archive['subject_name'] = $subject_details[0]['subject_name'] ?? '';
-            }
-            
             // Insert into archived_subjects
             $archive_data = [
                 'student_id' => $subject_to_archive['student_id'],
@@ -180,103 +210,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
             $archive_result = supabaseInsert('archived_subjects', $archive_data);
             
             if ($archive_result !== false) {
-                // Get class standing categories and scores
-                $categories = supabaseFetch('student_class_standing_categories', ['student_subject_id' => $subject_record_id]);
-                
-                if ($categories && count($categories) > 0) {
-                    foreach ($categories as $category) {
-                        // Archive category
-                        $archive_category_data = [
-                            'archived_subject_id' => $archive_result[0]['id'] ?? $archive_result['id'] ?? null,
-                            'category_name' => $category['category_name'],
-                            'category_percentage' => $category['category_percentage']
-                        ];
-                        
-                        $archived_category = supabaseInsert('archived_class_standing_categories', $archive_category_data);
-                        
-                        if ($archived_category) {
-                            // Archive scores for this category
-                            $scores = supabaseFetch('student_subject_scores', ['category_id' => $category['id']]);
-                            
-                            if ($scores && count($scores) > 0) {
-                                foreach ($scores as $score) {
-                                    $archive_score_data = [
-                                        'archived_category_id' => $archived_category[0]['id'] ?? $archived_category['id'] ?? null,
-                                        'score_type' => $score['score_type'],
-                                        'score_name' => $score['score_name'],
-                                        'score_value' => $score['score_value'],
-                                        'max_score' => $score['max_score'],
-                                        'score_date' => $score['score_date']
-                                    ];
-                                    
-                                    supabaseInsert('archived_subject_scores', $archive_score_data);
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                // Archive exam scores
-                $exam_scores = supabaseFetch('student_subject_scores', [
-                    'student_subject_id' => $subject_record_id,
-                    'score_type' => 'midterm_exam'
-                ]);
-                $exam_scores = array_merge($exam_scores, supabaseFetch('student_subject_scores', [
-                    'student_subject_id' => $subject_record_id,
-                    'score_type' => 'final_exam'
-                ]));
-                
-                if ($exam_scores && count($exam_scores) > 0) {
-                    foreach ($exam_scores as $exam_score) {
-                        // Create exam category
-                        $exam_category_data = [
-                            'archived_subject_id' => $archive_result[0]['id'] ?? $archive_result['id'] ?? null,
-                            'category_name' => $exam_score['score_type'] . '_exam',
-                            'category_percentage' => 0
-                        ];
-                        
-                        $exam_category = supabaseInsert('archived_class_standing_categories', $exam_category_data);
-                        
-                        if ($exam_category) {
-                            $archive_exam_data = [
-                                'archived_category_id' => $exam_category[0]['id'] ?? $exam_category['id'] ?? null,
-                                'score_type' => $exam_score['score_type'],
-                                'score_name' => $exam_score['score_name'],
-                                'score_value' => $exam_score['score_value'],
-                                'max_score' => $exam_score['max_score'],
-                                'score_date' => $exam_score['score_date']
-                            ];
-                            
-                            supabaseInsert('archived_subject_scores', $archive_exam_data);
-                        }
-                    }
-                }
-                
-                // Archive performance data
-                $performance_data = supabaseFetch('subject_performance', ['student_subject_id' => $subject_record_id]);
-                
-                if ($performance_data && count($performance_data) > 0) {
-                    $performance_data = $performance_data[0];
-                    $archive_performance_data = [
-                        'archived_subject_id' => $archive_result[0]['id'] ?? $archive_result['id'] ?? null,
-                        'overall_grade' => $performance_data['overall_grade'],
-                        'gpa' => $performance_data['gpa'],
-                        'class_standing' => $performance_data['class_standing'],
-                        'exams_score' => $performance_data['exams_score'],
-                        'risk_level' => $performance_data['risk_level'],
-                        'risk_description' => $performance_data['risk_description']
-                    ];
-                    
-                    supabaseInsert('archived_subject_performance', $archive_performance_data);
-                }
-                
                 // Delete from active tables
-                supabaseDelete('student_subject_scores', ['student_subject_id' => $subject_record_id]);
-                supabaseDelete('student_class_standing_categories', ['student_subject_id' => $subject_record_id]);
-                supabaseDelete('subject_performance', ['student_subject_id' => $subject_record_id]);
                 supabaseDelete('student_subjects', ['id' => $subject_record_id, 'student_id' => $student['id']]);
                 
-                $success_message = 'Subject archived successfully with all records preserved!';
+                $success_message = 'Subject archived successfully!';
                 
                 // Refresh subjects list
                 $subjects = supabaseFetch('student_subjects', ['student_id' => $student['id']]);
@@ -293,6 +230,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
                 }
                 
                 // Refresh available subjects
+                $all_subjects = supabaseFetch('subjects', ['semester' => $student_semester]);
                 $enrolled_subject_ids = [];
                 if ($subjects && count($subjects) > 0) {
                     foreach ($subjects as $enrolled_subject) {
@@ -362,61 +300,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
     }
 }
 
-// Initialize subjects if they don't exist
-try {
-    $existing_subjects = supabaseFetch('subjects', []);
-    $subject_count = $existing_subjects ? count($existing_subjects) : 0;
-    
-    if ($subject_count == 0) {
-        $actual_subjects = [
-            // First Semester
-            ['COMP 104', 'Data Structures and Algorithms', 3, 'First Semester'],
-            ['COMP 105', 'Information Management', 3, 'First Semester'],
-            ['IT 102', 'Quantitative Methods', 3, 'First Semester'],
-            ['IT 201', 'IT Elective: Platform Technologies', 3, 'First Semester'],
-            ['IT 202', 'IT Elective: Object-Oriented Programming (VB.Net)', 3, 'First Semester'],
-            
-            // Second Semester
-            ['IT 103', 'Advanced Database Systems', 3, 'Second Semester'],
-            ['IT 104', 'Integrative Programming and Technologies I', 3, 'Second Semester'],
-            ['IT 105', 'Networking I', 3, 'Second Semester'],
-            ['IT 301', 'Web Programming', 3, 'Second Semester'],
-            ['COMP 106', 'Applications Development and Emerging Technologies', 3, 'Second Semester']
-        ];
-        
-        foreach ($actual_subjects as $subject) {
-            $subject_data = [
-                'subject_code' => $subject[0],
-                'subject_name' => $subject[1],
-                'credits' => $subject[2],
-                'semester' => $subject[3]
-            ];
-            
-            supabaseInsert('subjects', $subject_data);
-        }
-        
-        // Refresh available subjects
-        $all_subjects = supabaseFetch('subjects', ['semester' => $student_semester]);
-        $enrolled_subject_ids = [];
-        if ($subjects && count($subjects) > 0) {
-            foreach ($subjects as $enrolled_subject) {
-                $enrolled_subject_ids[] = $enrolled_subject['subject_id'];
-            }
-        }
-        
-        $available_subjects = [];
-        if ($all_subjects && count($all_subjects) > 0) {
-            foreach ($all_subjects as $subject) {
-                if (!in_array($subject['id'], $enrolled_subject_ids)) {
-                    $available_subjects[] = $subject;
-                }
-            }
-        }
-    }
-} catch (Exception $e) {
-    // Silently continue
-}
-
 $semester_mapping = [
     '1st Semester' => 'First Semester',
     '2nd Semester' => 'Second Semester',
@@ -434,7 +317,7 @@ $current_semester_display = $semester_mapping[$student['semester']] ?? 'First Se
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* Your existing CSS styles remain the same */
+        /* Your existing CSS styles remain exactly the same */
         :root {
             --plp-green: #006341;
             --plp-green-light: #008856;
@@ -1533,7 +1416,7 @@ $current_semester_display = $semester_mapping[$student['semester']] ?? 'First Se
     </div>
 
     <script>
-        // Modal functionality
+        // Your existing JavaScript remains exactly the same
         const addSubjectBtn = document.getElementById('addSubjectBtn');
         const addSubjectModal = document.getElementById('addSubjectModal');
         const cancelAddSubject = document.getElementById('cancelAddSubject');

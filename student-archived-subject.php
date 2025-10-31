@@ -16,12 +16,9 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || $_SESSI
 $userEmail = $_SESSION['user_email'] ?? '';
 $userId = $_SESSION['user_id'] ?? null;
 
-// Fetch student data
-$stmt = $pdo->prepare("SELECT * FROM students WHERE id = ? AND email = ?");
-$stmt->execute([$userId, $userEmail]);
-$student = $stmt->fetch(PDO::FETCH_ASSOC);
-
-if (!$student) {
+// Fetch student data using Supabase
+$student = getStudentById($userId);
+if (!$student || $student['email'] !== $userEmail) {
     $_SESSION['error_message'] = "Student account not found";
     header('Location: login.php');
     exit;
@@ -35,237 +32,189 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_subject'])) {
     $archived_subject_id = $_POST['archived_subject_id'];
     
     try {
-        // Begin transaction
-        $pdo->beginTransaction();
-        
         // Get the archived subject details
-        $get_archived_stmt = $pdo->prepare("
-            SELECT * FROM archived_subjects 
-            WHERE id = ? AND student_id = ?
-        ");
-        $get_archived_stmt->execute([$archived_subject_id, $student['id']]);
-        $archived_subject = $get_archived_stmt->fetch(PDO::FETCH_ASSOC);
+        $archived_subjects = supabaseFetch('archived_subjects', ['id' => $archived_subject_id, 'student_id' => $student['id']]);
+        $archived_subject = $archived_subjects && count($archived_subjects) > 0 ? $archived_subjects[0] : null;
         
         if (!$archived_subject) {
             throw new Exception("Archived subject not found.");
         }
         
         // Check if subject already exists in active subjects
-        $check_stmt = $pdo->prepare("
-            SELECT id FROM student_subjects 
-            WHERE student_id = ? AND subject_id = ?
-        ");
-        $check_stmt->execute([$student['id'], $archived_subject['subject_id']]);
-        
-        if ($check_stmt->fetch()) {
+        $existing_subjects = supabaseFetch('student_subjects', ['student_id' => $student['id'], 'subject_id' => $archived_subject['subject_id']]);
+        if ($existing_subjects && count($existing_subjects) > 0) {
             throw new Exception("This subject is already in your active subjects.");
         }
         
         // Restore to student_subjects
-        $restore_stmt = $pdo->prepare("
-            INSERT INTO student_subjects (student_id, subject_id, professor_name, schedule) 
-            VALUES (?, ?, ?, ?)
-        ");
-        $restore_stmt->execute([
-            $archived_subject['student_id'],
-            $archived_subject['subject_id'],
-            $archived_subject['professor_name'],
-            $archived_subject['schedule']
+        $restored_subject = supabaseInsert('student_subjects', [
+            'student_id' => $archived_subject['student_id'],
+            'subject_id' => $archived_subject['subject_id'],
+            'professor_name' => $archived_subject['professor_name'],
+            'schedule' => $archived_subject['schedule']
         ]);
         
-        $restored_subject_id = $pdo->lastInsertId();
+        if (!$restored_subject) {
+            throw new Exception("Failed to restore subject.");
+        }
+        
+        $restored_subject_id = $restored_subject[0]['id'] ?? null;
+        if (!$restored_subject_id) {
+            throw new Exception("Failed to get restored subject ID.");
+        }
         
         // Get archived categories
-        $archived_categories_stmt = $pdo->prepare("
-            SELECT * FROM archived_class_standing_categories 
-            WHERE archived_subject_id = ?
-        ");
-        $archived_categories_stmt->execute([$archived_subject_id]);
-        $archived_categories = $archived_categories_stmt->fetchAll(PDO::FETCH_ASSOC);
+        $archived_categories = supabaseFetch('archived_class_standing_categories', ['archived_subject_id' => $archived_subject_id]);
         
         $category_mapping = [];
         
         // Restore categories
         foreach ($archived_categories as $archived_category) {
-            $restore_category_stmt = $pdo->prepare("
-                INSERT INTO student_class_standing_categories 
-                (student_subject_id, category_name, category_percentage) 
-                VALUES (?, ?, ?)
-            ");
-            $restore_category_stmt->execute([
-                $restored_subject_id,
-                $archived_category['category_name'],
-                $archived_category['category_percentage']
+            $restored_category = supabaseInsert('student_class_standing_categories', [
+                'student_subject_id' => $restored_subject_id,
+                'category_name' => $archived_category['category_name'],
+                'category_percentage' => $archived_category['category_percentage']
             ]);
             
-            $new_category_id = $pdo->lastInsertId();
-            $category_mapping[$archived_category['id']] = $new_category_id;
+            if ($restored_category && count($restored_category) > 0) {
+                $new_category_id = $restored_category[0]['id'];
+                $category_mapping[$archived_category['id']] = $new_category_id;
+            }
         }
         
         // Restore scores
         foreach ($category_mapping as $old_category_id => $new_category_id) {
-            $archived_scores_stmt = $pdo->prepare("
-                SELECT * FROM archived_subject_scores 
-                WHERE archived_category_id = ?
-            ");
-            $archived_scores_stmt->execute([$old_category_id]);
-            $archived_scores = $archived_scores_stmt->fetchAll(PDO::FETCH_ASSOC);
+            $archived_scores = supabaseFetch('archived_subject_scores', ['archived_category_id' => $old_category_id]);
             
             foreach ($archived_scores as $score) {
                 // For exam scores, category_id should be NULL
                 $category_id_for_score = (strpos($score['score_type'], 'exam') !== false) ? NULL : $new_category_id;
                 
-                $restore_score_stmt = $pdo->prepare("
-                    INSERT INTO student_subject_scores 
-                    (student_subject_id, category_id, score_type, score_name, score_value, max_score, score_date) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                ");
-                $restore_score_stmt->execute([
-                    $restored_subject_id,
-                    $category_id_for_score,
-                    $score['score_type'],
-                    $score['score_name'],
-                    $score['score_value'],
-                    $score['max_score'],
-                    $score['score_date']
+                supabaseInsert('student_subject_scores', [
+                    'student_subject_id' => $restored_subject_id,
+                    'category_id' => $category_id_for_score,
+                    'score_type' => $score['score_type'],
+                    'score_name' => $score['score_name'],
+                    'score_value' => $score['score_value'],
+                    'max_score' => $score['max_score'],
+                    'score_date' => $score['score_date']
                 ]);
             }
         }
         
         // Restore performance data if exists
-        $archived_performance_stmt = $pdo->prepare("
-            SELECT * FROM archived_subject_performance 
-            WHERE archived_subject_id = ?
-        ");
-        $archived_performance_stmt->execute([$archived_subject_id]);
-        $archived_performance = $archived_performance_stmt->fetch(PDO::FETCH_ASSOC);
-        
-        if ($archived_performance) {
-            // Ensure subject_performance table exists
-            try {
-                $pdo->exec("
-                    CREATE TABLE IF NOT EXISTS subject_performance (
-                        id INT PRIMARY KEY AUTO_INCREMENT,
-                        student_subject_id INT NOT NULL,
-                        overall_grade DECIMAL(5,2) DEFAULT 0,
-                        gpa DECIMAL(3,2) DEFAULT 0,
-                        class_standing DECIMAL(5,2) DEFAULT 0,
-                        exams_score DECIMAL(5,2) DEFAULT 0,
-                        risk_level VARCHAR(20) DEFAULT 'no-data',
-                        risk_description VARCHAR(255) DEFAULT 'No Data Inputted',
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                        FOREIGN KEY (student_subject_id) REFERENCES student_subjects(id) ON DELETE CASCADE
-                    )
-                ");
-                
-                $restore_performance_stmt = $pdo->prepare("
-                    INSERT INTO subject_performance 
-                    (student_subject_id, overall_grade, gpa, class_standing, exams_score, risk_level, risk_description) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                ");
-                $restore_performance_stmt->execute([
-                    $restored_subject_id,
-                    $archived_performance['overall_grade'],
-                    $archived_performance['gpa'],
-                    $archived_performance['class_standing'],
-                    $archived_performance['exams_score'],
-                    $archived_performance['risk_level'],
-                    $archived_performance['risk_description']
-                ]);
-            } catch (PDOException $e) {
-                // Silently continue if performance table operations fail
-                error_log("Performance restoration skipped: " . $e->getMessage());
-            }
+        $archived_performance = supabaseFetch('archived_subject_performance', ['archived_subject_id' => $archived_subject_id]);
+        if ($archived_performance && count($archived_performance) > 0) {
+            $archived_performance = $archived_performance[0];
+            
+            supabaseInsert('subject_performance', [
+                'student_subject_id' => $restored_subject_id,
+                'overall_grade' => $archived_performance['overall_grade'],
+                'gpa' => $archived_performance['gpa'],
+                'class_standing' => $archived_performance['class_standing'],
+                'exams_score' => $archived_performance['exams_score'],
+                'risk_level' => $archived_performance['risk_level'],
+                'risk_description' => $archived_performance['risk_description']
+            ]);
         }
         
         // Delete from archived tables
-        $delete_scores_stmt = $pdo->prepare("
-            DELETE FROM archived_subject_scores 
-            WHERE archived_category_id IN (
-                SELECT id FROM archived_class_standing_categories WHERE archived_subject_id = ?
-            )
-        ");
-        $delete_scores_stmt->execute([$archived_subject_id]);
+        // First delete scores
+        $archived_categories_for_deletion = supabaseFetch('archived_class_standing_categories', ['archived_subject_id' => $archived_subject_id]);
+        foreach ($archived_categories_for_deletion as $category) {
+            supabaseDelete('archived_subject_scores', ['archived_category_id' => $category['id']]);
+        }
         
-        $delete_categories_stmt = $pdo->prepare("
-            DELETE FROM archived_class_standing_categories 
-            WHERE archived_subject_id = ?
-        ");
-        $delete_categories_stmt->execute([$archived_subject_id]);
+        // Then delete categories
+        supabaseDelete('archived_class_standing_categories', ['archived_subject_id' => $archived_subject_id]);
         
-        $delete_performance_stmt = $pdo->prepare("
-            DELETE FROM archived_subject_performance 
-            WHERE archived_subject_id = ?
-        ");
-        $delete_performance_stmt->execute([$archived_subject_id]);
+        // Delete performance
+        supabaseDelete('archived_subject_performance', ['archived_subject_id' => $archived_subject_id]);
         
-        $delete_subject_stmt = $pdo->prepare("
-            DELETE FROM archived_subjects 
-            WHERE id = ?
-        ");
-        $delete_subject_stmt->execute([$archived_subject_id]);
-        
-        // Commit transaction
-        $pdo->commit();
+        // Finally delete the archived subject
+        supabaseDelete('archived_subjects', ['id' => $archived_subject_id]);
         
         $success_message = 'Subject restored successfully with all records!';
         
     } catch (Exception $e) {
-        $pdo->rollBack();
         $error_message = 'Error restoring subject: ' . $e->getMessage();
     }
 }
 
 // Fetch archived subjects with calculated performance data
 try {
-    $archived_subjects_stmt = $pdo->prepare("
-        SELECT 
-            a.*, 
-            s.subject_code, 
-            s.subject_name, 
-            s.credits, 
-            s.semester,
-            p.overall_grade,
-            p.gpa,
-            p.class_standing,
-            p.exams_score,
-            p.risk_level,
-            p.risk_description,
-            CASE 
-                WHEN p.overall_grade IS NOT NULL AND p.overall_grade > 0 THEN 1 
-                ELSE 0 
-            END as has_scores
-        FROM archived_subjects a
-        JOIN subjects s ON a.subject_id = s.id
-        LEFT JOIN archived_subject_performance p ON a.id = p.archived_subject_id
-        WHERE a.student_id = ?
-        ORDER BY a.archived_at DESC
-    ");
-    $archived_subjects_stmt->execute([$student['id']]);
-    $archived_subjects = $archived_subjects_stmt->fetchAll(PDO::FETCH_ASSOC);
+    // First get all archived subjects for this student
+    $archived_subjects_data = supabaseFetch('archived_subjects', ['student_id' => $student['id']]);
+    $archived_subjects = [];
     
-    // If no performance data exists in archived_subject_performance, calculate it from scores
-    foreach ($archived_subjects as &$subject) {
-        if (!$subject['has_scores']) {
-            // Calculate performance from archived scores
-            $calculated_performance = calculateArchivedSubjectPerformance($subject['id'], $pdo);
-            if ($calculated_performance) {
-                $subject['overall_grade'] = $calculated_performance['overall_grade'];
-                $subject['gpa'] = $calculated_performance['gpa'];
-                $subject['class_standing'] = $calculated_performance['class_standing'];
-                $subject['exams_score'] = $calculated_performance['exams_score'];
-                $subject['risk_level'] = $calculated_performance['risk_level'];
-                $subject['risk_description'] = $calculated_performance['risk_description'];
-                $subject['has_scores'] = $calculated_performance['has_scores'];
+    foreach ($archived_subjects_data as $archived_subject) {
+        // Get subject details
+        $subject_data = supabaseFetch('subjects', ['id' => $archived_subject['subject_id']]);
+        if ($subject_data && count($subject_data) > 0) {
+            $subject = $subject_data[0];
+            
+            // Get performance data
+            $performance_data = supabaseFetch('archived_subject_performance', ['archived_subject_id' => $archived_subject['id']]);
+            $performance = $performance_data && count($performance_data) > 0 ? $performance_data[0] : null;
+            
+            $has_scores = false;
+            $overall_grade = 0;
+            $gpa = 0;
+            $class_standing = 0;
+            $exams_score = 0;
+            $risk_level = 'no-data';
+            $risk_description = 'No Data Inputted';
+            
+            if ($performance) {
+                $has_scores = true;
+                $overall_grade = $performance['overall_grade'] ?? 0;
+                $gpa = $performance['gpa'] ?? 0;
+                $class_standing = $performance['class_standing'] ?? 0;
+                $exams_score = $performance['exams_score'] ?? 0;
+                $risk_level = $performance['risk_level'] ?? 'no-data';
+                $risk_description = $performance['risk_description'] ?? 'No Data Inputted';
+            } else {
+                // Calculate performance from scores if no performance data exists
+                $calculated_performance = calculateArchivedSubjectPerformance($archived_subject['id']);
+                if ($calculated_performance) {
+                    $has_scores = $calculated_performance['has_scores'];
+                    $overall_grade = $calculated_performance['overall_grade'];
+                    $gpa = $calculated_performance['gpa'];
+                    $class_standing = $calculated_performance['class_standing'];
+                    $exams_score = $calculated_performance['exams_score'];
+                    $risk_level = $calculated_performance['risk_level'];
+                    $risk_description = $calculated_performance['risk_description'];
+                }
             }
+            
+            $archived_subjects[] = [
+                'id' => $archived_subject['id'],
+                'subject_code' => $subject['subject_code'],
+                'subject_name' => $subject['subject_name'],
+                'credits' => $subject['credits'],
+                'semester' => $subject['semester'],
+                'professor_name' => $archived_subject['professor_name'],
+                'schedule' => $archived_subject['schedule'],
+                'archived_at' => $archived_subject['archived_at'],
+                'overall_grade' => $overall_grade,
+                'gpa' => $gpa,
+                'class_standing' => $class_standing,
+                'exams_score' => $exams_score,
+                'risk_level' => $risk_level,
+                'risk_description' => $risk_description,
+                'has_scores' => $has_scores
+            ];
         }
     }
-    unset($subject); // break the reference
+    
+    // Sort by archived date descending
+    usort($archived_subjects, function($a, $b) {
+        return strtotime($b['archived_at']) - strtotime($a['archived_at']);
+    });
     
     $total_archived = count($archived_subjects);
     
-} catch (PDOException $e) {
+} catch (Exception $e) {
     $archived_subjects = [];
     $total_archived = 0;
     error_log("Error fetching archived subjects: " . $e->getMessage());
@@ -274,15 +223,10 @@ try {
 /**
  * Calculate performance for archived subject from scores
  */
-function calculateArchivedSubjectPerformance($archived_subject_id, $pdo) {
+function calculateArchivedSubjectPerformance($archived_subject_id) {
     try {
         // Get all categories for this archived subject
-        $categories_stmt = $pdo->prepare("
-            SELECT * FROM archived_class_standing_categories 
-            WHERE archived_subject_id = ?
-        ");
-        $categories_stmt->execute([$archived_subject_id]);
-        $categories = $categories_stmt->fetchAll(PDO::FETCH_ASSOC);
+        $categories = supabaseFetch('archived_class_standing_categories', ['archived_subject_id' => $archived_subject_id]);
         
         if (empty($categories)) {
             return null;
@@ -295,12 +239,7 @@ function calculateArchivedSubjectPerformance($archived_subject_id, $pdo) {
         
         // Calculate class standing from categories
         foreach ($categories as $category) {
-            $scores_stmt = $pdo->prepare("
-                SELECT * FROM archived_subject_scores 
-                WHERE archived_category_id = ? AND score_type = 'class_standing'
-            ");
-            $scores_stmt->execute([$category['id']]);
-            $scores = $scores_stmt->fetchAll(PDO::FETCH_ASSOC);
+            $scores = supabaseFetch('archived_subject_scores', ['archived_category_id' => $category['id'], 'score_type' => 'class_standing']);
             
             if (!empty($scores)) {
                 $hasScores = true;
@@ -326,31 +265,16 @@ function calculateArchivedSubjectPerformance($archived_subject_id, $pdo) {
         }
         
         // Get exam scores
-        $exam_categories_stmt = $pdo->prepare("
-            SELECT ac.id FROM archived_class_standing_categories ac
-            JOIN archived_subject_scores ass ON ac.id = ass.archived_category_id
-            WHERE ac.archived_subject_id = ? AND ass.score_type IN ('midterm_exam', 'final_exam')
-            GROUP BY ac.id
-        ");
-        $exam_categories_stmt->execute([$archived_subject_id]);
-        $exam_categories = $exam_categories_stmt->fetchAll(PDO::FETCH_ASSOC);
+        $exam_scores = supabaseFetch('archived_subject_scores', ['score_type' => 'midterm_exam']);
+        $exam_scores = array_merge($exam_scores, supabaseFetch('archived_subject_scores', ['score_type' => 'final_exam']));
         
-        foreach ($exam_categories as $exam_category) {
-            $exam_scores_stmt = $pdo->prepare("
-                SELECT * FROM archived_subject_scores 
-                WHERE archived_category_id = ? AND score_type IN ('midterm_exam', 'final_exam')
-            ");
-            $exam_scores_stmt->execute([$exam_category['id']]);
-            $exam_scores = $exam_scores_stmt->fetchAll(PDO::FETCH_ASSOC);
-            
-            foreach ($exam_scores as $exam) {
-                if ($exam['max_score'] > 0) {
-                    $examPercentage = ($exam['score_value'] / $exam['max_score']) * 100;
-                    if ($exam['score_type'] === 'midterm_exam') {
-                        $midtermScore = ($examPercentage * 20) / 100;
-                    } elseif ($exam['score_type'] === 'final_exam') {
-                        $finalScore = ($examPercentage * 20) / 100;
-                    }
+        foreach ($exam_scores as $exam) {
+            if ($exam['max_score'] > 0) {
+                $examPercentage = ($exam['score_value'] / $exam['max_score']) * 100;
+                if ($exam['score_type'] === 'midterm_exam') {
+                    $midtermScore = ($examPercentage * 20) / 100;
+                } elseif ($exam['score_type'] === 'final_exam') {
+                    $finalScore = ($examPercentage * 20) / 100;
                 }
             }
         }
@@ -373,12 +297,11 @@ function calculateArchivedSubjectPerformance($archived_subject_id, $pdo) {
             $overallGrade = 100;
         }
         
-        // Calculate GPA and risk level - USE THE SAME LOGIC AS subject-management.php
+        // Calculate GPA and risk level
         $gpa = 0;
         $riskLevel = 'no-data';
         $riskDescription = 'No Data Inputted';
         
-        // This is the same GPA calculation as in subject-management.php
         if ($overallGrade >= 89) {
             $gpa = 1.00; // Low Risk
         } elseif ($overallGrade >= 82) {
@@ -389,7 +312,7 @@ function calculateArchivedSubjectPerformance($archived_subject_id, $pdo) {
             $gpa = 3.00; // High Risk
         }
 
-        // Calculate risk level based on GPA - same as subject-management.php
+        // Calculate risk level based on GPA
         if ($gpa == 1.00) {
             $riskLevel = 'low';
             $riskDescription = 'Low Risk';
@@ -411,7 +334,7 @@ function calculateArchivedSubjectPerformance($archived_subject_id, $pdo) {
             'has_scores' => true
         ];
         
-    } catch (PDOException $e) {
+    } catch (Exception $e) {
         error_log("Error calculating archived subject performance: " . $e->getMessage());
         return null;
     }

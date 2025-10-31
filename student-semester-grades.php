@@ -18,30 +18,31 @@ $selected_semester = $_GET['semester'] ?? '';
 $error_message = '';
 
 try {
-    // Get student info
-    $stmt = $pdo->prepare("SELECT * FROM students WHERE email = ?");
-    $stmt->execute([$_SESSION['user_email']]);
-    $student = $stmt->fetch(PDO::FETCH_ASSOC);
+    // Get student info using Supabase
+    $student = getStudentByEmail($_SESSION['user_email']);
     
     if (!$student) {
         $error_message = 'Student record not found.';
     } else {
         // Get all semesters with archived subjects
-        $semester_stmt = $pdo->prepare("
-            SELECT DISTINCT s.semester 
-            FROM archived_subjects a 
-            JOIN subjects s ON a.subject_id = s.id 
-            WHERE a.student_id = ? 
-            ORDER BY 
-                CASE 
-                    WHEN s.semester = 'First Semester' THEN 1
-                    WHEN s.semester = 'Second Semester' THEN 2
-                    WHEN s.semester = 'Summer' THEN 3
-                    ELSE 4
-                END
-        ");
-        $semester_stmt->execute([$student['id']]);
-        $semesters = $semester_stmt->fetchAll(PDO::FETCH_COLUMN);
+        $archived_subjects = supabaseFetch('archived_subjects', ['student_id' => $student['id']]);
+        $semesters = [];
+        
+        foreach ($archived_subjects as $archived_subject) {
+            $subject_data = supabaseFetch('subjects', ['id' => $archived_subject['subject_id']]);
+            if ($subject_data && count($subject_data) > 0) {
+                $subject = $subject_data[0];
+                if (!in_array($subject['semester'], $semesters)) {
+                    $semesters[] = $subject['semester'];
+                }
+            }
+        }
+        
+        // Sort semesters logically
+        usort($semesters, function($a, $b) {
+            $order = ['First Semester' => 1, 'Second Semester' => 2, 'Summer' => 3];
+            return ($order[$a] ?? 4) - ($order[$b] ?? 4);
+        });
         
         // If no semester selected, use the first one
         if (empty($selected_semester) && !empty($semesters)) {
@@ -50,55 +51,56 @@ try {
         
         // Get archived subjects for the selected semester with calculated performance
         if ($selected_semester) {
-            $grades_stmt = $pdo->prepare("
-                SELECT 
-                    a.id as archived_subject_id,
-                    s.subject_code,
-                    s.subject_name,
-                    s.credits,
-                    s.semester,
-                    a.professor_name,
-                    a.schedule,
-                    a.archived_at,
-                    COALESCE(ap.overall_grade, 0) as overall_grade,
-                    COALESCE(ap.gpa, 0) as gpa,
-                    COALESCE(ap.class_standing, 0) as class_standing,
-                    COALESCE(ap.exams_score, 0) as exams_score,
-                    COALESCE(ap.risk_level, 'no-data') as risk_level,
-                    COALESCE(ap.risk_description, 'No Data Inputted') as risk_description,
-                    CASE 
-                        WHEN ap.overall_grade IS NOT NULL AND ap.overall_grade > 0 THEN 1 
-                        ELSE 0 
-                    END as has_scores
-                FROM archived_subjects a
-                JOIN subjects s ON a.subject_id = s.id
-                LEFT JOIN archived_subject_performance ap ON a.id = ap.archived_subject_id
-                WHERE a.student_id = ? AND s.semester = ?
-                ORDER BY s.subject_code
-            ");
-            $grades_stmt->execute([$student['id'], $selected_semester]);
-            $semester_grades = $grades_stmt->fetchAll(PDO::FETCH_ASSOC);
+            $semester_grades = [];
             
-            // If no performance data exists in archived_subject_performance, calculate it from scores
-            foreach ($semester_grades as &$subject) {
-                if (!$subject['has_scores']) {
-                    // Calculate performance from archived scores
-                    $calculated_performance = calculateArchivedSubjectPerformance($subject['archived_subject_id'], $pdo);
-                    if ($calculated_performance && $calculated_performance['has_scores']) {
-                        $subject['overall_grade'] = $calculated_performance['overall_grade'];
-                        $subject['gpa'] = $calculated_performance['gpa'];
-                        $subject['class_standing'] = $calculated_performance['class_standing'];
-                        $subject['exams_score'] = $calculated_performance['exams_score'];
-                        $subject['risk_level'] = $calculated_performance['risk_level'];
-                        $subject['risk_description'] = $calculated_performance['risk_description'];
-                        $subject['has_scores'] = $calculated_performance['has_scores'];
+            foreach ($archived_subjects as $archived_subject) {
+                $subject_data = supabaseFetch('subjects', ['id' => $archived_subject['subject_id']]);
+                if ($subject_data && count($subject_data) > 0) {
+                    $subject = $subject_data[0];
+                    
+                    if ($subject['semester'] === $selected_semester) {
+                        // Get performance data
+                        $performance_data = supabaseFetch('archived_subject_performance', ['archived_subject_id' => $archived_subject['id']]);
+                        $performance = $performance_data && count($performance_data) > 0 ? $performance_data[0] : null;
+                        
+                        $has_scores = false;
+                        $overall_grade = 0;
+                        
+                        if ($performance) {
+                            $has_scores = true;
+                            $overall_grade = $performance['overall_grade'] ?? 0;
+                        } else {
+                            // Calculate performance from scores if no performance data exists
+                            $calculated_performance = calculateArchivedSubjectPerformance($archived_subject['id']);
+                            if ($calculated_performance && $calculated_performance['has_scores']) {
+                                $has_scores = true;
+                                $overall_grade = $calculated_performance['overall_grade'];
+                            }
+                        }
+                        
+                        $semester_grades[] = [
+                            'archived_subject_id' => $archived_subject['id'],
+                            'subject_code' => $subject['subject_code'],
+                            'subject_name' => $subject['subject_name'],
+                            'credits' => $subject['credits'],
+                            'semester' => $subject['semester'],
+                            'professor_name' => $archived_subject['professor_name'],
+                            'schedule' => $archived_subject['schedule'],
+                            'archived_at' => $archived_subject['archived_at'],
+                            'overall_grade' => $overall_grade,
+                            'has_scores' => $has_scores
+                        ];
                     }
                 }
             }
-            unset($subject); // break the reference
+            
+            // Sort by subject code
+            usort($semester_grades, function($a, $b) {
+                return strcmp($a['subject_code'], $b['subject_code']);
+            });
         }
     }
-} catch (PDOException $e) {
+} catch (Exception $e) {
     $error_message = 'Database error: ' . $e->getMessage();
     error_log("Error in student-semester-grades.php: " . $e->getMessage());
 }
@@ -106,15 +108,10 @@ try {
 /**
  * Calculate performance for archived subject from scores
  */
-function calculateArchivedSubjectPerformance($archived_subject_id, $pdo) {
+function calculateArchivedSubjectPerformance($archived_subject_id) {
     try {
         // Get all categories for this archived subject
-        $categories_stmt = $pdo->prepare("
-            SELECT * FROM archived_class_standing_categories 
-            WHERE archived_subject_id = ?
-        ");
-        $categories_stmt->execute([$archived_subject_id]);
-        $categories = $categories_stmt->fetchAll(PDO::FETCH_ASSOC);
+        $categories = supabaseFetch('archived_class_standing_categories', ['archived_subject_id' => $archived_subject_id]);
         
         if (empty($categories)) {
             return null;
@@ -127,12 +124,7 @@ function calculateArchivedSubjectPerformance($archived_subject_id, $pdo) {
         
         // Calculate class standing from categories
         foreach ($categories as $category) {
-            $scores_stmt = $pdo->prepare("
-                SELECT * FROM archived_subject_scores 
-                WHERE archived_category_id = ? AND score_type = 'class_standing'
-            ");
-            $scores_stmt->execute([$category['id']]);
-            $scores = $scores_stmt->fetchAll(PDO::FETCH_ASSOC);
+            $scores = supabaseFetch('archived_subject_scores', ['archived_category_id' => $category['id'], 'score_type' => 'class_standing']);
             
             if (!empty($scores)) {
                 $hasScores = true;
@@ -158,31 +150,16 @@ function calculateArchivedSubjectPerformance($archived_subject_id, $pdo) {
         }
         
         // Get exam scores
-        $exam_categories_stmt = $pdo->prepare("
-            SELECT ac.id FROM archived_class_standing_categories ac
-            JOIN archived_subject_scores ass ON ac.id = ass.archived_category_id
-            WHERE ac.archived_subject_id = ? AND ass.score_type IN ('midterm_exam', 'final_exam')
-            GROUP BY ac.id
-        ");
-        $exam_categories_stmt->execute([$archived_subject_id]);
-        $exam_categories = $exam_categories_stmt->fetchAll(PDO::FETCH_ASSOC);
+        $exam_scores = supabaseFetch('archived_subject_scores', ['score_type' => 'midterm_exam']);
+        $exam_scores = array_merge($exam_scores, supabaseFetch('archived_subject_scores', ['score_type' => 'final_exam']));
         
-        foreach ($exam_categories as $exam_category) {
-            $exam_scores_stmt = $pdo->prepare("
-                SELECT * FROM archived_subject_scores 
-                WHERE archived_category_id = ? AND score_type IN ('midterm_exam', 'final_exam')
-            ");
-            $exam_scores_stmt->execute([$exam_category['id']]);
-            $exam_scores = $exam_scores_stmt->fetchAll(PDO::FETCH_ASSOC);
-            
-            foreach ($exam_scores as $exam) {
-                if ($exam['max_score'] > 0) {
-                    $examPercentage = ($exam['score_value'] / $exam['max_score']) * 100;
-                    if ($exam['score_type'] === 'midterm_exam') {
-                        $midtermScore = ($examPercentage * 20) / 100;
-                    } elseif ($exam['score_type'] === 'final_exam') {
-                        $finalScore = ($examPercentage * 20) / 100;
-                    }
+        foreach ($exam_scores as $exam) {
+            if ($exam['max_score'] > 0) {
+                $examPercentage = ($exam['score_value'] / $exam['max_score']) * 100;
+                if ($exam['score_type'] === 'midterm_exam') {
+                    $midtermScore = ($examPercentage * 20) / 100;
+                } elseif ($exam['score_type'] === 'final_exam') {
+                    $finalScore = ($examPercentage * 20) / 100;
                 }
             }
         }
@@ -190,11 +167,6 @@ function calculateArchivedSubjectPerformance($archived_subject_id, $pdo) {
         if (!$hasScores && $midtermScore == 0 && $finalScore == 0) {
             return [
                 'overall_grade' => 0,
-                'gpa' => 0,
-                'class_standing' => 0,
-                'exams_score' => 0,
-                'risk_level' => 'no-data',
-                'risk_description' => 'No Data Inputted',
                 'has_scores' => false
             ];
         }
@@ -205,45 +177,12 @@ function calculateArchivedSubjectPerformance($archived_subject_id, $pdo) {
             $overallGrade = 100;
         }
         
-        // Calculate GPA and risk level - USE THE SAME LOGIC AS subject-management.php
-        $gpa = 0;
-        $riskLevel = 'no-data';
-        $riskDescription = 'No Data Inputted';
-        
-        // This is the same GPA calculation as in subject-management.php
-        if ($overallGrade >= 89) {
-            $gpa = 1.00; // Low Risk
-        } elseif ($overallGrade >= 82) {
-            $gpa = 2.00; // Medium Risk  
-        } elseif ($overallGrade >= 79) {
-            $gpa = 2.75; // Medium Risk
-        } else {
-            $gpa = 3.00; // High Risk
-        }
-
-        // Calculate risk level based on GPA - same as subject-management.php
-        if ($gpa == 1.00) {
-            $riskLevel = 'low';
-            $riskDescription = 'Low Risk';
-        } elseif ($gpa == 2.00 || $gpa == 2.75) {
-            $riskLevel = 'medium';
-            $riskDescription = 'Medium Risk';
-        } elseif ($gpa == 3.00) {
-            $riskLevel = 'high';
-            $riskDescription = 'High Risk';
-        }
-        
         return [
             'overall_grade' => $overallGrade,
-            'gpa' => $gpa,
-            'class_standing' => $totalClassStanding,
-            'exams_score' => $midtermScore + $finalScore,
-            'risk_level' => $riskLevel,
-            'risk_description' => $riskDescription,
             'has_scores' => true
         ];
         
-    } catch (PDOException $e) {
+    } catch (Exception $e) {
         error_log("Error calculating archived subject performance: " . $e->getMessage());
         return null;
     }
