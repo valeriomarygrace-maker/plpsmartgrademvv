@@ -9,6 +9,46 @@ $showOTPModal = false;
 $otpError = '';
 $email = '';
 
+// Check if user is already logged in
+if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
+    header('Location: student-dashboard.php');
+    exit;
+}
+
+// Handle OTP verification (this should come FIRST)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['otp'])) {
+    $otp = sanitizeInput($_POST['otp']);
+    $email = $_SESSION['verify_email'] ?? '';
+    
+    if (empty($email)) {
+        $otpError = 'Session expired. Please login again.';
+        $showOTPModal = true;
+    } elseif (verifyOTP($email, $otp)) {
+        // Regenerate session for security
+        regenerateSession();
+        
+        $_SESSION['logged_in'] = true;
+        $_SESSION['user_email'] = $email;
+        $_SESSION['user_type'] = 'student';
+        $_SESSION['user_id'] = $_SESSION['temp_user_id'] ?? null;
+        $_SESSION['user_name'] = $_SESSION['temp_user_name'] ?? '';
+        $_SESSION['login_time'] = time();
+        
+        // Clean up temporary session data
+        unset($_SESSION['verify_email']);
+        unset($_SESSION['temp_user_id']);
+        unset($_SESSION['temp_user_name']);
+        
+        // Redirect to student dashboard
+        header('Location: student-dashboard.php');
+        exit;
+    } else {
+        $otpError = 'Invalid OTP code or OTP has expired. Please check your email and try again.';
+        $showOTPModal = true;
+        $email = $_SESSION['verify_email'] ?? ''; // Keep email for display
+    }
+}
+
 // Handle login form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && !isset($_POST['signup'])) {
     $email = sanitizeInput($_POST['email']);
@@ -49,39 +89,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && !isset($_
     }
 }
 
-// Handle OTP verification
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['otp'])) {
-    $otp = sanitizeInput($_POST['otp']);
-    $email = $_SESSION['verify_email'] ?? '';
-    
-    if (empty($email)) {
-        $otpError = 'Session expired. Please login again.';
-        $showOTPModal = true;
-    } elseif (verifyOTP($email, $otp)) {
-        // Regenerate session for security
-        regenerateSession();
-        
-        $_SESSION['logged_in'] = true;
-        $_SESSION['user_email'] = $email;
-        $_SESSION['user_type'] = 'student';
-        $_SESSION['user_id'] = $_SESSION['temp_user_id'] ?? null;
-        $_SESSION['user_name'] = $_SESSION['temp_user_name'] ?? '';
-        $_SESSION['login_time'] = time();
-        
-        // Clean up temporary session data
-        unset($_SESSION['verify_email']);
-        unset($_SESSION['temp_user_id']);
-        unset($_SESSION['temp_user_name']);
-        
-        // Redirect to student dashboard
-        header('Location: student-dashboard.php');
-        exit;
-    } else {
-        $otpError = 'Invalid OTP code or OTP has expired. Please check your email and try again.';
-        $showOTPModal = true;
-    }
-}
-    
 // Handle signup
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
     $student_number = sanitizeInput($_POST['student_number']);
@@ -139,6 +146,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             }
         }
     }
+}
+
+// Check if we're coming from OTP verification with session still active
+if (isset($_SESSION['verify_email']) && !$showOTPModal) {
+    $showOTPModal = true;
+    $email = $_SESSION['verify_email'];
+    $success = "Please enter the OTP sent to your email.";
 }
 ?>
 
