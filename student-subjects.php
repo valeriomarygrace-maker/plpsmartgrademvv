@@ -93,10 +93,22 @@ try {
         'Summer' => 'Summer'
     ];
     
+    // Debug: Check student semester
+    error_log("Student semester: " . ($student['semester'] ?? 'Not set'));
+    
     $student_semester = $semester_mapping[$student['semester']] ?? 'First Semester';
+    error_log("Mapped semester: " . $student_semester);
     
     // Get all subjects for the current semester
     $all_subjects = supabaseFetch('subjects', ['semester' => $student_semester]);
+    
+    // Debug: Check all subjects
+    error_log("All subjects count: " . ($all_subjects ? count($all_subjects) : 0));
+    if ($all_subjects) {
+        foreach ($all_subjects as $subj) {
+            error_log("Subject: " . ($subj['subject_code'] ?? 'No code') . " - " . ($subj['subject_name'] ?? 'No name'));
+        }
+    }
     
     // Get enrolled subject IDs to exclude
     $enrolled_subject_ids = [];
@@ -105,6 +117,8 @@ try {
             $enrolled_subject_ids[] = $enrolled_subject['subject_id'];
         }
     }
+    
+    error_log("Enrolled subject IDs: " . implode(', ', $enrolled_subject_ids));
     
     // Filter available subjects
     $available_subjects = [];
@@ -115,7 +129,11 @@ try {
             }
         }
     }
+    
+    error_log("Available subjects count: " . count($available_subjects));
+    
 } catch (Exception $e) {
+    error_log("Error fetching available subjects: " . $e->getMessage());
     $available_subjects = [];
 }
 
