@@ -16,100 +16,77 @@ $error_message = '';
 $student = null;
 $subjects = [];
 $available_subjects = [];
+$subject = null;
 
-// Get student data
 try {
-    $student = getStudentByEmail($_SESSION['user_email']);
+    $stmt = $pdo->prepare("SELECT * FROM students WHERE email = ?");
+    $stmt->execute([$_SESSION['user_email']]);
+    $student = $stmt->fetch(PDO::FETCH_ASSOC);
     
     if (!$student) {
         $error_message = 'Student record not found.';
     }
-} catch (Exception $e) {
+} catch (PDOException $e) {
     $error_message = 'Database error: ' . $e->getMessage();
-}
-
-// Initialize subjects in database if they don't exist
-try {
-    $existing_subjects = supabaseFetch('subjects', []);
-    $subject_count = $existing_subjects ? count($existing_subjects) : 0;
-    
-    if ($subject_count == 0) {
-        $actual_subjects = [
-            // First Semester
-            ['COMP 104', 'Data Structures and Algorithms', 3, 'First Semester'],
-            ['COMP 105', 'Information Management', 3, 'First Semester'],
-            ['IT 102', 'Quantitative Methods', 3, 'First Semester'],
-            ['IT 201', 'IT Elective: Platform Technologies', 3, 'First Semester'],
-            ['IT 202', 'IT Elective: Object-Oriented Programming (VB.Net)', 3, 'First Semester'],
-            
-            // Second Semester
-            ['IT 103', 'Advanced Database Systems', 3, 'Second Semester'],
-            ['IT 104', 'Integrative Programming and Technologies I', 3, 'Second Semester'],
-            ['IT 105', 'Networking I', 3, 'Second Semester'],
-            ['IT 301', 'Web Programming', 3, 'Second Semester'],
-            ['COMP 106', 'Applications Development and Emerging Technologies', 3, 'Second Semester']
-        ];
-        
-        foreach ($actual_subjects as $subject) {
-            $subject_data = [
-                'subject_code' => $subject[0],
-                'subject_name' => $subject[1],
-                'credits' => $subject[2],
-                'semester' => $subject[3]
-            ];
-            
-            supabaseInsert('subjects', $subject_data);
-        }
-    }
-} catch (Exception $e) {
-    // Silently continue
 }
 
 // Get student's enrolled subjects
 try {
-    $subjects = supabaseFetch('student_subjects', ['student_id' => $student['id']]);
-    
-    // Get subject details for each enrolled subject
-    if ($subjects && count($subjects) > 0) {
-        foreach ($subjects as &$subject) {
-            $subject_details = supabaseFetch('subjects', ['id' => $subject['subject_id']]);
-            if ($subject_details && count($subject_details) > 0) {
-                $subject['subject_code'] = $subject_details[0]['subject_code'] ?? '';
-                $subject['subject_name'] = $subject_details[0]['subject_name'] ?? '';
-                $subject['credits'] = $subject_details[0]['credits'] ?? '';
-                $subject['semester'] = $subject_details[0]['semester'] ?? '';
-            }
-        }
-    }
-} catch (Exception $e) {
+    $subjects_stmt = $pdo->prepare("
+        SELECT ss.*, s.subject_code, s.subject_name, s.credits, s.semester 
+        FROM student_subjects ss 
+        JOIN subjects s ON ss.subject_id = s.id 
+        WHERE ss.student_id = ? 
+        ORDER BY ss.created_at DESC
+    ");
+    $subjects_stmt->execute([$student['id']]);
+    $subjects = $subjects_stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
     $error_message = 'Database error: ' . $e->getMessage();
 }
 
-// Get available subjects for dropdown - SIMPLIFIED VERSION
+// Get available subjects for dropdown - FIXED VERSION
 try {
-    $all_subjects = supabaseFetch('subjects', []);
+    // Map student semester to match subjects table format
+    $semester_mapping = [
+        '1st Semester' => 'First Semester',
+        '2nd Semester' => 'Second Semester', 
+        'Summer' => 'Summer'
+    ];
     
-    // Get enrolled subject IDs
-    $enrolled_subject_ids = [];
-    if ($subjects && count($subjects) > 0) {
-        foreach ($subjects as $enrolled_subject) {
-            if (isset($enrolled_subject['subject_id'])) {
-                $enrolled_subject_ids[] = $enrolled_subject['subject_id'];
-            }
-        }
+    $student_semester = $semester_mapping[$student['semester']] ?? 'First Semester';
+    
+    // First, let's debug what's actually in the subjects table
+    $debug_subjects = $pdo->query("SELECT subject_code, subject_name, semester FROM subjects")->fetchAll(PDO::FETCH_ASSOC);
+    error_log("Available subjects in database: " . print_r($debug_subjects, true));
+    
+    // Get all subjects that the student hasn't enrolled in yet
+    $available_subjects_stmt = $pdo->prepare("
+        SELECT s.* FROM subjects s
+        WHERE s.id NOT IN (
+            SELECT subject_id FROM student_subjects WHERE student_id = ?
+        )
+        ORDER BY s.subject_code
+    ");
+    $available_subjects_stmt->execute([$student['id']]);
+    $available_subjects = $available_subjects_stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // If no subjects found, try without semester filter as fallback
+    if (empty($available_subjects)) {
+        $all_subjects_stmt = $pdo->prepare("
+            SELECT * FROM subjects 
+            WHERE id NOT IN (
+                SELECT subject_id FROM student_subjects WHERE student_id = ?
+            )
+            ORDER BY subject_code
+        ");
+        $all_subjects_stmt->execute([$student['id']]);
+        $available_subjects = $all_subjects_stmt->fetchAll(PDO::FETCH_ASSOC);
     }
     
-    // Filter out enrolled subjects
-    $available_subjects = [];
-    if ($all_subjects && count($all_subjects) > 0) {
-        foreach ($all_subjects as $subject) {
-            if (isset($subject['id']) && !in_array($subject['id'], $enrolled_subject_ids)) {
-                $available_subjects[] = $subject;
-            }
-        }
-    }
+    error_log("Available subjects for dropdown: " . count($available_subjects));
     
-} catch (Exception $e) {
+} catch (PDOException $e) {
     error_log("Error fetching available subjects: " . $e->getMessage());
     $available_subjects = [];
 }
@@ -129,55 +106,103 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_subject'])) {
         $error_message = 'Schedule is required.';
     } else {
         try {
-            $insert_data = [
-                'student_id' => $student['id'],
-                'subject_id' => $subject_id,
-                'professor_name' => $professor_name,
-                'schedule' => $schedule
-            ];
-            
-            $insert_result = supabaseInsert('student_subjects', $insert_data);
-            
-            if ($insert_result !== false) {
+            $insert_stmt = $pdo->prepare("
+                INSERT INTO student_subjects (student_id, subject_id, professor_name, schedule) 
+                VALUES (?, ?, ?, ?)
+            ");
+            if ($insert_stmt->execute([$student['id'], $subject_id, $professor_name, $schedule])) {
                 $success_message = 'Subject added successfully!';
-                
-                // Refresh subjects list
-                $subjects = supabaseFetch('student_subjects', ['student_id' => $student['id']]);
-                if ($subjects && count($subjects) > 0) {
-                    foreach ($subjects as &$subject) {
-                        $subject_details = supabaseFetch('subjects', ['id' => $subject['subject_id']]);
-                        if ($subject_details && count($subject_details) > 0) {
-                            $subject['subject_code'] = $subject_details[0]['subject_code'] ?? '';
-                            $subject['subject_name'] = $subject_details[0]['subject_name'] ?? '';
-                            $subject['credits'] = $subject_details[0]['credits'] ?? '';
-                            $subject['semester'] = $subject_details[0]['semester'] ?? '';
-                        }
-                    }
-                }
-                
-                // Refresh available subjects
-                $all_subjects = supabaseFetch('subjects', []);
-                $enrolled_subject_ids = [];
-                if ($subjects && count($subjects) > 0) {
-                    foreach ($subjects as $enrolled_subject) {
-                        $enrolled_subject_ids[] = $enrolled_subject['subject_id'];
-                    }
-                }
-                
-                $available_subjects = [];
-                if ($all_subjects && count($all_subjects) > 0) {
-                    foreach ($all_subjects as $subject) {
-                        if (!in_array($subject['id'], $enrolled_subject_ids)) {
-                            $available_subjects[] = $subject;
-                        }
-                    }
-                }
+                $subjects_stmt->execute([$student['id']]);
+                $subjects = $subjects_stmt->fetchAll(PDO::FETCH_ASSOC);
+                $available_subjects_stmt->execute([$student['id']]);
+                $available_subjects = $available_subjects_stmt->fetchAll(PDO::FETCH_ASSOC);
             } else {
                 $error_message = 'Failed to add subject.';
             }
-        } catch (Exception $e) {
-            $error_message = 'Database error: ' . $e->getMessage();
+        } catch (PDOException $e) {
+            if ($e->getCode() == '42S02') { 
+                try {
+                    $pdo->exec("
+                        CREATE TABLE student_subjects (
+                            id INT PRIMARY KEY AUTO_INCREMENT,
+                            student_id INT NOT NULL,
+                            subject_id INT NOT NULL,
+                            professor_name VARCHAR(255) NOT NULL,
+                            schedule VARCHAR(100) NOT NULL,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
+                            FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE
+                        )
+                    ");
+                    
+                    $pdo->exec("
+                        CREATE TABLE IF NOT EXISTS subjects (
+                            id INT PRIMARY KEY AUTO_INCREMENT,
+                            subject_code VARCHAR(50) NOT NULL UNIQUE,
+                            subject_name VARCHAR(255) NOT NULL,
+                            credits INT NOT NULL,
+                            semester VARCHAR(50),
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                    ");
+                    
+                    $actual_subjects = [
+                        // First Semester
+                        ['COMP 104', 'Data Structures and Algorithms', 3, 'First Semester'],
+                        ['COMP 105', 'Information Management', 3, 'First Semester'],
+                        ['IT 102', 'Quantitative Methods', 3, 'First Semester'],
+                        ['IT 201', 'IT Elective: Platform Technologies', 3, 'First Semester'],
+                        ['IT 202', 'IT Elective: Object-Oriented Programming (VB.Net)', 3, 'First Semester'],
+                        
+                        // Second Semester
+                        ['IT 103', 'Advanced Database Systems', 3, 'Second Semester'],
+                        ['IT 104', 'Integrative Programming and Technologies I', 3, 'Second Semester'],
+                        ['IT 105', 'Networking I', 3, 'Second Semester'],
+                        ['IT 301', 'Web Programming', 3, 'Second Semester'],
+                        ['COMP 106', 'Applications Development and Emerging Technologies', 3, 'Second Semester']
+                    ];
+                    
+                    foreach ($actual_subjects as $subject) {
+                        $pdo->prepare("
+                            INSERT IGNORE INTO subjects (subject_code, subject_name, credits, semester) 
+                            VALUES (?, ?, ?, ?)
+                        ")->execute($subject);
+                    }
+                    
+                    if ($insert_stmt->execute([$student['id'], $subject_id, $professor_name, $schedule])) {
+                        $success_message = 'Subject added successfully! Database has been initialized with your curriculum subjects.';
+                        $subjects_stmt->execute([$student['id']]);
+                        $subjects = $subjects_stmt->fetchAll(PDO::FETCH_ASSOC);
+                        $available_subjects_stmt->execute([$student['id']]);
+                        $available_subjects = $available_subjects_stmt->fetchAll(PDO::FETCH_ASSOC);
+                    }
+                } catch (PDOException $create_error) {
+                    $error_message = 'Database setup error: ' . $create_error->getMessage();
+                }
+            } else {
+                $error_message = 'Database error: ' . $e->getMessage();
+            }
         }
+    }
+}
+
+// Handle delete subject
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_subject'])) {
+    $subject_record_id = $_POST['subject_record_id'];
+    
+    try {
+        $delete_stmt = $pdo->prepare("DELETE FROM student_subjects WHERE id = ? AND student_id = ?");
+        if ($delete_stmt->execute([$subject_record_id, $student['id']])) {
+            $success_message = 'Subject removed successfully!';
+            $subjects_stmt->execute([$student['id']]);
+            $subjects = $subjects_stmt->fetchAll(PDO::FETCH_ASSOC);
+            $available_subjects_stmt->execute([$student['id']]);
+            $available_subjects = $available_subjects_stmt->fetchAll(PDO::FETCH_ASSOC);
+        } else {
+            $error_message = 'Failed to remove subject.';
+        }
+    } catch (PDOException $e) {
+        $error_message = 'Database error: ' . $e->getMessage();
     }
 }
 
@@ -187,65 +212,232 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
     
     try {
         // Get the subject details before archiving
-        $subject_to_archive = supabaseFetch('student_subjects', ['id' => $subject_record_id, 'student_id' => $student['id']]);
+        $get_stmt = $pdo->prepare("
+            SELECT ss.*, s.subject_code, s.subject_name, s.credits, s.semester 
+            FROM student_subjects ss 
+            JOIN subjects s ON ss.subject_id = s.id 
+            WHERE ss.id = ? AND ss.student_id = ?
+        ");
+        $get_stmt->execute([$subject_record_id, $student['id']]);
+        $subject_to_archive = $get_stmt->fetch(PDO::FETCH_ASSOC);
         
-        if (!$subject_to_archive || count($subject_to_archive) === 0) {
+        if (!$subject_to_archive) {
             $error_message = 'Subject not found.';
         } else {
-            $subject_to_archive = $subject_to_archive[0];
-            
-            // Insert into archived_subjects
-            $archive_data = [
-                'student_id' => $subject_to_archive['student_id'],
-                'subject_id' => $subject_to_archive['subject_id'],
-                'professor_name' => $subject_to_archive['professor_name'],
-                'schedule' => $subject_to_archive['schedule']
+            // Ensure all archive tables exist
+            $archive_tables_sql = [
+                "CREATE TABLE IF NOT EXISTS archived_subjects (
+                    id INT PRIMARY KEY AUTO_INCREMENT,
+                    student_id INT NOT NULL,
+                    subject_id INT NOT NULL,
+                    professor_name VARCHAR(255) NOT NULL,
+                    schedule VARCHAR(100) NOT NULL,
+                    archived_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
+                    FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE
+                )",
+                
+                "CREATE TABLE IF NOT EXISTS archived_class_standing_categories (
+                    id INT PRIMARY KEY AUTO_INCREMENT,
+                    archived_subject_id INT NOT NULL,
+                    category_name VARCHAR(255) NOT NULL,
+                    category_percentage DECIMAL(5,2) NOT NULL,
+                    archived_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (archived_subject_id) REFERENCES archived_subjects(id) ON DELETE CASCADE
+                )",
+                
+                "CREATE TABLE IF NOT EXISTS archived_subject_scores (
+                    id INT PRIMARY KEY AUTO_INCREMENT,
+                    archived_category_id INT NOT NULL,
+                    score_type ENUM('class_standing', 'midterm_exam', 'final_exam') NOT NULL,
+                    score_name VARCHAR(255) NOT NULL,
+                    score_value DECIMAL(5,2) DEFAULT 0,
+                    max_score DECIMAL(5,2) DEFAULT 100,
+                    score_date DATE NULL,
+                    archived_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (archived_category_id) REFERENCES archived_class_standing_categories(id) ON DELETE CASCADE
+                )",
+                
+                "CREATE TABLE IF NOT EXISTS archived_subject_performance (
+                    id INT PRIMARY KEY AUTO_INCREMENT,
+                    archived_subject_id INT NOT NULL,
+                    overall_grade DECIMAL(5,2) DEFAULT 0,
+                    gpa DECIMAL(3,2) DEFAULT 0,
+                    class_standing DECIMAL(5,2) DEFAULT 0,
+                    exams_score DECIMAL(5,2) DEFAULT 0,
+                    risk_level VARCHAR(20) DEFAULT 'no-data',
+                    risk_description VARCHAR(255) DEFAULT 'No Data Inputted',
+                    archived_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (archived_subject_id) REFERENCES archived_subjects(id) ON DELETE CASCADE
+                )"
             ];
             
-            $archive_result = supabaseInsert('archived_subjects', $archive_data);
-            
-            if ($archive_result !== false) {
-                // Delete from active tables
-                supabaseDelete('student_subjects', ['id' => $subject_record_id, 'student_id' => $student['id']]);
-                
-                $success_message = 'Subject archived successfully!';
-                
-                // Refresh subjects list
-                $subjects = supabaseFetch('student_subjects', ['student_id' => $student['id']]);
-                if ($subjects && count($subjects) > 0) {
-                    foreach ($subjects as &$subject) {
-                        $subject_details = supabaseFetch('subjects', ['id' => $subject['subject_id']]);
-                        if ($subject_details && count($subject_details) > 0) {
-                            $subject['subject_code'] = $subject_details[0]['subject_code'] ?? '';
-                            $subject['subject_name'] = $subject_details[0]['subject_name'] ?? '';
-                            $subject['credits'] = $subject_details[0]['credits'] ?? '';
-                            $subject['semester'] = $subject_details[0]['semester'] ?? '';
-                        }
-                    }
+            // Create tables without transaction
+            foreach ($archive_tables_sql as $sql) {
+                try {
+                    $pdo->exec($sql);
+                } catch (PDOException $tableError) {
+                    error_log("Table creation skipped: " . $tableError->getMessage());
                 }
-                
-                // Refresh available subjects
-                $all_subjects = supabaseFetch('subjects', []);
-                $enrolled_subject_ids = [];
-                if ($subjects && count($subjects) > 0) {
-                    foreach ($subjects as $enrolled_subject) {
-                        $enrolled_subject_ids[] = $enrolled_subject['subject_id'];
-                    }
-                }
-                
-                $available_subjects = [];
-                if ($all_subjects && count($all_subjects) > 0) {
-                    foreach ($all_subjects as $subject) {
-                        if (!in_array($subject['id'], $enrolled_subject_ids)) {
-                            $available_subjects[] = $subject;
-                        }
-                    }
-                }
-            } else {
-                $error_message = 'Failed to archive subject.';
             }
+            
+            // Insert into archived_subjects
+            $archive_stmt = $pdo->prepare("
+                INSERT INTO archived_subjects (student_id, subject_id, professor_name, schedule) 
+                VALUES (?, ?, ?, ?)
+            ");
+            
+            $archive_stmt->execute([
+                $subject_to_archive['student_id'], 
+                $subject_to_archive['subject_id'], 
+                $subject_to_archive['professor_name'], 
+                $subject_to_archive['schedule']
+            ]);
+            
+            $archived_subject_id = $pdo->lastInsertId();
+            
+            // Archive class standing categories
+            $categories_stmt = $pdo->prepare("
+                SELECT * FROM student_class_standing_categories 
+                WHERE student_subject_id = ?
+            ");
+            $categories_stmt->execute([$subject_record_id]);
+            $categories = $categories_stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            foreach ($categories as $category) {
+                // Insert into archived_class_standing_categories
+                $archive_category_stmt = $pdo->prepare("
+                    INSERT INTO archived_class_standing_categories 
+                    (archived_subject_id, category_name, category_percentage) 
+                    VALUES (?, ?, ?)
+                ");
+                $archive_category_stmt->execute([
+                    $archived_subject_id,
+                    $category['category_name'],
+                    $category['category_percentage']
+                ]);
+                
+                $archived_category_id = $pdo->lastInsertId();
+                
+                // Archive scores for this category
+                $scores_stmt = $pdo->prepare("
+                    SELECT * FROM student_subject_scores 
+                    WHERE category_id = ?
+                ");
+                $scores_stmt->execute([$category['id']]);
+                $scores = $scores_stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                foreach ($scores as $score) {
+                    $archive_score_stmt = $pdo->prepare("
+                        INSERT INTO archived_subject_scores 
+                        (archived_category_id, score_type, score_name, score_value, max_score, score_date) 
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    ");
+                    $archive_score_stmt->execute([
+                        $archived_category_id,
+                        $score['score_type'],
+                        $score['score_name'],
+                        $score['score_value'],
+                        $score['max_score'],
+                        $score['score_date']
+                    ]);
+                }
+            }
+            
+            // Archive exam scores (midterm and final)
+            $exam_scores_stmt = $pdo->prepare("
+                SELECT * FROM student_subject_scores 
+                WHERE student_subject_id = ? AND score_type IN ('midterm_exam', 'final_exam')
+            ");
+            $exam_scores_stmt->execute([$subject_record_id]);
+            $exam_scores = $exam_scores_stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            foreach ($exam_scores as $exam_score) {
+                // Create a category for exam scores in archived structure
+                $exam_category_stmt = $pdo->prepare("
+                    INSERT INTO archived_class_standing_categories 
+                    (archived_subject_id, category_name, category_percentage) 
+                    VALUES (?, ?, 0)
+                ");
+                $exam_category_stmt->execute([
+                    $archived_subject_id,
+                    $exam_score['score_type'] . '_exam'
+                ]);
+                
+                $exam_category_id = $pdo->lastInsertId();
+                
+                $archive_exam_stmt = $pdo->prepare("
+                    INSERT INTO archived_subject_scores 
+                    (archived_category_id, score_type, score_name, score_value, max_score, score_date) 
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ");
+                $archive_exam_stmt->execute([
+                    $exam_category_id,
+                    $exam_score['score_type'],
+                    $exam_score['score_name'],
+                    $exam_score['score_value'],
+                    $exam_score['max_score'],
+                    $exam_score['score_date']
+                ]);
+            }
+            
+            // Archive performance data (if exists)
+            try {
+                $performance_stmt = $pdo->prepare("
+                    SELECT * FROM subject_performance 
+                    WHERE student_subject_id = ?
+                ");
+                $performance_stmt->execute([$subject_record_id]);
+                $performance_data = $performance_stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if ($performance_data) {
+                    $archive_performance_stmt = $pdo->prepare("
+                        INSERT INTO archived_subject_performance 
+                        (archived_subject_id, overall_grade, gpa, class_standing, exams_score, risk_level, risk_description) 
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ");
+                    $archive_performance_stmt->execute([
+                        $archived_subject_id,
+                        $performance_data['overall_grade'],
+                        $performance_data['gpa'],
+                        $performance_data['class_standing'],
+                        $performance_data['exams_score'],
+                        $performance_data['risk_level'],
+                        $performance_data['risk_description']
+                    ]);
+                }
+            } catch (PDOException $e) {
+                // If performance table doesn't exist or has issues, continue without performance data
+                error_log("Performance archiving skipped: " . $e->getMessage());
+            }
+            
+            // Now delete from active tables
+            $delete_scores_stmt = $pdo->prepare("DELETE FROM student_subject_scores WHERE student_subject_id = ?");
+            $delete_scores_stmt->execute([$subject_record_id]);
+            
+            $delete_categories_stmt = $pdo->prepare("DELETE FROM student_class_standing_categories WHERE student_subject_id = ?");
+            $delete_categories_stmt->execute([$subject_record_id]);
+            
+            // Delete performance data if exists
+            try {
+                $delete_performance_stmt = $pdo->prepare("DELETE FROM subject_performance WHERE student_subject_id = ?");
+                $delete_performance_stmt->execute([$subject_record_id]);
+            } catch (PDOException $e) {
+                // Ignore if table doesn't exist
+            }
+            
+            $delete_subject_stmt = $pdo->prepare("DELETE FROM student_subjects WHERE id = ? AND student_id = ?");
+            $delete_subject_stmt->execute([$subject_record_id, $student['id']]);
+            
+            $success_message = 'Subject archived successfully with all records preserved!';
+            
+            // Refresh the subjects lists
+            $subjects_stmt->execute([$student['id']]);
+            $subjects = $subjects_stmt->fetchAll(PDO::FETCH_ASSOC);
+            $available_subjects_stmt->execute([$student['id']]);
+            $available_subjects = $available_subjects_stmt->fetchAll(PDO::FETCH_ASSOC);
         }
-    } catch (Exception $e) {
+    } catch (PDOException $e) {
         $error_message = 'Database error during archiving: ' . $e->getMessage();
     }
 }
@@ -263,37 +455,65 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
         $error_message = 'Schedule is required.';
     } else {
         try {
-            $update_data = [
-                'professor_name' => $professor_name,
-                'schedule' => $schedule
-            ];
-            
-            $update_result = supabaseUpdate('student_subjects', $update_data, ['id' => $subject_record_id, 'student_id' => $student['id']]);
-            
-            if ($update_result !== false) {
+            $update_stmt = $pdo->prepare("
+                UPDATE student_subjects 
+                SET professor_name = ?, schedule = ? 
+                WHERE id = ? AND student_id = ?
+            ");
+            if ($update_stmt->execute([$professor_name, $schedule, $subject_record_id, $student['id']])) {
                 $success_message = 'Subject updated successfully!';
-                
-                // Refresh subjects list
-                $subjects = supabaseFetch('student_subjects', ['student_id' => $student['id']]);
-                if ($subjects && count($subjects) > 0) {
-                    foreach ($subjects as &$subject) {
-                        $subject_details = supabaseFetch('subjects', ['id' => $subject['subject_id']]);
-                        if ($subject_details && count($subject_details) > 0) {
-                            $subject['subject_code'] = $subject_details[0]['subject_code'] ?? '';
-                            $subject['subject_name'] = $subject_details[0]['subject_name'] ?? '';
-                            $subject['credits'] = $subject_details[0]['credits'] ?? '';
-                            $subject['semester'] = $subject_details[0]['semester'] ?? '';
-                        }
-                    }
-                }
+                $subjects_stmt->execute([$student['id']]);
+                $subjects = $subjects_stmt->fetchAll(PDO::FETCH_ASSOC);
             } else {
                 $error_message = 'Failed to update subject.';
             }
-        } catch (Exception $e) {
+        } catch (PDOException $e) {
             $error_message = 'Database error: ' . $e->getMessage();
         }
     }
 }
+
+try {
+    $check_subjects = $pdo->query("SELECT COUNT(*) as count FROM subjects");
+    $subject_count = $check_subjects->fetch(PDO::FETCH_ASSOC)['count'];
+    
+    if ($subject_count == 0) {
+        $actual_subjects = [
+            // First Semester
+            ['COMP 104', 'Data Structures and Algorithms', 3, 'First Semester'],
+            ['COMP 105', 'Information Management', 3, 'First Semester'],
+            ['IT 102', 'Quantitative Methods', 3, 'First Semester'],
+            ['IT 201', 'IT Elective: Platform Technologies', 3, 'First Semester'],
+            ['IT 202', 'IT Elective: Object-Oriented Programming (VB.Net)', 3, 'First Semester'],
+            
+            // Second Semester
+            ['IT 103', 'Advanced Database Systems', 3, 'Second Semester'],
+            ['IT 104', 'Integrative Programming and Technologies I', 3, 'Second Semester'],
+            ['IT 105', 'Networking I', 3, 'Second Semester'],
+            ['IT 301', 'Web Programming', 3, 'Second Semester'],
+            ['COMP 106', 'Applications Development and Emerging Technologies', 3, 'Second Semester']
+        ];
+        
+        foreach ($actual_subjects as $subject) {
+            $pdo->prepare("
+                INSERT IGNORE INTO subjects (subject_code, subject_name, credits, semester) 
+                VALUES (?, ?, ?, ?)
+            ")->execute($subject);
+        }
+        
+        $available_subjects_stmt->execute([$student['id']]);
+        $available_subjects = $available_subjects_stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+} catch (PDOException $e) {
+    // Silently continue
+}
+
+$semester_mapping = [
+    '1st Semester' => 'First Semester',
+    '2nd Semester' => 'Second Semester',
+    'Summer' => 'Summer'
+];
+$current_semester_display = $semester_mapping[$student['semester']] ?? 'First Semester';
 ?>
 
 <!DOCTYPE html>
@@ -303,6 +523,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Subjects - PLP SmartGrade</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --plp-green: #006341;
@@ -445,27 +666,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
         }
 
         .logout-btn {
-            margin-top:1rem;
-            background: transparent;
-            color: var(--text-medium);
-            padding: 0.75rem 1rem;
-            border: none;
-            border-radius: var(--border-radius);
-            cursor: pointer;
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            width: 100%;
-            font-weight: 500;
-            transition: var(--transition);
-        }
+                margin-top:1rem;
+                background: transparent;
+                color: var(--text-medium);
+                padding: 0.75rem 1rem;
+                border: none;
+                border-radius: var(--border-radius);
+                cursor: pointer;
+                text-decoration: none;
+                display: flex;
+                align-items: center;
+                gap: 0.75rem;
+                width: 100%;
+                font-weight: 500;
+                transition: var(--transition);
+            }
 
-        .logout-btn:hover {
-            background: #fee2e2;
-            color: #b91c1c;
-            transform: translateX(5px);
-        }
+            .logout-btn:hover {
+                background: #fee2e2;
+                color: #b91c1c;
+                transform: translateX(5px);
+            }
 
         .main-content {
             flex: 1;
@@ -1123,23 +1344,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
         <div class="sidebar-header">
             <div class="logo-container">
                 <div class="logo">
-                    <img src="plplogo.png" alt="PLP Logo" width="50">
+                    <img src="plplogo.png" alt="PLP Logo">
                 </div>
             </div>
             <div class="portal-title">PLPSMARTGRADE</div>
-            <div class="student-email"><?php echo htmlspecialchars($student['email'] ?? ''); ?></div>
+            <div class="student-email"><?php echo htmlspecialchars($student['email']); ?></div>
         </div>
 
         <ul class="nav-menu">
-            <li><a href="student-dashboard.php"><i class="fas fa-chart-line"></i> Dashboard</a></li>
-            <li><a href="student-profile.php"><i class="fas fa-user"></i> Profile</a></li>
-            <li><a href="student-subjects.php" class="active"><i class="fas fa-book"></i> Subjects</a></li>
-            <li><a href="student-archived-subject.php"><i class="fas fa-archive"></i> Archived Subjects</a></li>
-            <li><a href="student-semester-grades.php"><i class="fas fa-history"></i> History Records</a></li>
+            <li class="nav-item">
+                <a href="student-dashboard.php" class="nav-link">
+                    <i class="fas fa-chart-line"></i>
+                    Dashboard
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="student-profile.php" class="nav-link">
+                    <i class="fas fa-user"></i>
+                    Profile
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="student-subjects.php" class="nav-link active">
+                    <i class="fas fa-book"></i>
+                    Subjects
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="student-archived-subject.php" class="nav-link">
+                    <i class="fas fa-archive"></i>
+                    Archived Subjects
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="student-semester-grades.php" class="nav-link">
+                    <i class="fas fa-history"></i>
+                    History Records
+                </a>
+            </li>
         </ul>
 
         <div class="sidebar-footer">
-            <a href="logout.php" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</a>
+            <a href="logout.php" class="logout-btn">
+                <i class="fas fa-sign-out-alt"></i>
+                Logout
+            </a>
         </div>
     </div>
 
@@ -1162,7 +1411,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
             <div class="welcome">Current Subjects</div>
             <div class="semester-indicator">
                 <i class="fas fa-calendar-alt"></i>
-                Current Semester: <?php echo htmlspecialchars($student['semester'] ?? ''); ?> 
+                Current Semester: <?php echo htmlspecialchars($student['semester']); ?> 
             </div>
         </div>
 
@@ -1175,7 +1424,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
                 <div class="card-actions">
                     <div class="subject-count">
                         <i class="fas fa-layer-group"></i>
-                        <?php echo is_array($subjects) ? count($subjects) : 0; ?> Subjects
+                        <?php echo count($subjects); ?> Subjects
                     </div>
                     <button type="button" class="btn btn-primary" id="addSubjectBtn">
                         <i class="fas fa-plus"></i> Add New Subject
@@ -1183,7 +1432,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
                 </div>
             </div>
             
-            <?php if (empty($subjects) || !is_array($subjects) || count($subjects) === 0): ?>
+            <?php if (empty($subjects)): ?>
                 <div class="empty-state">
                     <i class="fas fa-book"></i>
                     <p>No subjects enrolled yet</p>
@@ -1195,38 +1444,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
                         <div class="subject-card" onclick="window.location.href='subject-management.php?subject_id=<?php echo $subject['id']; ?>'">
                             <div class="subject-header">
                                 <div style="flex: 1;">
-                                    <div class="subject-code"><?php echo htmlspecialchars($subject['subject_code'] ?? ''); ?></div>
-                                    <div class="subject-name"><?php echo htmlspecialchars($subject['subject_name'] ?? ''); ?></div>
+                                    <div class="subject-code"><?php echo htmlspecialchars($subject['subject_code']); ?></div>
+                                    <div class="subject-name"><?php echo htmlspecialchars($subject['subject_name']); ?></div>
                                 </div>
                                 <div class="credits">
-                                    <?php echo htmlspecialchars($subject['credits'] ?? ''); ?> CRDTS
+                                    <?php echo htmlspecialchars($subject['credits']); ?> CRDTS
                                 </div>
                             </div>
                             
                             <div class="subject-info">
                                 <div class="info-item">
                                     <i class="fas fa-user-tie"></i>
-                                    <span><strong>Professor:</strong> <?php echo htmlspecialchars($subject['professor_name'] ?? ''); ?></span>
+                                    <span><strong>Professor:</strong> <?php echo htmlspecialchars($subject['professor_name']); ?></span>
                                 </div>
                                 <div class="info-item">
                                     <i class="fas fa-calendar-alt"></i>
-                                    <span><strong>Schedule:</strong> <?php echo htmlspecialchars($subject['schedule'] ?? ''); ?></span>
+                                    <span><strong>Schedule:</strong> <?php echo htmlspecialchars($subject['schedule']); ?></span>
                                 </div>
                                 <div class="info-item">
                                     <i class="fas fa-calendar"></i>
-                                    <span><strong>Semester:</strong> <?php echo htmlspecialchars($subject['semester'] ?? ''); ?></span>
+                                    <span><strong>Semester:</strong> <?php echo htmlspecialchars($subject['semester']); ?></span>
                                 </div>
                                 <div class="info-item">
                                     <i class="fas fa-clock"></i>
-                                    <span><strong>Added:</strong> <?php echo date('M j, Y', strtotime($subject['created_at'] ?? 'now')); ?></span>
+                                    <span><strong>Added:</strong> <?php echo date('M j, Y', strtotime($subject['created_at'])); ?></span>
                                 </div>
                             </div>
                             
                             <div class="subject-actions">
-                                <button type="button" class="btn-edit" onclick="openEditModal(<?php echo $subject['id']; ?>, '<?php echo htmlspecialchars(($subject['subject_code'] ?? '') . ' - ' . ($subject['subject_name'] ?? '')); ?>', '<?php echo htmlspecialchars($subject['professor_name'] ?? ''); ?>', '<?php echo htmlspecialchars($subject['schedule'] ?? ''); ?>')">
+                                <button type="button" class="btn-edit" onclick="openEditModal(<?php echo $subject['id']; ?>, '<?php echo htmlspecialchars($subject['subject_code']); ?> - <?php echo htmlspecialchars($subject['subject_name']); ?>', '<?php echo htmlspecialchars($subject['professor_name']); ?>', '<?php echo htmlspecialchars($subject['schedule']); ?>')">
                                     <i class="fas fa-edit"></i> Edit
                                 </button>
-                                <button type="button" class="btn-archive" onclick="openArchiveModal(<?php echo $subject['id']; ?>, '<?php echo htmlspecialchars(($subject['subject_code'] ?? '') . ' - ' . ($subject['subject_name'] ?? '')); ?>')">
+                                <button type="button" class="btn-archive" onclick="openArchiveModal(<?php echo $subject['id']; ?>, '<?php echo htmlspecialchars($subject['subject_code']); ?> - <?php echo htmlspecialchars($subject['subject_name']); ?>')">
                                     <i class="fas fa-archive"></i> Archive
                                 </button>
                             </div>
@@ -1317,15 +1566,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
                         <label for="subject_id" class="form-label">Subject</label>
                         <select name="subject_id" id="subject_id" class="form-select" required>
                             <option value="">Select a subject</option>
-                            <?php if (is_array($available_subjects) && count($available_subjects) > 0): ?>
-                                <?php foreach ($available_subjects as $available_subject): ?>
-                                    <option value="<?php echo $available_subject['id']; ?>">
-                                        <?php echo htmlspecialchars(($available_subject['subject_code'] ?? '') . ' - ' . ($available_subject['subject_name'] ?? '') . ' (' . ($available_subject['credits'] ?? '') . ' credits)'); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            <?php else: ?>
-                                <option value="" disabled>No subjects available - all subjects may be enrolled</option>
-                            <?php endif; ?>
+                            <?php foreach ($available_subjects as $available_subject): ?>
+                                <option value="<?php echo $available_subject['id']; ?>">
+                                    <?php echo htmlspecialchars($available_subject['subject_code'] . ' - ' . $available_subject['subject_name'] . ' (' . $available_subject['credits'] . ' credits)'); ?>
+                                </option>
+                            <?php endforeach; ?>
                         </select>
                     </div>
                     
@@ -1354,7 +1599,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
         </div>
     </div>
 
+    <!-- Updated Logout Modal -->
+    <div class="modal" id="logoutModal">
+        <div class="modal-content" style="max-width: 450px; text-align: center;">
+            <h3 style="color: var(--plp-green); font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem;">
+                Confirm Logout
+            </h3>
+            <div style="color: var(--text-medium); margin-bottom: 2rem; line-height: 1.6;">
+                Are you sure you want to logout? You'll need<br>
+                to log in again to access your account.
+            </div>
+            <div style="display: flex; justify-content: center; gap: 1rem;">
+                <button class="modal-btn modal-btn-cancel" id="cancelLogout" style="min-width: 120px;">
+                    Cancel
+                </button>
+                <button class="modal-btn modal-btn-confirm" id="confirmLogout" style="min-width: 120px;">
+                    Yes, Logout
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
+        // Modal functionality
         const addSubjectBtn = document.getElementById('addSubjectBtn');
         const addSubjectModal = document.getElementById('addSubjectModal');
         const cancelAddSubject = document.getElementById('cancelAddSubject');
@@ -1368,6 +1635,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
         const cancelArchiveSubject = document.getElementById('cancelArchiveSubject');
         const confirmArchiveSubject = document.getElementById('confirmArchiveSubject');
         const archiveSubjectForm = document.getElementById('archiveSubjectForm');
+
+        // Logout modal functionality
+        const logoutBtn = document.querySelector('.logout-btn');
+        const logoutModal = document.getElementById('logoutModal');
+        const cancelLogout = document.getElementById('cancelLogout');
+        const confirmLogout = document.getElementById('confirmLogout');
 
         // Show modal when clicking add subject button
         addSubjectBtn.addEventListener('click', () => {
@@ -1392,11 +1665,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
             archiveSubjectForm.submit();
         });
 
-        // Close modals when clicking outside
-        window.addEventListener('click', (e) => {
-            if (e.target === addSubjectModal) addSubjectModal.classList.remove('show');
-            if (e.target === editSubjectModal) editSubjectModal.classList.remove('show');
-            if (e.target === archiveSubjectModal) archiveSubjectModal.classList.remove('show');
+        // Show modal when clicking logout button
+        logoutBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            logoutModal.classList.add('show');
+        });
+
+        // Hide modal when clicking cancel
+        cancelLogout.addEventListener('click', () => {
+            logoutModal.classList.remove('show');
+        });
+
+        // Handle logout confirmation
+        confirmLogout.addEventListener('click', () => {
+            window.location.href = 'logout.php';
+        });
+
+        // Hide modal when clicking outside the modal content
+        const modals = [addSubjectModal, editSubjectModal, archiveSubjectModal, logoutModal];
+        modals.forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.remove('show');
+                }
+            });
         });
 
         // Reset form when modal is closed
@@ -1408,7 +1700,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
 
         // Edit modal functions
         function openEditModal(subjectId, subjectInfo, professorName, schedule) {
+            // Prevent event from bubbling to the card click
             event.stopPropagation();
+            
             document.getElementById('edit_subject_id').value = subjectId;
             document.getElementById('edit_subject_info').value = subjectInfo;
             document.getElementById('edit_professor_name').value = professorName;
@@ -1418,7 +1712,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
 
         // Archive modal functions
         function openArchiveModal(subjectId, subjectName) {
+            // Prevent event from bubbling to the card click
             event.stopPropagation();
+            
             document.getElementById('archive_subject_id').value = subjectId;
             document.getElementById('archive_subject_name').textContent = subjectName;
             archiveSubjectModal.classList.add('show');
@@ -1435,6 +1731,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
                 }, 100);
             });
         }, 5000);
+
+        // Close modal after successful form submission if there are no errors
+        <?php if ($success_message && empty($error_message)): ?>
+            document.addEventListener('DOMContentLoaded', function() {
+                const modals = [
+                    document.getElementById('addSubjectModal'),
+                    document.getElementById('editSubjectModal'),
+                    document.getElementById('archiveSubjectModal')
+                ];
+                modals.forEach(modal => {
+                    if (modal) {
+                        modal.classList.remove('show');
+                    }
+                });
+            });
+        <?php endif; ?>
     </script>
 </body>
 </html>
