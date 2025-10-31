@@ -85,52 +85,29 @@ try {
     $error_message = 'Database error: ' . $e->getMessage();
 }
 
-// Get available subjects for dropdown 
+// Get available subjects for dropdown - SIMPLIFIED VERSION
 try {
-    $semester_mapping = [
-        '1st Semester' => 'First Semester',
-        '2nd Semester' => 'Second Semester',
-        'Summer' => 'Summer'
-    ];
+    $all_subjects = supabaseFetch('subjects', []);
     
-    // Debug: Check student semester
-    error_log("Student semester: " . ($student['semester'] ?? 'Not set'));
-    
-    $student_semester = $semester_mapping[$student['semester']] ?? 'First Semester';
-    error_log("Mapped semester: " . $student_semester);
-    
-    // Get all subjects for the current semester
-    $all_subjects = supabaseFetch('subjects', ['semester' => $student_semester]);
-    
-    // Debug: Check all subjects
-    error_log("All subjects count: " . ($all_subjects ? count($all_subjects) : 0));
-    if ($all_subjects) {
-        foreach ($all_subjects as $subj) {
-            error_log("Subject: " . ($subj['subject_code'] ?? 'No code') . " - " . ($subj['subject_name'] ?? 'No name'));
-        }
-    }
-    
-    // Get enrolled subject IDs to exclude
+    // Get enrolled subject IDs
     $enrolled_subject_ids = [];
     if ($subjects && count($subjects) > 0) {
         foreach ($subjects as $enrolled_subject) {
-            $enrolled_subject_ids[] = $enrolled_subject['subject_id'];
-        }
-    }
-    
-    error_log("Enrolled subject IDs: " . implode(', ', $enrolled_subject_ids));
-    
-    // Filter available subjects
-    $available_subjects = [];
-    if ($all_subjects && count($all_subjects) > 0) {
-        foreach ($all_subjects as $subject) {
-            if (!in_array($subject['id'], $enrolled_subject_ids)) {
-                $available_subjects[] = $subject;
+            if (isset($enrolled_subject['subject_id'])) {
+                $enrolled_subject_ids[] = $enrolled_subject['subject_id'];
             }
         }
     }
     
-    error_log("Available subjects count: " . count($available_subjects));
+    // Filter out enrolled subjects
+    $available_subjects = [];
+    if ($all_subjects && count($all_subjects) > 0) {
+        foreach ($all_subjects as $subject) {
+            if (isset($subject['id']) && !in_array($subject['id'], $enrolled_subject_ids)) {
+                $available_subjects[] = $subject;
+            }
+        }
+    }
     
 } catch (Exception $e) {
     error_log("Error fetching available subjects: " . $e->getMessage());
@@ -179,7 +156,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_subject'])) {
                 }
                 
                 // Refresh available subjects
-                $all_subjects = supabaseFetch('subjects', ['semester' => $student_semester]);
+                $all_subjects = supabaseFetch('subjects', []);
                 $enrolled_subject_ids = [];
                 if ($subjects && count($subjects) > 0) {
                     foreach ($subjects as $enrolled_subject) {
@@ -248,7 +225,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
                 }
                 
                 // Refresh available subjects
-                $all_subjects = supabaseFetch('subjects', ['semester' => $student_semester]);
+                $all_subjects = supabaseFetch('subjects', []);
                 $enrolled_subject_ids = [];
                 if ($subjects && count($subjects) > 0) {
                     foreach ($subjects as $enrolled_subject) {
@@ -317,13 +294,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
         }
     }
 }
-
-$semester_mapping = [
-    '1st Semester' => 'First Semester',
-    '2nd Semester' => 'Second Semester',
-    'Summer' => 'Summer'
-];
-$current_semester_display = $semester_mapping[$student['semester']] ?? 'First Semester';
 ?>
 
 <!DOCTYPE html>
@@ -333,9 +303,7 @@ $current_semester_display = $semester_mapping[$student['semester']] ?? 'First Se
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Subjects - PLP SmartGrade</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* Your existing CSS styles remain exactly the same */
         :root {
             --plp-green: #006341;
             --plp-green-light: #008856;
@@ -1155,7 +1123,7 @@ $current_semester_display = $semester_mapping[$student['semester']] ?? 'First Se
         <div class="sidebar-header">
             <div class="logo-container">
                 <div class="logo">
-                    <img src="plplogo.png" alt="PLP Logo">
+                    <img src="plplogo.png" alt="PLP Logo" width="50">
                 </div>
             </div>
             <div class="portal-title">PLPSMARTGRADE</div>
@@ -1163,43 +1131,15 @@ $current_semester_display = $semester_mapping[$student['semester']] ?? 'First Se
         </div>
 
         <ul class="nav-menu">
-            <li class="nav-item">
-                <a href="student-dashboard.php" class="nav-link">
-                    <i class="fas fa-chart-line"></i>
-                    Dashboard
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="student-profile.php" class="nav-link">
-                    <i class="fas fa-user"></i>
-                    Profile
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="student-subjects.php" class="nav-link active">
-                    <i class="fas fa-book"></i>
-                    Subjects
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="student-archived-subject.php" class="nav-link">
-                    <i class="fas fa-archive"></i>
-                    Archived Subjects
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="student-semester-grades.php" class="nav-link">
-                    <i class="fas fa-history"></i>
-                    History Records
-                </a>
-            </li>
+            <li><a href="student-dashboard.php"><i class="fas fa-chart-line"></i> Dashboard</a></li>
+            <li><a href="student-profile.php"><i class="fas fa-user"></i> Profile</a></li>
+            <li><a href="student-subjects.php" class="active"><i class="fas fa-book"></i> Subjects</a></li>
+            <li><a href="student-archived-subject.php"><i class="fas fa-archive"></i> Archived Subjects</a></li>
+            <li><a href="student-semester-grades.php"><i class="fas fa-history"></i> History Records</a></li>
         </ul>
 
         <div class="sidebar-footer">
-            <a href="logout.php" class="logout-btn">
-                <i class="fas fa-sign-out-alt"></i>
-                Logout
-            </a>
+            <a href="logout.php" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</a>
         </div>
     </div>
 
@@ -1383,6 +1323,8 @@ $current_semester_display = $semester_mapping[$student['semester']] ?? 'First Se
                                         <?php echo htmlspecialchars(($available_subject['subject_code'] ?? '') . ' - ' . ($available_subject['subject_name'] ?? '') . ' (' . ($available_subject['credits'] ?? '') . ' credits)'); ?>
                                     </option>
                                 <?php endforeach; ?>
+                            <?php else: ?>
+                                <option value="" disabled>No subjects available - all subjects may be enrolled</option>
                             <?php endif; ?>
                         </select>
                     </div>
@@ -1412,29 +1354,7 @@ $current_semester_display = $semester_mapping[$student['semester']] ?? 'First Se
         </div>
     </div>
 
-    <!-- Updated Logout Modal -->
-    <div class="modal" id="logoutModal">
-        <div class="modal-content" style="max-width: 450px; text-align: center;">
-            <h3 style="color: var(--plp-green); font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem;">
-                Confirm Logout
-            </h3>
-            <div style="color: var(--text-medium); margin-bottom: 2rem; line-height: 1.6;">
-                Are you sure you want to logout? You'll need<br>
-                to log in again to access your account.
-            </div>
-            <div style="display: flex; justify-content: center; gap: 1rem;">
-                <button class="modal-btn modal-btn-cancel" id="cancelLogout" style="min-width: 120px;">
-                    Cancel
-                </button>
-                <button class="modal-btn modal-btn-confirm" id="confirmLogout" style="min-width: 120px;">
-                    Yes, Logout
-                </button>
-            </div>
-        </div>
-    </div>
-
     <script>
-        // Your existing JavaScript remains exactly the same
         const addSubjectBtn = document.getElementById('addSubjectBtn');
         const addSubjectModal = document.getElementById('addSubjectModal');
         const cancelAddSubject = document.getElementById('cancelAddSubject');
@@ -1448,12 +1368,6 @@ $current_semester_display = $semester_mapping[$student['semester']] ?? 'First Se
         const cancelArchiveSubject = document.getElementById('cancelArchiveSubject');
         const confirmArchiveSubject = document.getElementById('confirmArchiveSubject');
         const archiveSubjectForm = document.getElementById('archiveSubjectForm');
-
-        // Logout modal functionality
-        const logoutBtn = document.querySelector('.logout-btn');
-        const logoutModal = document.getElementById('logoutModal');
-        const cancelLogout = document.getElementById('cancelLogout');
-        const confirmLogout = document.getElementById('confirmLogout');
 
         // Show modal when clicking add subject button
         addSubjectBtn.addEventListener('click', () => {
@@ -1478,30 +1392,11 @@ $current_semester_display = $semester_mapping[$student['semester']] ?? 'First Se
             archiveSubjectForm.submit();
         });
 
-        // Show modal when clicking logout button
-        logoutBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            logoutModal.classList.add('show');
-        });
-
-        // Hide modal when clicking cancel
-        cancelLogout.addEventListener('click', () => {
-            logoutModal.classList.remove('show');
-        });
-
-        // Handle logout confirmation
-        confirmLogout.addEventListener('click', () => {
-            window.location.href = 'logout.php';
-        });
-
-        // Hide modal when clicking outside the modal content
-        const modals = [addSubjectModal, editSubjectModal, archiveSubjectModal, logoutModal];
-        modals.forEach(modal => {
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    modal.classList.remove('show');
-                }
-            });
+        // Close modals when clicking outside
+        window.addEventListener('click', (e) => {
+            if (e.target === addSubjectModal) addSubjectModal.classList.remove('show');
+            if (e.target === editSubjectModal) editSubjectModal.classList.remove('show');
+            if (e.target === archiveSubjectModal) archiveSubjectModal.classList.remove('show');
         });
 
         // Reset form when modal is closed
@@ -1513,9 +1408,7 @@ $current_semester_display = $semester_mapping[$student['semester']] ?? 'First Se
 
         // Edit modal functions
         function openEditModal(subjectId, subjectInfo, professorName, schedule) {
-            // Prevent event from bubbling to the card click
             event.stopPropagation();
-            
             document.getElementById('edit_subject_id').value = subjectId;
             document.getElementById('edit_subject_info').value = subjectInfo;
             document.getElementById('edit_professor_name').value = professorName;
@@ -1525,9 +1418,7 @@ $current_semester_display = $semester_mapping[$student['semester']] ?? 'First Se
 
         // Archive modal functions
         function openArchiveModal(subjectId, subjectName) {
-            // Prevent event from bubbling to the card click
             event.stopPropagation();
-            
             document.getElementById('archive_subject_id').value = subjectId;
             document.getElementById('archive_subject_name').textContent = subjectName;
             archiveSubjectModal.classList.add('show');
@@ -1544,22 +1435,6 @@ $current_semester_display = $semester_mapping[$student['semester']] ?? 'First Se
                 }, 100);
             });
         }, 5000);
-
-        // Close modal after successful form submission if there are no errors
-        <?php if ($success_message && empty($error_message)): ?>
-            document.addEventListener('DOMContentLoaded', function() {
-                const modals = [
-                    document.getElementById('addSubjectModal'),
-                    document.getElementById('editSubjectModal'),
-                    document.getElementById('archiveSubjectModal')
-                ];
-                modals.forEach(modal => {
-                    if (modal) {
-                        modal.classList.remove('show');
-                    }
-                });
-            });
-        <?php endif; ?>
     </script>
 </body>
 </html>
