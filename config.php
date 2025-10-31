@@ -17,95 +17,6 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 /**
- * Input Sanitization Function
- */
-function sanitizeInput($data) {
-    if (is_array($data)) {
-        return array_map('sanitizeInput', $data);
-    }
-    return htmlspecialchars(trim($data), ENT_QUOTES, 'UTF-8');
-}
-
-function sendMagicLink($email) {
-    global $supabase_url, $supabase_key;
-    
-    // ⚠️ REPLACE THIS WITH YOUR ACTUAL RENDER URL ⚠️
-    $redirect_url = 'https://plpsmartgrademvv.onrender.com/auth-callback.php';
-    
-    $data = [
-        'email' => $email,
-        'options' => [
-            'emailRedirectTo' => $redirect_url
-        ]
-    ];
-    
-    $ch = curl_init();
-    curl_setopt_array($ch, [
-        CURLOPT_URL => $supabase_url . '/auth/v1/magiclink',
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_POST => true,
-        CURLOPT_POSTFIELDS => json_encode($data),
-        CURLOPT_HTTPHEADER => [
-            'Content-Type: application/json',
-            'Authorization: Bearer ' . $supabase_key,
-            'apikey: ' . $supabase_key
-        ],
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_TIMEOUT => 30,
-    ]);
-    
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    
-    error_log("🔐 Magic Link sent to: $email - HTTP: $httpCode - Redirect: $redirect_url");
-    
-    return $httpCode === 200;
-}
-
-/**
- * Student Functions
- */
-function getStudentByEmail($email) {
-    $students = supabaseFetch('students', ['email' => $email]);
-    return $students && count($students) > 0 ? $students[0] : null;
-}
-
-function getStudentById($id) {
-    $students = supabaseFetch('students', ['id' => $id]);
-    return $students && count($students) > 0 ? $students[0] : null;
-}
-
-function studentExists($email) {
-    $students = supabaseFetch('students', ['email' => $email]);
-    return $students && count($students) > 0;
-}
-
-function isValidPLPEmail($email) {
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        return false;
-    }
-    
-    $domain = substr(strrchr($email, "@"), 1);
-    return strtolower($domain) === 'plpasig.edu.ph';
-}
-
-/**
- * Session Security Functions
- */
-function regenerateSession() {
-    session_regenerate_id(true);
-    $_SESSION['created'] = time();
-}
-
-/**
- * Check if user is logged in
- */
-function isLoggedIn() {
-    return isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true;
-}
-
-/**
  * Supabase API Helper Function
  */
 function supabaseFetch($table, $filters = [], $method = 'GET', $data = null) {
@@ -172,6 +83,59 @@ function supabaseInsert($table, $data) {
 
 function supabaseUpdate($table, $data, $filters) {
     return supabaseFetch($table, $filters, 'PATCH', $data);
+}
+
+/**
+ * Password Hashing and Verification
+ */
+function hashPassword($password) {
+    return password_hash($password, PASSWORD_DEFAULT);
+}
+
+function verifyPassword($password, $hashedPassword) {
+    return password_verify($password, $hashedPassword);
+}
+
+/**
+ * Student Functions
+ */
+function getStudentByEmail($email) {
+    $students = supabaseFetch('students', ['email' => $email]);
+    return $students && count($students) > 0 ? $students[0] : null;
+}
+
+function getStudentById($id) {
+    $students = supabaseFetch('students', ['id' => $id]);
+    return $students && count($students) > 0 ? $students[0] : null;
+}
+
+function studentExists($email) {
+    $students = supabaseFetch('students', ['email' => $email]);
+    return $students && count($students) > 0;
+}
+
+function isValidPLPEmail($email) {
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        return false;
+    }
+    
+    $domain = substr(strrchr($email, "@"), 1);
+    return strtolower($domain) === 'plpasig.edu.ph';
+}
+
+/**
+ * Session Security Functions
+ */
+function regenerateSession() {
+    session_regenerate_id(true);
+    $_SESSION['created'] = time();
+}
+
+function sanitizeInput($data) {
+    if (is_array($data)) {
+        return array_map('sanitizeInput', $data);
+    }
+    return htmlspecialchars(trim($data), ENT_QUOTES, 'UTF-8');
 }
 
 // Check session expiration on every request

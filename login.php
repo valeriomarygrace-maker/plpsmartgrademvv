@@ -5,64 +5,46 @@ require_once 'config.php';
 $error = '';
 $success = '';
 $showSignupModal = false;
-$showOTPModal = false;
-$otpError = '';
 $email = '';
 
-// Handle login form submission - USING MAGIC LINKS
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && !isset($_POST['signup'])) {
+// Handle login form submission
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && isset($_POST['password']) && !isset($_POST['signup'])) {
     $email = sanitizeInput($_POST['email']);
+    $password = $_POST['password'];
     
+    // Validate PLP email
     if (!isValidPLPEmail($email)) {
         $error = 'Please use your valid @plpasig.edu.ph email address.';
     } else {
+        // Check if email exists in students table
         $student = getStudentByEmail($email);
         
         if ($student) {
-            if (sendMagicLink($email)) {
-                $success = "🎉 Magic link sent to your email! Check your inbox and click the link to login automatically.";
-                error_log("✅ Magic link sent successfully to: $email");
+            // Check if student has a password set
+            if (empty($student['password'])) {
+                $error = 'No password set for this account. Please sign up first or contact administrator.';
+                $showSignupModal = true;
+            } elseif (verifyPassword($password, $student['password'])) {
+                // Regenerate session for security
+                regenerateSession();
+                
+                $_SESSION['logged_in'] = true;
+                $_SESSION['user_email'] = $email;
+                $_SESSION['user_type'] = 'student';
+                $_SESSION['user_id'] = $student['id'];
+                $_SESSION['user_name'] = $student['fullname'];
+                $_SESSION['login_time'] = time();
+                
+                // Redirect to student dashboard
+                header('Location: student-dashboard.php');
+                exit;
             } else {
-                $error = 'Failed to send magic link. Please try again.';
-                error_log("❌ Failed to send magic link to: $email");
+                $error = 'Invalid password. Please try again.';
             }
         } else {
             $error = 'Email not found in our system. Please sign up first.';
             $showSignupModal = true;
         }
-    }
-}
-
-// Handle OTP verification
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['otp'])) {
-    $otp = sanitizeInput($_POST['otp']);
-    $email = $_SESSION['verify_email'] ?? '';
-    
-    if (empty($email)) {
-        $otpError = 'Session expired. Please login again.';
-        $showOTPModal = true;
-    } elseif (verifyOTP($email, $otp)) {
-        // Regenerate session for security
-        regenerateSession();
-        
-        $_SESSION['logged_in'] = true;
-        $_SESSION['user_email'] = $email;
-        $_SESSION['user_type'] = 'student';
-        $_SESSION['user_id'] = $_SESSION['temp_user_id'] ?? null;
-        $_SESSION['user_name'] = $_SESSION['temp_user_name'] ?? '';
-        $_SESSION['login_time'] = time();
-        
-        // Clean up temporary session data
-        unset($_SESSION['verify_email']);
-        unset($_SESSION['temp_user_id']);
-        unset($_SESSION['temp_user_name']);
-        
-        // Redirect to student dashboard
-        header('Location: student-dashboard.php');
-        exit;
-    } else {
-        $otpError = 'Invalid OTP code or OTP has expired. Please check your email and try again.';
-        $showOTPModal = true;
     }
 }
     
@@ -71,17 +53,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
     $student_number = sanitizeInput($_POST['student_number']);
     $fullname = sanitizeInput($_POST['fullname']);
     $email = sanitizeInput($_POST['email']);
+    $password = $_POST['password'];
+    $confirm_password = $_POST['confirm_password'];
     $year_level = 2;
     $semester = sanitizeInput($_POST['semester']);
     $section = sanitizeInput($_POST['section']);
     $course = 'BS Information Technology';
     
     // Basic validation
-    if (empty($student_number) || empty($fullname) || empty($email) || empty($semester) || empty($section)) {
+    if (empty($student_number) || empty($fullname) || empty($email) || empty($password) || empty($semester) || empty($section)) {
         $error = 'All fields are required.';
         $showSignupModal = true;
     } elseif (!isValidPLPEmail($email)) {
         $error = 'Please use your valid @plpasig.edu.ph email address.';
+        $showSignupModal = true;
+    } elseif ($password !== $confirm_password) {
+        $error = 'Passwords do not match.';
+        $showSignupModal = true;
+    } elseif (strlen($password) < 6) {
+        $error = 'Password must be at least 6 characters long.';
         $showSignupModal = true;
     } else {
         // Check if student already exists
@@ -90,11 +80,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             $error = 'A student with this email already exists.';
             $showSignupModal = true;
         } else {
-            // Insert new student
+            // Insert new student with hashed password
             $studentData = [
                 'student_number' => $student_number,
                 'fullname' => $fullname,
                 'email' => $email,
+                'password' => hashPassword($password),
                 'year_level' => $year_level,
                 'semester' => $semester,
                 'section' => $section,
@@ -106,17 +97,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             if ($result !== false) {
                 $success = 'Registration successful! You can now login with your credentials.';
                 $showSignupModal = false;
-                
-                // Auto-login after successful registration
-                $otp = generateOTP();
-                if (sendOTP($email, $otp)) {
-                    $_SESSION['verify_email'] = $email;
-                    $_SESSION['user_type'] = 'student';
-                    $_SESSION['temp_user_id'] = $result[0]['id'] ?? null;
-                    $_SESSION['temp_user_name'] = $fullname;
-                    $showOTPModal = true;
-                    $success = "Registration successful! OTP sent to your email for verification.";
-                }
             } else {
                 $error = 'Registration failed. Please try again.';
                 $showSignupModal = true;
@@ -132,7 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PAMANTASAN NG LUNGSOD NG PASIG - SMART GRADE AI</title>
-    <style>
+        <style>
         /* Your existing CSS styles remain exactly the same */
         :root {
             --plp-green: #006341;
@@ -704,6 +684,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
                             <i class="fas fa-envelope input-icon"></i>
                             <input type="email" id="email" name="email" placeholder="Enter your @plpasig.edu.ph" required value="<?php echo isset($_POST['email']) && !isset($_POST['signup']) ? htmlspecialchars($_POST['email']) : ''; ?>">
                         </div>
+
+                        <div class="input-group">
+                            <i class="fas fa-lock input-icon"></i>
+                            <input type="password" id="password" name="password" placeholder="Enter your password" required>
+                        </div>
+
                         <button type="submit" class="login-btn">
                             <i class="fas fa-sign-in-alt"></i>
                             LOG IN
@@ -716,56 +702,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
                     </form>
                 </div>
             </div>
-        </div>
-    </div>
-
-    <!-- OTP Verification Modal -->
-    <div class="modal-overlay <?php echo $showOTPModal ? 'active' : ''; ?>" id="otpModal">
-        <div class="otp-modal">
-            <button type="button" class="close-modal" id="closeOtpModal">
-                <i class="fas fa-times"></i>
-            </button>
-            
-            <div class="modal-logo">
-                <i class="fas fa-shield-alt"></i>
-            </div>
-            <h1>OTP Verification</h1>
-            <p class="otp-subtitle">Enter the 6-digit verification code sent to<br>
-                <span class="email-display"><?php echo isset($_SESSION['verify_email']) ? htmlspecialchars($_SESSION['verify_email']) : ''; ?></span>
-            </p>
-            
-            <?php if (isset($otpError)): ?>
-                <div class="modal-alert-error">
-                    <i class="fas fa-exclamation-circle"></i>
-                    <span><?php echo $otpError; ?></span>
-                </div>
-            <?php endif; ?>
-            
-            <form method="POST" id="otpForm">
-                <div class="otp-inputs">
-                    <input type="text" class="otp-input" maxlength="1" pattern="\d" inputmode="numeric" autofocus>
-                    <input type="text" class="otp-input" maxlength="1" pattern="\d" inputmode="numeric">
-                    <input type="text" class="otp-input" maxlength="1" pattern="\d" inputmode="numeric">
-                    <input type="text" class="otp-input" maxlength="1" pattern="\d" inputmode="numeric">
-                    <input type="text" class="otp-input" maxlength="1" pattern="\d" inputmode="numeric">
-                    <input type="text" class="otp-input" maxlength="1" pattern="\d" inputmode="numeric">
-                </div>
-                <input type="hidden" id="otp" name="otp">
-                
-                <button type="submit" class="verify-btn">
-                    <i class="fas fa-check-circle"></i>
-                    Verify & Continue
-                </button>
-            </form>
-            
-            <p style="text-align: center; margin-top: 1rem; color: var(--text-medium); font-size: 0.9rem;">
-                Didn't receive the OTP? Check your spam folder or <a href="#" onclick="document.getElementById('loginForm').submit(); return false;" style="color: var(--plp-green); text-decoration: none; font-weight: 500;">resend OTP</a>
-            </p>
-            
-            <button type="button" class="back-to-login-btn" id="backToLogin">
-                <i class="fas fa-arrow-left"></i>
-                Back to Login
-            </button>
         </div>
     </div>
 
@@ -810,6 +746,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
                         <div class="input-group">
                             <i class="fas fa-envelope input-icon"></i>
                             <input type="email" id="signup_email" name="email" placeholder="Email (@plpasig.edu.ph)" required value="<?php echo isset($_POST['email']) && isset($_POST['signup']) ? htmlspecialchars($_POST['email']) : ''; ?>">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <div class="input-group">
+                            <i class="fas fa-lock input-icon"></i>
+                            <input type="password" id="password" name="password" placeholder="Password" required>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <div class="input-group">
+                            <i class="fas fa-lock input-icon"></i>
+                            <input type="password" id="confirm_password" name="confirm_password" placeholder="Confirm Password" required>
                         </div>
                     </div>
                 </div>
@@ -863,67 +815,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
     </div>
 
     <script>
-        // Auto-focus and move between OTP inputs
-        const otpInputs = document.querySelectorAll('.otp-input');
-        const otpHiddenInput = document.getElementById('otp');
-        
-        function updateHiddenInput() {
-            let otpValue = '';
-            otpInputs.forEach(input => {
-                otpValue += input.value;
-            });
-            otpHiddenInput.value = otpValue;
-        }
-        
-        if (otpInputs.length > 0) {
-            otpInputs.forEach((input, index) => {
-                // Handle paste event
-                input.addEventListener('paste', (e) => {
-                    e.preventDefault();
-                    const pasteData = e.clipboardData.getData('text');
-                    if (/^\d{6}$/.test(pasteData)) {
-                        pasteData.split('').forEach((char, i) => {
-                            if (otpInputs[i]) {
-                                otpInputs[i].value = char;
-                            }
-                        });
-                        updateHiddenInput();
-                        if (otpInputs[5]) {
-                            otpInputs[5].focus();
-                        }
-                    }
-                });
-                
-                // Handle input
-                input.addEventListener('input', (e) => {
-                    if (e.target.value.length === 1 && index < otpInputs.length - 1) {
-                        otpInputs[index + 1].focus();
-                    }
-                    updateHiddenInput();
-                });
-                
-                // Handle backspace
-                input.addEventListener('keydown', (e) => {
-                    if (e.key === 'Backspace' && e.target.value.length === 0 && index > 0) {
-                        otpInputs[index - 1].focus();
-                    }
-                });
-            });
-            
-            // Focus first input when modal opens
-            const otpModal = document.getElementById('otpModal');
-            if (otpModal.classList.contains('active')) {
-                otpInputs[0].focus();
-            }
-        }
-        
         // Modal functionality
         const showSignupModalBtn = document.getElementById('showSignupModal');
         const signupModal = document.getElementById('signupModal');
         const closeSignupModal = document.getElementById('closeSignupModal');
-        const closeOtpModal = document.getElementById('closeOtpModal');
         const showLogin = document.getElementById('showLogin');
-        const backToLogin = document.getElementById('backToLogin');
         
         if (showSignupModalBtn) {
             showSignupModalBtn.addEventListener('click', function() {
@@ -937,12 +833,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             });
         }
         
-        if (closeOtpModal) {
-            closeOtpModal.addEventListener('click', function() {
-                otpModal.classList.remove('active');
-            });
-        }
-        
         if (showLogin) {
             showLogin.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -950,19 +840,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             });
         }
         
-        if (backToLogin) {
-            backToLogin.addEventListener('click', function() {
-                otpModal.classList.remove('active');
-            });
-        }
-        
         // Close modal when clicking outside
         document.addEventListener('click', function(e) {
             if (e.target === signupModal) {
                 signupModal.classList.remove('active');
-            }
-            if (e.target === otpModal) {
-                otpModal.classList.remove('active');
             }
         });
     </script>
