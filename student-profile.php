@@ -1,15 +1,22 @@
 <?php
 require_once 'config.php';
 
-// Start session if not already started
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
 if (!isset($_SESSION['logged_in']) || $_SESSION['user_type'] !== 'student') {
     header('Location: login.php');
     exit;
 }
+
+$userEmail = $_SESSION['user_email'] ?? '';
+$userId = $_SESSION['user_id'] ?? null;
+
+// Get student data from Supabase
+$student = getStudentById($userId);
+if (!$student) {
+    $_SESSION['error_message'] = "Student account not found";
+    header('Location: login.php');
+    exit;
+}
+
 
 // Initialize messages
 $success_message = '';
