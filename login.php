@@ -606,7 +606,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             .login-container {
                 width: 100%;
                 max-width: 100%;
-                padding: 2rem 1rem;
+                padding: 2rem 1.5rem;
             }
             
             .header h1 {
