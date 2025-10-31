@@ -53,18 +53,10 @@ try {
     $error_message = 'Database error: ' . $e->getMessage();
 }
 
-// Get available subjects for dropdown 
+// Get ALL available subjects for dropdown (not filtered by semester)
 try {
-    $semester_mapping = [
-        '1st Semester' => 'First Semester',
-        '2nd Semester' => 'Second Semester',
-        'Summer' => 'Summer'
-    ];
-    
-    $student_semester = $semester_mapping[$student['semester']] ?? 'First Semester';
-    
-    // Get all subjects for current semester
-    $all_subjects = supabaseFetch('subjects', ['semester' => $student_semester]);
+    // Get ALL subjects from the database
+    $all_subjects = supabaseFetch('subjects');
     
     // Get already enrolled subject IDs
     $enrolled_subject_ids = [];
@@ -74,7 +66,7 @@ try {
         }
     }
     
-    // Filter out enrolled subjects
+    // Filter out enrolled subjects from ALL subjects
     $available_subjects = [];
     if ($all_subjects) {
         foreach ($all_subjects as $subject) {
@@ -369,7 +361,7 @@ try {
         }
         
         // Refresh available subjects
-        $all_subjects = supabaseFetch('subjects', ['semester' => $student_semester]);
+        $all_subjects = supabaseFetch('subjects');
         $enrolled_subject_ids = [];
         if ($student_subjects) {
             foreach ($student_subjects as $enrolled) {
@@ -407,7 +399,7 @@ $current_semester_display = $semester_mapping[$student['semester']] ?? 'First Se
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* Your existing CSS styles remain the same */
+        /* Your existing CSS styles remain exactly the same */
         :root {
             --plp-green: #006341;
             --plp-green-light: #008856;
@@ -1451,7 +1443,7 @@ $current_semester_display = $semester_mapping[$student['semester']] ?? 'First Se
                             <option value="">Select a subject</option>
                             <?php foreach ($available_subjects as $available_subject): ?>
                                 <option value="<?php echo $available_subject['id']; ?>">
-                                    <?php echo htmlspecialchars($available_subject['subject_code'] . ' - ' . $available_subject['subject_name'] . ' (' . $available_subject['credits'] . ' credits)'); ?>
+                                    <?php echo htmlspecialchars($available_subject['subject_code'] . ' - ' . $available_subject['subject_name'] . ' (' . $available_subject['credits'] . ' credits) - ' . $available_subject['semester']); ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
