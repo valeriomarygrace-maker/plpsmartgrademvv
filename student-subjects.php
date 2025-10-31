@@ -62,30 +62,38 @@ try {
 
 // Get available subjects for dropdown - FIXED VERSION
 try {
-    // Get all subjects
+    // Get all subjects from Supabase
     $all_subjects = supabaseFetch('subjects');
     
-    // Get enrolled subject IDs
+    // Get enrolled subject IDs for this student
+    $enrolled_subjects = supabaseFetch('student_subjects', ['student_id' => $student['id']]);
     $enrolled_subject_ids = [];
-    if ($student_subjects) {
-        foreach ($student_subjects as $enrolled) {
+    
+    if ($enrolled_subjects && is_array($enrolled_subjects)) {
+        foreach ($enrolled_subjects as $enrolled) {
             $enrolled_subject_ids[] = $enrolled['subject_id'];
         }
     }
     
     // Filter out enrolled subjects
     $available_subjects = [];
-    if ($all_subjects) {
+    if ($all_subjects && is_array($all_subjects)) {
         foreach ($all_subjects as $subject) {
-            if (!in_array($subject['id'], $enrolled_subject_ids)) {
+            // Make sure subject has an ID and check if it's not enrolled
+            if (isset($subject['id']) && !in_array($subject['id'], $enrolled_subject_ids)) {
                 $available_subjects[] = $subject;
             }
         }
     }
     
+    // Debug logging
+    error_log("Total subjects found: " . ($all_subjects ? count($all_subjects) : 0));
+    error_log("Enrolled subject IDs: " . implode(', ', $enrolled_subject_ids));
+    error_log("Available subjects count: " . count($available_subjects));
+    
     // Sort by subject code
     usort($available_subjects, function($a, $b) {
-        return strcmp($a['subject_code'], $b['subject_code']);
+        return strcmp($a['subject_code'] ?? '', $b['subject_code'] ?? '');
     });
     
 } catch (Exception $e) {
@@ -1441,31 +1449,48 @@ $current_semester_display = $semester_mapping[$student['semester']] ?? 'First Se
                 Add New Subject
             </h3>
             
+            <!-- Temporary Debug Info -->
+            <div style="background: #f8f9fa; padding: 10px; margin-bottom: 15px; border-radius: 5px; border-left: 4px solid #007bff;">
+                <small style="color: #6c757d;">
+                    <strong>Debug Info:</strong><br>
+                    Available Subjects: <?php echo count($available_subjects); ?><br>
+                    Student ID: <?php echo $student['id'] ?? 'Not found'; ?>
+                </small>
+            </div>
+            
             <form action="student-subjects.php" method="POST" id="addSubjectForm">
                 <div class="form-row">
                     <div class="form-group">
                         <label for="subject_id" class="form-label">Subject</label>
                         <select name="subject_id" id="subject_id" class="form-select" required>
                             <option value="">Select a subject</option>
-                            <?php foreach ($available_subjects as $available_subject): ?>
-                                <option value="<?php echo $available_subject['id']; ?>">
-                                    <?php echo htmlspecialchars($available_subject['subject_code'] . ' - ' . $available_subject['subject_name'] . ' (' . $available_subject['credits'] . ' credits)'); ?>
-                                </option>
-                            <?php endforeach; ?>
+                            <?php if (!empty($available_subjects)): ?>
+                                <?php foreach ($available_subjects as $available_subject): ?>
+                                    <option value="<?php echo $available_subject['id']; ?>">
+                                        <?php echo htmlspecialchars(
+                                            ($available_subject['subject_code'] ?? 'N/A') . ' - ' . 
+                                            ($available_subject['subject_name'] ?? 'Unknown') . ' (' . 
+                                            ($available_subject['credits'] ?? '0') . ' credits)'
+                                        ); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <option value="" disabled>No subjects available</option>
+                            <?php endif; ?>
                         </select>
                     </div>
                     
                     <div class="form-group">
                         <label for="professor_name" class="form-label">Professor Name</label>
                         <input type="text" name="professor_name" id="professor_name" class="form-input" 
-                               placeholder="Enter professor's name" required>
+                            placeholder="Enter professor's name" required>
                     </div>
                 </div>
                 
                 <div class="form-group">
                     <label for="schedule" class="form-label">Schedule</label>
                     <input type="text" name="schedule" id="schedule" class="form-input" 
-                           placeholder="Day-Day Time" required>
+                        placeholder="Day-Day Time" required>
                 </div>
                 
                 <div class="modal-actions">
@@ -1629,6 +1654,38 @@ $current_semester_display = $semester_mapping[$student['semester']] ?? 'First Se
                 });
             });
         <?php endif; ?>
+        
+        // Function to initialize subjects if table is empty
+        function initializeSubjects() {
+            $existing_subjects = supabaseFetch('subjects');
+            
+            if (!$existing_subjects || count($existing_subjects) === 0) {
+                $subjects_to_add = [
+                    // First Semester
+                    ['subject_code' => 'COMP 004', 'subject_name' => 'Data Structures and Algorithms', 'credits' => 3, 'semester' => 'First Semester'],
+                    ['subject_code' => 'COMP 005', 'subject_name' => 'Information Management', 'credits' => 3, 'semester' => 'First Semester'],
+                    ['subject_code' => 'IT 102', 'subject_name' => 'Quantitative Methods', 'credits' => 3, 'semester' => 'First Semester'],
+                    ['subject_code' => 'IT 201', 'subject_name' => 'IT Elective: Platform Technologies', 'credits' => 3, 'semester' => 'First Semester'],
+                    ['subject_code' => 'IT 202', 'subject_name' => 'IT Elective: Object-Oriented Programming', 'credits' => 3, 'semester' => 'First Semester'],
+                    
+                    // Second Semester
+                    ['subject_code' => 'IT 103', 'subject_name' => 'Advanced Database Systems', 'credits' => 3, 'semester' => 'Second Semester'],
+                    ['subject_code' => 'IT 104', 'subject_name' => 'Integrative Programming and Technology', 'credits' => 3, 'semester' => 'Second Semester'],
+                    ['subject_code' => 'IT 105', 'subject_name' => 'Networking I', 'credits' => 3, 'semester' => 'Second Semester'],
+                    ['subject_code' => 'IT 301', 'subject_name' => 'Web Programming', 'credits' => 3, 'semester' => 'Second Semester'],
+                    ['subject_code' => 'COMP 106', 'subject_name' => 'Applications Development and Emerging', 'credits' => 3, 'semester' => 'Second Semester']
+                ];
+                
+                foreach ($subjects_to_add as $subject) {
+                    supabaseInsert('subjects', $subject);
+                }
+                
+                error_log("Subjects table initialized with " . count($subjects_to_add) . " subjects");
+            }
+        }
+
+        // Call this function to ensure subjects exist
+        initializeSubjects();
     </script>
 </body>
 </html>
