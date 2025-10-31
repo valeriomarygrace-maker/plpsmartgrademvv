@@ -251,20 +251,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
         .login-form h3 {
             text-align: center;
             color: var(--plp-green);
-            margin-bottom: 1.5rem;
+            margin-bottom: 0.85rem;
             font-size: 1.5rem;
             font-weight: 700;
             position: relative;
-        }
-        
-        .login-form h3::after {
-            content: "";
-            display: block;
-            width: 60px;
-            height: 4px;
-            background: var(--plp-green-light);
-            margin: 0.8rem auto 0;
-            border-radius: 3px;
         }
         
         .input-group {
@@ -616,7 +606,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             .login-container {
                 width: 100%;
                 max-width: 100%;
-                padding: 2rem 1.5rem;
+                padding: 2rem 1rem;
             }
             
             .header h1 {
