@@ -146,4 +146,52 @@ if (isset($_SESSION['created']) && (time() - $_SESSION['created'] > 28800)) {
         exit;
     }
 }
+function supabaseDelete($table, $filters = []) {
+    global $supabase_url, $supabase_key;
+    
+    $url = $supabase_url . "/rest/v1/$table";
+    
+    // Build query string from filters
+    $queryParams = [];
+    foreach ($filters as $key => $value) {
+        $queryParams[] = "$key=eq.$value";
+    }
+    
+    if (!empty($queryParams)) {
+        $url .= "?" . implode('&', $queryParams);
+    }
+    
+    $ch = curl_init();
+    $headers = [
+        'apikey: ' . $supabase_key,
+        'Authorization: Bearer ' . $supabase_key,
+        'Content-Type: application/json',
+    ];
+    
+    curl_setopt_array($ch, [
+        CURLOPT_URL => $url,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => $headers,
+        CURLOPT_CUSTOMREQUEST => 'DELETE',
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_TIMEOUT => 30,
+    ]);
+    
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $error = curl_error($ch);
+    curl_close($ch);
+    
+    if ($error) {
+        error_log("❌ cURL Error: $error");
+        return false;
+    }
+    
+    if ($httpCode >= 400) {
+        error_log("❌ HTTP Error $httpCode for table: $table");
+        return false;
+    }
+    
+    return true;
+}
 ?>
