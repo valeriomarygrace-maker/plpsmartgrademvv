@@ -60,9 +60,9 @@ try {
     $error_message = 'Database error: ' . $e->getMessage();
 }
 
-// Get available subjects for dropdown
+// Get available subjects for dropdown - CLEAN VERSION
 try {
-    // Get all subjects
+    // Get all subjects from Supabase
     $all_subjects = supabaseFetch('subjects');
     
     // Get enrolled subject IDs for this student
@@ -71,9 +71,7 @@ try {
     
     if ($enrolled_subjects) {
         foreach ($enrolled_subjects as $enrolled) {
-            if (isset($enrolled['subject_id'])) {
-                $enrolled_subject_ids[] = $enrolled['subject_id'];
-            }
+            $enrolled_subject_ids[] = $enrolled['subject_id'];
         }
     }
     
@@ -81,7 +79,7 @@ try {
     $available_subjects = [];
     if ($all_subjects) {
         foreach ($all_subjects as $subject) {
-            if (isset($subject['id']) && !in_array($subject['id'], $enrolled_subject_ids)) {
+            if (!in_array($subject['id'], $enrolled_subject_ids)) {
                 $available_subjects[] = $subject;
             }
         }
@@ -243,8 +241,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
         if (!$subject_to_archive) {
             $error_message = 'Subject not found.';
         } else {
-            // Archive the subject (for now, we'll just delete it since archiving is complex)
-            // In a real implementation, you'd insert into archived tables
+            // Archive the subject
             $result = supabaseDelete('student_subjects', ['id' => $subject_record_id, 'student_id' => $student['id']]);
             
             if ($result !== false) {
@@ -1461,14 +1458,14 @@ $current_semester_display = $semester_mapping[$student['semester']] ?? 'First Se
                     <div class="form-group">
                         <label for="professor_name" class="form-label">Professor Name</label>
                         <input type="text" name="professor_name" id="professor_name" class="form-input" 
-                            placeholder="Enter professor's name" required>
+                               placeholder="Enter professor's name" required>
                     </div>
                 </div>
                 
                 <div class="form-group">
                     <label for="schedule" class="form-label">Schedule</label>
                     <input type="text" name="schedule" id="schedule" class="form-input" 
-                        placeholder="Day-Day Time" required>
+                           placeholder="Day-Day Time" required>
                 </div>
                 
                 <div class="modal-actions">
@@ -1482,7 +1479,7 @@ $current_semester_display = $semester_mapping[$student['semester']] ?? 'First Se
             </form>
         </div>
     </div>
-    
+
     <!-- Updated Logout Modal -->
     <div class="modal" id="logoutModal">
         <div class="modal-content" style="max-width: 450px; text-align: center;">
@@ -1505,82 +1502,135 @@ $current_semester_display = $semester_mapping[$student['semester']] ?? 'First Se
     </div>
 
     <script>
-        // Your existing JavaScript remains exactly the same
-        // Modal functionality
-        const addSubjectBtn = document.getElementById('addSubjectBtn');
-        const addSubjectModal = document.getElementById('addSubjectModal');
-        const cancelAddSubject = document.getElementById('cancelAddSubject');
-        const addSubjectForm = document.getElementById('addSubjectForm');
+        // Modal functionality - FIXED VERSION
+        document.addEventListener('DOMContentLoaded', function() {
+            const addSubjectBtn = document.getElementById('addSubjectBtn');
+            const addSubjectModal = document.getElementById('addSubjectModal');
+            const cancelAddSubject = document.getElementById('cancelAddSubject');
+            const addSubjectForm = document.getElementById('addSubjectForm');
 
-        const editSubjectModal = document.getElementById('editSubjectModal');
-        const cancelEditSubject = document.getElementById('cancelEditSubject');
-        const editSubjectForm = document.getElementById('editSubjectForm');
+            const editSubjectModal = document.getElementById('editSubjectModal');
+            const cancelEditSubject = document.getElementById('cancelEditSubject');
+            const editSubjectForm = document.getElementById('editSubjectForm');
 
-        const archiveSubjectModal = document.getElementById('archiveSubjectModal');
-        const cancelArchiveSubject = document.getElementById('cancelArchiveSubject');
-        const confirmArchiveSubject = document.getElementById('confirmArchiveSubject');
-        const archiveSubjectForm = document.getElementById('archiveSubjectForm');
+            const archiveSubjectModal = document.getElementById('archiveSubjectModal');
+            const cancelArchiveSubject = document.getElementById('cancelArchiveSubject');
+            const confirmArchiveSubject = document.getElementById('confirmArchiveSubject');
+            const archiveSubjectForm = document.getElementById('archiveSubjectForm');
 
-        // Logout modal functionality
-        const logoutBtn = document.querySelector('.logout-btn');
-        const logoutModal = document.getElementById('logoutModal');
-        const cancelLogout = document.getElementById('cancelLogout');
-        const confirmLogout = document.getElementById('confirmLogout');
+            // Logout modal functionality
+            const logoutBtn = document.querySelector('.logout-btn');
+            const logoutModal = document.getElementById('logoutModal');
+            const cancelLogout = document.getElementById('cancelLogout');
+            const confirmLogout = document.getElementById('confirmLogout');
 
-        // Show modal when clicking add subject button
-        addSubjectBtn.addEventListener('click', () => {
-            addSubjectModal.classList.add('show');
-        });
+            // Show modal when clicking add subject button - FIXED
+            if (addSubjectBtn) {
+                addSubjectBtn.addEventListener('click', function() {
+                    if (addSubjectModal) {
+                        addSubjectModal.classList.add('show');
+                    }
+                });
+            }
 
-        // Hide modal when clicking cancel
-        cancelAddSubject.addEventListener('click', () => {
-            addSubjectModal.classList.remove('show');
-        });
+            // Hide modal when clicking cancel
+            if (cancelAddSubject) {
+                cancelAddSubject.addEventListener('click', function() {
+                    addSubjectModal.classList.remove('show');
+                });
+            }
 
-        cancelEditSubject.addEventListener('click', () => {
-            editSubjectModal.classList.remove('show');
-        });
+            if (cancelEditSubject) {
+                cancelEditSubject.addEventListener('click', function() {
+                    editSubjectModal.classList.remove('show');
+                });
+            }
 
-        cancelArchiveSubject.addEventListener('click', () => {
-            archiveSubjectModal.classList.remove('show');
-        });
+            if (cancelArchiveSubject) {
+                cancelArchiveSubject.addEventListener('click', function() {
+                    archiveSubjectModal.classList.remove('show');
+                });
+            }
 
-        // Confirm archive action
-        confirmArchiveSubject.addEventListener('click', () => {
-            archiveSubjectForm.submit();
-        });
+            // Confirm archive action
+            if (confirmArchiveSubject) {
+                confirmArchiveSubject.addEventListener('click', function() {
+                    archiveSubjectForm.submit();
+                });
+            }
 
-        // Show modal when clicking logout button
-        logoutBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            logoutModal.classList.add('show');
-        });
+            // Show modal when clicking logout button
+            if (logoutBtn) {
+                logoutBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    if (logoutModal) {
+                        logoutModal.classList.add('show');
+                    }
+                });
+            }
 
-        // Hide modal when clicking cancel
-        cancelLogout.addEventListener('click', () => {
-            logoutModal.classList.remove('show');
-        });
+            // Hide modal when clicking cancel
+            if (cancelLogout) {
+                cancelLogout.addEventListener('click', function() {
+                    logoutModal.classList.remove('show');
+                });
+            }
 
-        // Handle logout confirmation
-        confirmLogout.addEventListener('click', () => {
-            window.location.href = 'logout.php';
-        });
+            // Handle logout confirmation
+            if (confirmLogout) {
+                confirmLogout.addEventListener('click', function() {
+                    window.location.href = 'logout.php';
+                });
+            }
 
-        // Hide modal when clicking outside the modal content
-        const modals = [addSubjectModal, editSubjectModal, archiveSubjectModal, logoutModal];
-        modals.forEach(modal => {
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    modal.classList.remove('show');
+            // Hide modal when clicking outside the modal content
+            const modals = [addSubjectModal, editSubjectModal, archiveSubjectModal, logoutModal];
+            modals.forEach(modal => {
+                if (modal) {
+                    modal.addEventListener('click', function(e) {
+                        if (e.target === modal) {
+                            modal.classList.remove('show');
+                        }
+                    });
                 }
             });
-        });
 
-        // Reset form when modal is closed
-        addSubjectModal.addEventListener('transitionend', () => {
-            if (!addSubjectModal.classList.contains('show')) {
-                addSubjectForm.reset();
+            // Reset form when modal is closed
+            if (addSubjectModal) {
+                addSubjectModal.addEventListener('transitionend', function() {
+                    if (!addSubjectModal.classList.contains('show')) {
+                        if (addSubjectForm) {
+                            addSubjectForm.reset();
+                        }
+                    }
+                });
             }
+
+            // Auto-hide success/error messages after 5 seconds
+            setTimeout(function() {
+                const alerts = document.querySelectorAll('.alert-success, .alert-error');
+                alerts.forEach(alert => {
+                    alert.style.transition = 'opacity 0.1s ease';
+                    alert.style.opacity = '0';
+                    setTimeout(function() {
+                        alert.remove();
+                    }, 100);
+                });
+            }, 5000);
+
+            // Close modal after successful form submission if there are no errors
+            <?php if ($success_message && empty($error_message)): ?>
+                const modalsToClose = [
+                    document.getElementById('addSubjectModal'),
+                    document.getElementById('editSubjectModal'),
+                    document.getElementById('archiveSubjectModal')
+                ];
+                modalsToClose.forEach(modal => {
+                    if (modal) {
+                        modal.classList.remove('show');
+                    }
+                });
+            <?php endif; ?>
         });
 
         // Edit modal functions
@@ -1592,7 +1642,11 @@ $current_semester_display = $semester_mapping[$student['semester']] ?? 'First Se
             document.getElementById('edit_subject_info').value = subjectInfo;
             document.getElementById('edit_professor_name').value = professorName;
             document.getElementById('edit_schedule').value = schedule;
-            editSubjectModal.classList.add('show');
+            
+            const editModal = document.getElementById('editSubjectModal');
+            if (editModal) {
+                editModal.classList.add('show');
+            }
         }
 
         // Archive modal functions
@@ -1602,68 +1656,12 @@ $current_semester_display = $semester_mapping[$student['semester']] ?? 'First Se
             
             document.getElementById('archive_subject_id').value = subjectId;
             document.getElementById('archive_subject_name').textContent = subjectName;
-            archiveSubjectModal.classList.add('show');
-        }
-
-        // Auto-hide success/error messages after 5 seconds
-        setTimeout(() => {
-            const alerts = document.querySelectorAll('.alert-success, .alert-error');
-            alerts.forEach(alert => {
-                alert.style.transition = 'opacity 0.1s ease';
-                alert.style.opacity = '0';
-                setTimeout(() => {
-                    alert.remove();
-                }, 100);
-            });
-        }, 5000);
-
-        // Close modal after successful form submission if there are no errors
-        <?php if ($success_message && empty($error_message)): ?>
-            document.addEventListener('DOMContentLoaded', function() {
-                const modals = [
-                    document.getElementById('addSubjectModal'),
-                    document.getElementById('editSubjectModal'),
-                    document.getElementById('archiveSubjectModal')
-                ];
-                modals.forEach(modal => {
-                    if (modal) {
-                        modal.classList.remove('show');
-                    }
-                });
-            });
-        <?php endif; ?>
-
-        // Function to initialize subjects if table is empty
-        function initializeSubjects() {
-            $existing_subjects = supabaseFetch('subjects');
             
-            if (!$existing_subjects || count($existing_subjects) === 0) {
-                $subjects_to_add = [
-                    // First Semester
-                    ['subject_code' => 'COMP 004', 'subject_name' => 'Data Structures and Algorithms', 'credits' => 3, 'semester' => 'First Semester'],
-                    ['subject_code' => 'COMP 005', 'subject_name' => 'Information Management', 'credits' => 3, 'semester' => 'First Semester'],
-                    ['subject_code' => 'IT 102', 'subject_name' => 'Quantitative Methods', 'credits' => 3, 'semester' => 'First Semester'],
-                    ['subject_code' => 'IT 201', 'subject_name' => 'IT Elective: Platform Technologies', 'credits' => 3, 'semester' => 'First Semester'],
-                    ['subject_code' => 'IT 202', 'subject_name' => 'IT Elective: Object-Oriented Programming', 'credits' => 3, 'semester' => 'First Semester'],
-                    
-                    // Second Semester
-                    ['subject_code' => 'IT 103', 'subject_name' => 'Advanced Database Systems', 'credits' => 3, 'semester' => 'Second Semester'],
-                    ['subject_code' => 'IT 104', 'subject_name' => 'Integrative Programming and Technology', 'credits' => 3, 'semester' => 'Second Semester'],
-                    ['subject_code' => 'IT 105', 'subject_name' => 'Networking I', 'credits' => 3, 'semester' => 'Second Semester'],
-                    ['subject_code' => 'IT 301', 'subject_name' => 'Web Programming', 'credits' => 3, 'semester' => 'Second Semester'],
-                    ['subject_code' => 'COMP 106', 'subject_name' => 'Applications Development and Emerging', 'credits' => 3, 'semester' => 'Second Semester']
-                ];
-                
-                foreach ($subjects_to_add as $subject) {
-                    supabaseInsert('subjects', $subject);
-                }
-                
-                error_log("Subjects table initialized with " . count($subjects_to_add) . " subjects");
+            const archiveModal = document.getElementById('archiveSubjectModal');
+            if (archiveModal) {
+                archiveModal.classList.add('show');
             }
         }
-
-        // Call this function to ensure subjects exist
-        initializeSubjects();
     </script>
 </body>
 </html>
