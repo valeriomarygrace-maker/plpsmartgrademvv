@@ -9,38 +9,20 @@ $showOTPModal = false;
 $otpError = '';
 $email = '';
 
-// Handle login form submission
+// Handle login form submission - USING MAGIC LINKS
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && !isset($_POST['signup'])) {
     $email = sanitizeInput($_POST['email']);
     
-    // Validate PLP email
     if (!isValidPLPEmail($email)) {
         $error = 'Please use your valid @plpasig.edu.ph email address.';
     } else {
-        // Check if email exists in students table
         $student = getStudentByEmail($email);
         
         if ($student) {
-            $userId = $student['id'];
-            $userName = $student['fullname'];
-            
-            // Generate and send OTP
-            $otp = generateOTP();
-            
-            if (sendOTP($email, $otp)) {
-                $_SESSION['verify_email'] = $email;
-                $_SESSION['user_type'] = 'student';
-                $_SESSION['temp_user_id'] = $userId;
-                $_SESSION['temp_user_name'] = $userName;
-                
-                // Show the OTP modal
-                $showOTPModal = true;
-                
-                // Success message
-                $success = "OTP sent to your email! Please check your inbox and spam folder.";
-                
+            if (sendMagicLink($email)) {
+                $success = "🎉 Magic link sent to your email! Check your inbox and click the link to login automatically.";
             } else {
-                $error = 'Failed to send OTP. Please try again.';
+                $error = 'Failed to send magic link. Please try again.';
             }
         } else {
             $error = 'Email not found in our system. Please sign up first.';
