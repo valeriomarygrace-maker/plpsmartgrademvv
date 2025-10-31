@@ -1,270 +1,152 @@
 <?php
-// Environment Configuration
-$supabase_url = getenv('SUPABASE_URL') ?: 'https://xwvrgpxcceivakzrwwji.supabase.co';
-$supabase_key = getenv('SUPABASE_KEY') ?: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh3dnJncHhjY2VpdmFrenJ3d2ppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE3MjQ0NzQsImV4cCI6MjA3NzMwMDQ3NH0.ovd8v3lqsYtJU78D4iM6CyAyvi6jK4FUbYUjydFi4FM';
+// Database configuration - Use environment variables for Render
+$host = getenv('DB_HOST') ?: 'localhost';
+$dbname = getenv('DB_NAME') ?: 'smartgrade';
+$username = getenv('DB_USER') ?: 'root';
+$password = getenv('DB_PASS') ?: '';
 
-// Start session only if not already started
-if (session_status() === PHP_SESSION_NONE) {
-    session_set_cookie_params([
-        'lifetime' => 0,
-        'path' => '/',
-        'domain' => '',
-        'secure' => isset($_SERVER['HTTPS']),
-        'httponly' => true,
-        'samesite' => 'Strict'
-    ]);
-    session_start();
+try {
+    $pdo = new PDO("mysql:host=$host;dbname=$dbname", $username, $password);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+} catch(PDOException $e) {
+    die("Connection failed: " . $e->getMessage());
 }
 
-/**
- * Supabase API Helper Function
- */
-function supabaseFetch($table, $filters = [], $method = 'GET', $data = null) {
-    global $supabase_url, $supabase_key;
+session_start();
+
+require_once 'PHPMailer/src/Exception.php';
+require_once 'PHPMailer/src/PHPMailer.php';
+require_once 'PHPMailer/src/SMTP.php';
+
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\SMTP;
+use PHPMailer\PHPMailer\Exception;
+
+function sendOTP($email, $otp) {
+    global $pdo;
     
-    $url = $supabase_url . "/rest/v1/$table";
+    $userType = '';
+    $fullname = '';
     
-    // Build query string from filters
-    $queryParams = [];
-    foreach ($filters as $key => $value) {
-        $queryParams[] = "$key=eq.$value";
+    // Check if email exists in students table
+    $stmt = $pdo->prepare("SELECT fullname FROM students WHERE email = ?");
+    $stmt->execute([$email]);
+    if ($stmt->rowCount() > 0) {
+        $userType = 'Student';
+        $fullname = $stmt->fetchColumn();
+    } else {
+        // Check if email exists in teachers table (add this if you have teachers)
+        $stmt = $pdo->prepare("SELECT fullname FROM teachers WHERE email = ?");
+        $stmt->execute([$email]);
+        if ($stmt->rowCount() > 0) {
+            $userType = 'Teacher';
+            $fullname = $stmt->fetchColumn();
+        } else {
+            $userType = 'User';
+            $fullname = 'User';
+        }
     }
+
+    $mail = new PHPMailer(true);
     
-    if (!empty($queryParams)) {
-        $url .= "?" . implode('&', $queryParams);
-    }
-    
-    $ch = curl_init();
-    $headers = [
-        'apikey: ' . $supabase_key,
-        'Authorization: Bearer ' . $supabase_key,
-        'Content-Type: ' . ($method === 'GET' ? 'application/json' : 'application/json'),
-        'Prefer: return=representation'
-    ];
-    
-    curl_setopt_array($ch, [
-        CURLOPT_URL => $url,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER => $headers,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_TIMEOUT => 30,
-    ]);
-    
-    if ($method === 'POST') {
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-    } elseif ($method === 'PATCH') {
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PATCH');
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-    }
-    
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    
-    if ($httpCode >= 400) {
-        error_log("HTTP Error $httpCode for table: $table");
+    try {
+        $mail->isSMTP();
+        $mail->Host       = getenv('SMTP_HOST') ?: 'smtp.gmail.com';
+        $mail->SMTPAuth   = true;
+        $mail->Username   = getenv('SMTP_USER') ?: 'marygracevalerio177@gmail.com';
+        $mail->Password   = getenv('SMTP_PASS') ?: 'swjx bwoj taxq tjdv';
+        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+        $mail->Port       = getenv('SMTP_PORT') ?: 587;
+
+        
+        // Add SMTP options for Render compatibility
+        $mail->SMTPOptions = array(
+            'ssl' => array(
+                'verify_peer' => false,
+                'verify_peer_name' => false,
+                'allow_self_signed' => true
+            )
+        );
+        
+        // Debugging (remove in production)
+        $mail->SMTPDebug = SMTP::DEBUG_OFF; // Change to DEBUG_SERVER for troubleshooting
+
+        $mail->setFrom(getenv('SMTP_USER') ?: 'noreply@smartgrade.com', 'PLP SmartGrade');
+        $mail->addAddress($email);
+
+        $mail->isHTML(true);
+        $mail->Subject = 'PLP SmartGrade - OTP Verification';
+        $mail->Body    = "
+            <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
+                <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; text-align: center; color: white;'>
+                    <h2 style='margin: 0;'>PLP SmartGrade</h2>
+                    <p style='margin: 5px 0 0 0; opacity: 0.9;'>Email Verification</p>
+                </div>
+                
+                <div style='padding: 30px; background: #f9f9f9;'>
+                    <p style='margin-bottom: 15px; color: #333;'>Hello, <strong>$fullname</strong>,</p>
+                    <p style='margin-bottom: 15px; color: #333;'>You are logging in as a <strong>$userType</strong>.</p>
+                    <p style='margin-bottom: 20px; color: #333;'>Your OTP code is:</p>
+                    
+                    <div style='text-align: center; margin: 25px 0;'>
+                        <div style='display: inline-block; padding: 15px 30px; background: white; border: 2px dashed #667eea; border-radius: 8px;'>
+                            <div style='font-size: 32px; font-weight: bold; color: #141414; letter-spacing: 5px;'>$otp</div>
+                        </div>
+                    </div>
+                    
+                    <p style='color: #666; font-size: 14px; text-align: center;'>
+                        This code will expire in 10 minutes.
+                    </p>
+                    
+                    <div style='margin-top: 25px; padding: 15px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px;'>
+                        <p style='margin: 0; color: #856404; font-size: 12px;'>
+                            <strong>Security Tip:</strong> If you didn't request this OTP, please ignore this email and contact support immediately.
+                        </p>
+                    </div>
+                </div>
+                
+                <div style='padding: 20px; text-align: center; background: #333; color: #fff;'>
+                    <p style='margin: 0; font-size: 12px;'>
+                        © " . date('Y') . " Pamantasan ng Lungsod ng Pasig. All rights reserved.
+                    </p>
+                </div>
+            </div>
+        ";
+
+        // Alternative plain text version
+        $mail->AltBody = "PLP SmartGrade OTP Verification\n\nHello $fullname,\nYou are logging in as a $userType.\nYour OTP code is: $otp\nThis code will expire in 10 minutes.\n\nIf you didn't request this OTP, please ignore this email.";
+
+        if ($mail->send()) {
+            error_log("OTP sent successfully to: $email");
+            return true;
+        } else {
+            error_log("Failed to send OTP to: $email");
+            return false;
+        }
+    } catch (Exception $e) {
+        error_log("PHPMailer Error for $email: " . $mail->ErrorInfo);
         return false;
     }
-    
-    return json_decode($response, true);
 }
 
-function supabaseInsert($table, $data) {
-    return supabaseFetch($table, [], 'POST', $data);
-}
-
-function supabaseUpdate($table, $data, $filters) {
-    return supabaseFetch($table, $filters, 'PATCH', $data);
-}
-
-/**
- * Generate 6-digit OTP
- */
 function generateOTP() {
     return sprintf("%06d", random_int(1, 999999));
 }
 
-/**
- * Send OTP via Supabase Edge Function
- */
-function sendOTP($email, $otp) {
-    error_log("🔐 Generating OTP for: $email - Code: $otp");
+// Test function to check email configuration
+function testEmailConfig() {
+    $testEmail = 'test@example.com'; // Replace with your test email
+    $testOTP = generateOTP();
     
-    try {
-        $student = getStudentByEmail($email);
-        if (!$student) {
-            error_log("❌ Student not found for email: $email");
-            return false;
-        }
-
-        // Store OTP in Supabase
-        $otpData = [
-            'email' => $email,
-            'otp_code' => $otp,
-            'expires_at' => date('Y-m-d H:i:s', strtotime('+10 minutes')),
-            'is_used' => false
-        ];
-        
-        $result = supabaseInsert('otp_verification', $otpData);
-        
-        if (!$result) {
-            error_log("❌ FAILED to store OTP in Supabase");
-            return false;
-        }
-        
-        // For testing - display OTP on screen instead of email
-        $_SESSION['debug_otp'] = $otp;
-        error_log("✅ OTP stored successfully: $otp");
-        
-        return true; // Always return true for testing
-        
-    } catch (Exception $e) {
-        error_log("❌ OTP sending failed: " . $e->getMessage());
-        return false;
+    if (sendOTP($testEmail, $testOTP)) {
+        echo "Email configuration test: SUCCESS";
+        error_log("Email test: SUCCESS - OTP sent to $testEmail");
+    } else {
+        echo "Email configuration test: FAILED";
+        error_log("Email test: FAILED - Check SMTP configuration");
     }
 }
 
-/**
- * Send OTP using Supabase Edge Function
- */
-function sendOTPViaEdgeFunction($email, $fullname, $otp) {
-    global $supabase_url, $supabase_key;
-    
-    $function_url = $supabase_url . '/functions/v1/send-otp';
-    
-    $data = [
-        'email' => $email,
-        'otp' => $otp,
-        'fullname' => $fullname
-    ];
-    
-    $ch = curl_init();
-    curl_setopt_array($ch, [
-        CURLOPT_URL => $function_url,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_POST => true,
-        CURLOPT_POSTFIELDS => json_encode($data),
-        CURLOPT_HTTPHEADER => [
-            'Authorization: Bearer ' . $supabase_key,
-            'Content-Type: application/json',
-        ],
-        CURLOPT_TIMEOUT => 30,
-    ]);
-    
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    
-    if ($httpCode === 200) {
-        $result = json_decode($response, true);
-        if ($result['success']) {
-            error_log("✅ OTP email sent successfully via Edge Function");
-            return true;
-        }
-    }
-    
-    error_log("❌ Edge Function failed - HTTP $httpCode: $response");
-    return false;
-}
-
-/**
- * Verify OTP
- */
-function verifyOTP($email, $otp) {
-    try {
-        // Validate OTP format
-        if (!preg_match('/^\d{6}$/', $otp)) {
-            error_log("❌ Invalid OTP format: $otp");
-            return false;
-        }
-
-        // Get OTP records for this email
-        $otpRecords = supabaseFetch('otp_verification', ['email' => $email]);
-        
-        if (!$otpRecords || count($otpRecords) === 0) {
-            error_log("❌ No OTP records found for: $email");
-            return false;
-        }
-        
-        // Find the most recent valid OTP
-        $validOtp = null;
-        foreach ($otpRecords as $record) {
-            if (!$record['is_used'] && $record['otp_code'] === $otp) {
-                $validOtp = $record;
-                break;
-            }
-        }
-        
-        if (!$validOtp) {
-            error_log("❌ Invalid OTP or already used for: $email");
-            return false;
-        }
-        
-        // Check expiration
-        if (strtotime($validOtp['expires_at']) < time()) {
-            error_log("❌ OTP expired for: $email");
-            return false;
-        }
-        
-        // Mark OTP as used
-        $updateResult = supabaseUpdate('otp_verification', 
-            ['is_used' => true], 
-            ['id' => $validOtp['id']]
-        );
-        
-        if ($updateResult !== false) {
-            error_log("✅ OTP verified successfully for: $email");
-            return true;
-        }
-        
-        return false;
-        
-    } catch (Exception $e) {
-        error_log("❌ OTP verification error: " . $e->getMessage());
-        return false;
-    }
-}
-
-/**
- * Student Functions
- */
-function getStudentByEmail($email) {
-    $students = supabaseFetch('students', ['email' => $email]);
-    return $students && count($students) > 0 ? $students[0] : null;
-}
-
-function getStudentById($id) {
-    $students = supabaseFetch('students', ['id' => $id]);
-    return $students && count($students) > 0 ? $students[0] : null;
-}
-
-function studentExists($email) {
-    $students = supabaseFetch('students', ['email' => $email]);
-    return $students && count($students) > 0;
-}
-
-function isValidPLPEmail($email) {
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        return false;
-    }
-    
-    $domain = substr(strrchr($email, "@"), 1);
-    return strtolower($domain) === 'plpasig.edu.ph';
-}
-
-/**
- * Session Security Functions
- */
-function regenerateSession() {
-    session_regenerate_id(true);
-    $_SESSION['created'] = time();
-}
-
-function sanitizeInput($data) {
-    if (is_array($data)) {
-        return array_map('sanitizeInput', $data);
-    }
-    return htmlspecialchars(trim($data), ENT_QUOTES, 'UTF-8');
-}
+// Uncomment the line below to test email configuration
+// testEmailConfig();
 ?>
