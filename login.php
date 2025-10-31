@@ -15,7 +15,7 @@ if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
     exit;
 }
 
-// Handle OTP verification (this should come FIRST)
+// Handle OTP verification (THIS MUST COME FIRST)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['otp'])) {
     $otp = sanitizeInput($_POST['otp']);
     $email = $_SESSION['verify_email'] ?? '';
@@ -45,7 +45,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['otp'])) {
     } else {
         $otpError = 'Invalid OTP code or OTP has expired. Please check your email and try again.';
         $showOTPModal = true;
-        $email = $_SESSION['verify_email'] ?? ''; // Keep email for display
     }
 }
 
@@ -127,9 +126,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             $result = supabaseInsert('students', $studentData);
             
             if ($result !== false) {
-                $success = 'Registration successful! You can now login with your credentials.';
-                $showSignupModal = false;
-                
                 // Auto-login after successful registration
                 $otp = generateOTP();
                 if (sendOTP($email, $otp)) {
@@ -139,6 +135,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
                     $_SESSION['temp_user_name'] = $fullname;
                     $showOTPModal = true;
                     $success = "Registration successful! OTP sent to your email for verification.";
+                    $showSignupModal = false;
+                } else {
+                    $error = 'Registration successful but failed to send OTP. Please try logging in.';
+                    $showSignupModal = false;
                 }
             } else {
                 $error = 'Registration failed. Please try again.';
@@ -148,11 +148,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
     }
 }
 
-// Check if we're coming from OTP verification with session still active
-if (isset($_SESSION['verify_email']) && !$showOTPModal) {
+// Check if we should show OTP modal from session (when page reloads)
+if (isset($_SESSION['verify_email']) && !$showOTPModal && !isset($_POST['otp'])) {
     $showOTPModal = true;
     $email = $_SESSION['verify_email'];
-    $success = "Please enter the OTP sent to your email.";
+    if (empty($success)) {
+        $success = "Please enter the OTP sent to your email.";
+    }
 }
 ?>
 
@@ -162,7 +164,7 @@ if (isset($_SESSION['verify_email']) && !$showOTPModal) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PAMANTASAN NG LUNGSOD NG PASIG - SMART GRADE AI</title>
-    <style>
+        <style>
         /* Your existing CSS styles remain exactly the same */
         :root {
             --plp-green: #006341;
@@ -702,7 +704,6 @@ if (isset($_SESSION['verify_email']) && !$showOTPModal) {
     <div class="header">
         <h1>PLP SMARTGRADE</h1>
         <p>An Intelligent System for Academic Performance Prediction and Risk Assessment<br>across Major Subjects of Second Year BSIT College Students</p>
-
         
         <div class="main-content-wrapper">
             <div class="main-content">
@@ -969,7 +970,7 @@ if (isset($_SESSION['verify_email']) && !$showOTPModal) {
         
         if (closeOtpModal) {
             closeOtpModal.addEventListener('click', function() {
-                otpModal.classList.remove('active');
+                document.getElementById('otpModal').classList.remove('active');
             });
         }
         
@@ -982,7 +983,7 @@ if (isset($_SESSION['verify_email']) && !$showOTPModal) {
         
         if (backToLogin) {
             backToLogin.addEventListener('click', function() {
-                otpModal.classList.remove('active');
+                document.getElementById('otpModal').classList.remove('active');
             });
         }
         
@@ -991,8 +992,8 @@ if (isset($_SESSION['verify_email']) && !$showOTPModal) {
             if (e.target === signupModal) {
                 signupModal.classList.remove('active');
             }
-            if (e.target === otpModal) {
-                otpModal.classList.remove('active');
+            if (e.target === document.getElementById('otpModal')) {
+                document.getElementById('otpModal').classList.remove('active');
             }
         });
     </script>
