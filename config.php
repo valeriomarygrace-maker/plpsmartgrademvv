@@ -33,7 +33,7 @@ function sendMagicLink($email) {
     global $supabase_url, $supabase_key;
     
     // IMPORTANT: Replace with your actual Render URL
-    $redirect_url = 'https://your-actual-app.onrender.com/auth-callback.php';
+    $redirect_url = 'https://plpsmartgrademvv.onrender.com/auth-callback.php';
     
     $data = [
         'email' => $email,
