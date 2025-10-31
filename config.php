@@ -65,15 +65,12 @@ try {
     $error_message = 'Error initializing subjects: ' . $e->getMessage();
 }
 
-// Get student's enrolled subjects
 try {
-    // First get all student_subjects for this student
     $student_subjects = supabaseFetch('student_subjects', ['student_id' => $student['id']]);
     
     $subjects = [];
     if ($student_subjects) {
         foreach ($student_subjects as $student_subject) {
-            // Get subject details for each enrolled subject
             $subject_details = supabaseFetch('subjects', ['id' => $student_subject['subject_id']]);
             if ($subject_details && count($subject_details) > 0) {
                 $subject_detail = $subject_details[0];
@@ -92,10 +89,8 @@ try {
 
 // Get ALL available subjects for dropdown (not filtered by semester)
 try {
-    // Get ALL subjects from the database
     $all_subjects = supabaseFetch('subjects');
     
-    // Get already enrolled subject IDs
     $enrolled_subject_ids = [];
     if ($student_subjects) {
         foreach ($student_subjects as $enrolled) {
@@ -103,7 +98,6 @@ try {
         }
     }
     
-    // Filter out enrolled subjects from ALL subjects
     $available_subjects = [];
     if ($all_subjects) {
         foreach ($all_subjects as $subject) {
