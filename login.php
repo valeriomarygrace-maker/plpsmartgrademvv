@@ -21,8 +21,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && !isset($_
         if ($student) {
             if (sendMagicLink($email)) {
                 $success = "🎉 Magic link sent to your email! Check your inbox and click the link to login automatically.";
+                error_log("✅ Magic link sent successfully to: $email");
             } else {
                 $error = 'Failed to send magic link. Please try again.';
+                error_log("❌ Failed to send magic link to: $email");
             }
         } else {
             $error = 'Email not found in our system. Please sign up first.';

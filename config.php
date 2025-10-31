@@ -32,7 +32,8 @@ function sanitizeInput($data) {
 function sendMagicLink($email) {
     global $supabase_url, $supabase_key;
     
-    $redirect_url = getBaseUrl() . '/auth-callback.php';
+    // Get your actual Render URL - CHANGE THIS TO YOUR ACTUAL RENDER URL
+    $redirect_url = 'https://plpsmartgrademvv.onrender.com/auth-callback.php';
     
     $data = [
         'email' => $email,
@@ -63,15 +64,6 @@ function sendMagicLink($email) {
     error_log("🔐 Magic Link attempt for: $email - HTTP Code: $httpCode");
     
     return $httpCode === 200;
-}
-
-/**
- * Get base URL for redirects
- */
-function getBaseUrl() {
-    $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http';
-    $host = $_SERVER['HTTP_HOST'];
-    return $protocol . '://' . $host;
 }
 
 /**
