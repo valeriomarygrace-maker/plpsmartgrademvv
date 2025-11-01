@@ -84,40 +84,81 @@ try {
 }
 
 // Get available subjects for dropdown - FIXED THIS SECTION
+// Get available subjects for dropdown - CORRECTED VERSION
 try {
     $semester_mapping = [
         '1st Semester' => 'First Semester',
-        '2nd Semester' => 'Second Semester',
-        'Summer' => 'Summer'
+        '2nd Semester' => 'Second Semester', 
+        'Summer' => 'Summer',
+        '1st' => 'First Semester',  // Added mapping for your student data
+        '2nd' => 'Second Semester'   // Added mapping for your student data
     ];
     
-    $student_semester = $semester_mapping[$student['semester']] ?? 'First Semester';
+    // Get student's current semester and map it
+    $student_semester_raw = $student['semester'];
+    $student_semester = $semester_mapping[$student_semester_raw] ?? 'First Semester';
     
-    // Get all subjects for current semester
+    // Debug output
+    error_log("Student semester raw: " . $student_semester_raw);
+    error_log("Student semester mapped: " . $student_semester);
+    
+    // Get all subjects for current semester from Supabase
     $all_subjects = supabaseFetch('subjects', ['semester' => $student_semester]);
     
-    if (!$all_subjects) {
-        $all_subjects = [];
-    }
-    
-    // Get enrolled subject IDs
-    $enrolled_subject_ids = [];
-    foreach ($subjects as $enrolled_subject) {
-        $enrolled_subject_ids[] = $enrolled_subject['subject_id'];
-    }
-    
-    // Filter available subjects - only show subjects from current semester that aren't enrolled
-    $available_subjects = [];
-    foreach ($all_subjects as $avail_subject) {
-        if (!in_array($avail_subject['id'], $enrolled_subject_ids)) {
-            $available_subjects[] = $avail_subject;
+    // If no subjects found, try alternative semester formats
+    if (!$all_subjects || count($all_subjects) === 0) {
+        // Try the raw semester value
+        $all_subjects = supabaseFetch('subjects', ['semester' => $student_semester_raw]);
+        
+        // If still no subjects, get all subjects and filter manually
+        if (!$all_subjects || count($all_subjects) === 0) {
+            $all_subjects = supabaseFetchAll('subjects');
+            if ($all_subjects) {
+                $all_subjects = array_filter($all_subjects, function($subject) use ($student_semester, $student_semester_raw) {
+                    $subject_semester = strtolower($subject['semester'] ?? '');
+                    $search_semester = strtolower($student_semester);
+                    $search_semester_raw = strtolower($student_semester_raw);
+                    
+                    return strpos($subject_semester, $search_semester) !== false || 
+                           strpos($subject_semester, $search_semester_raw) !== false;
+                });
+                $all_subjects = array_values($all_subjects); // Reindex array
+            }
         }
     }
+    
+    // Get enrolled subject IDs for this student
+    $enrolled_subject_ids = [];
+    if ($subjects && is_array($subjects)) {
+        foreach ($subjects as $enrolled_subject) {
+            if (isset($enrolled_subject['subject_id'])) {
+                $enrolled_subject_ids[] = $enrolled_subject['subject_id'];
+            }
+        }
+    }
+    
+    // Filter available subjects
+    $available_subjects = [];
+    if ($all_subjects && is_array($all_subjects)) {
+        foreach ($all_subjects as $subject) {
+            if (isset($subject['id']) && !in_array($subject['id'], $enrolled_subject_ids)) {
+                $available_subjects[] = $subject;
+            }
+        }
+    }
+    
+    // Debug output
+    error_log("All subjects count: " . ($all_subjects ? count($all_subjects) : 0));
+    error_log("Enrolled subject IDs: " . count($enrolled_subject_ids));
+    error_log("Available subjects count: " . count($available_subjects));
     
 } catch (Exception $e) {
     $available_subjects = [];
     error_log("Error fetching available subjects: " . $e->getMessage());
 }
+
+// Set current semester display
+$current_semester_display = $semester_mapping[$student['semester']] ?? $student['semester'];
 
 // Handle add subject
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_subject'])) {
@@ -1293,26 +1334,48 @@ $current_semester_display = $semester_mapping[$student['semester']] ?? 'First Se
                 <i class="fas fa-plus"></i>
                 Add New Subject
             </h3>
-            
+        
             <form action="student-subjects.php" method="POST" id="addSubjectForm">
                 <div class="form-row">
                     <div class="form-group">
                         <label for="subject_id" class="form-label">Subject</label>
                         <select name="subject_id" id="subject_id" class="form-select" required>
                             <option value="">Select a subject</option>
-                            <?php if (!empty($available_subjects)): ?>
-                                <?php foreach ($available_subjects as $available_subject): ?>
-                                    <option value="<?php echo $available_subject['id']; ?>">
-                                        <?php echo htmlspecialchars($available_subject['subject_code'] . ' - ' . $available_subject['subject_name'] . ' (' . $available_subject['credits'] . ' credits)'); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            <?php else: ?>
+                            <?php 
+                            // Debug: Check what's in available_subjects
+                            // echo "<!-- Available subjects count: " . count($available_subjects) . " -->";
+                            // echo "<!-- Student semester: " . $student['semester'] . " -->";
+                            // echo "<!-- Current semester display: " . $current_semester_display . " -->";
+                            
+                            if (!empty($available_subjects) && is_array($available_subjects)): 
+                                foreach ($available_subjects as $available_subject): 
+                                    if (is_array($available_subject) && isset($available_subject['id'])): 
+                            ?>
+                                        <option value="<?php echo $available_subject['id']; ?>">
+                                            <?php 
+                                            echo htmlspecialchars(
+                                                $available_subject['subject_code'] . ' - ' . 
+                                                $available_subject['subject_name'] . ' (' . 
+                                                $available_subject['credits'] . ' credits)'
+                                            ); 
+                                            ?>
+                                        </option>
+                            <?php 
+                                    endif;
+                                endforeach; 
+                            else: 
+                            ?>
                                 <option value="" disabled>No subjects available for your semester</option>
                             <?php endif; ?>
                         </select>
-                        <?php if (empty($available_subjects)): ?>
+                        
+                        <?php if (empty($available_subjects) || !is_array($available_subjects)): ?>
                             <p style="color: var(--text-light); font-size: 0.85rem; margin-top: 0.5rem;">
-                                All subjects for <?php echo htmlspecialchars($current_semester_display); ?> have been enrolled.
+                                <?php if (empty($available_subjects)): ?>
+                                    All subjects for <?php echo htmlspecialchars($current_semester_display); ?> have been enrolled.
+                                <?php else: ?>
+                                    No subjects found for your current semester.
+                                <?php endif; ?>
                             </p>
                         <?php endif; ?>
                     </div>
@@ -1320,21 +1383,22 @@ $current_semester_display = $semester_mapping[$student['semester']] ?? 'First Se
                     <div class="form-group">
                         <label for="professor_name" class="form-label">Professor Name</label>
                         <input type="text" name="professor_name" id="professor_name" class="form-input" 
-                               placeholder="Enter professor's name" required>
+                            placeholder="Enter professor's name" required>
                     </div>
                 </div>
                 
                 <div class="form-group">
                     <label for="schedule" class="form-label">Schedule</label>
                     <input type="text" name="schedule" id="schedule" class="form-input" 
-                           placeholder="Day-Day Time" required>
+                        placeholder="Day-Day Time" required>
                 </div>
                 
                 <div class="modal-actions">
                     <button type="button" class="modal-btn modal-btn-cancel" id="cancelAddSubject">
                         <i class="fas fa-times"></i> Cancel
                     </button>
-                    <button type="submit" name="add_subject" class="modal-btn modal-btn-confirm" <?php echo empty($available_subjects) ? 'disabled' : ''; ?>>
+                    <button type="submit" name="add_subject" class="modal-btn modal-btn-confirm" 
+                        <?php echo (empty($available_subjects) || !is_array($available_subjects)) ? 'disabled' : ''; ?>>
                         <i class="fas fa-plus"></i> Add Subject
                     </button>
                 </div>
