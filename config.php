@@ -17,7 +17,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 /**
- * Supabase API Helper Function
+ * Improved Supabase API Helper Function
  */
 function supabaseFetch($table, $filters = [], $method = 'GET', $data = null) {
     global $supabase_url, $supabase_key;
@@ -27,7 +27,9 @@ function supabaseFetch($table, $filters = [], $method = 'GET', $data = null) {
     // Build query string from filters
     $queryParams = [];
     foreach ($filters as $key => $value) {
-        $queryParams[] = "$key=eq.$value";
+        if ($value !== null) {
+            $queryParams[] = "$key=eq.$value";
+        }
     }
     
     if (!empty($queryParams)) {
@@ -56,6 +58,8 @@ function supabaseFetch($table, $filters = [], $method = 'GET', $data = null) {
     } elseif ($method === 'PATCH') {
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PATCH');
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+    } elseif ($method === 'DELETE') {
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
     }
     
     $response = curl_exec($ch);
@@ -64,25 +68,107 @@ function supabaseFetch($table, $filters = [], $method = 'GET', $data = null) {
     curl_close($ch);
     
     if ($error) {
-        error_log("❌ cURL Error: $error");
+        error_log("cURL Error: $error");
         return false;
     }
     
     if ($httpCode >= 400) {
-        error_log("❌ HTTP Error $httpCode for table: $table");
+        error_log("HTTP Error $httpCode for table: $table, URL: $url");
+        return false;
+    }
+    
+    // For DELETE requests, return success if no error
+    if ($method === 'DELETE' && $httpCode === 200) {
+        return true;
+    }
+    
+    $result = json_decode($response, true);
+    
+    // Handle empty responses
+    if ($result === null && $httpCode === 200) {
+        return true;
+    }
+    
+    return $result;
+}
+
+/**
+ * Insert data into Supabase table
+ */
+function supabaseInsert($table, $data) {
+    $result = supabaseFetch($table, [], 'POST', $data);
+    
+    if ($result && isset($result[0])) {
+        return $result[0]; // Return the inserted record
+    }
+    
+    return $result;
+}
+
+/**
+ * Update data in Supabase table
+ */
+function supabaseUpdate($table, $data, $filters) {
+    $result = supabaseFetch($table, $filters, 'PATCH', $data);
+    
+    if ($result && isset($result[0])) {
+        return $result[0]; // Return the updated record
+    }
+    
+    return $result;
+}
+
+/**
+ * Delete data from Supabase table
+ */
+function supabaseDelete($table, $filters) {
+    return supabaseFetch($table, $filters, 'DELETE');
+}
+
+/**
+ * Fetch all records from a table with optional ordering
+ */
+function supabaseFetchAll($table, $orderBy = null) {
+    global $supabase_url, $supabase_key;
+    
+    $url = $supabase_url . "/rest/v1/$table";
+    
+    if ($orderBy) {
+        $url .= "?order=$orderBy";
+    }
+    
+    $ch = curl_init();
+    $headers = [
+        'apikey: ' . $supabase_key,
+        'Authorization: Bearer ' . $supabase_key,
+        'Content-Type: application/json'
+    ];
+    
+    curl_setopt_array($ch, [
+        CURLOPT_URL => $url,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => $headers,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_TIMEOUT => 30,
+    ]);
+    
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $error = curl_error($ch);
+    curl_close($ch);
+    
+    if ($error) {
+        error_log("cURL Error: $error");
+        return false;
+    }
+    
+    if ($httpCode >= 400) {
+        error_log("HTTP Error $httpCode for table: $table");
         return false;
     }
     
     $result = json_decode($response, true);
-    return $result;
-}
-
-function supabaseInsert($table, $data) {
-    return supabaseFetch($table, [], 'POST', $data);
-}
-
-function supabaseUpdate($table, $data, $filters) {
-    return supabaseFetch($table, $filters, 'PATCH', $data);
+    return $result ?: [];
 }
 
 /**
@@ -124,6 +210,62 @@ function isValidPLPEmail($email) {
 }
 
 /**
+ * Subject Functions
+ */
+function getSubjectById($id) {
+    $subjects = supabaseFetch('subjects', ['id' => $id]);
+    return $subjects && count($subjects) > 0 ? $subjects[0] : null;
+}
+
+function getSubjectsBySemester($semester) {
+    return supabaseFetch('subjects', ['semester' => $semester]);
+}
+
+function getStudentSubjects($student_id) {
+    return supabaseFetch('student_subjects', ['student_id' => $student_id]);
+}
+
+/**
+ * OTP Functions
+ */
+function createOTP($email, $otp_code, $expires_minutes = 10) {
+    $expires_at = date('Y-m-d H:i:s', time() + ($expires_minutes * 60));
+    
+    $otp_data = [
+        'email' => $email,
+        'otp_code' => $otp_code,
+        'expires_at' => $expires_at,
+        'is_used' => false
+    ];
+    
+    return supabaseInsert('otp_verification', $otp_data);
+}
+
+function verifyOTP($email, $otp_code) {
+    $otp_records = supabaseFetch('otp_verification', [
+        'email' => $email,
+        'otp_code' => $otp_code,
+        'is_used' => false
+    ]);
+    
+    if (!$otp_records || count($otp_records) === 0) {
+        return false;
+    }
+    
+    $otp_record = $otp_records[0];
+    
+    // Check if OTP is expired
+    if (strtotime($otp_record['expires_at']) < time()) {
+        return false;
+    }
+    
+    // Mark OTP as used
+    supabaseUpdate('otp_verification', ['is_used' => true], ['id' => $otp_record['id']]);
+    
+    return true;
+}
+
+/**
  * Session Security Functions
  */
 function regenerateSession() {
@@ -138,12 +280,66 @@ function sanitizeInput($data) {
     return htmlspecialchars(trim($data), ENT_QUOTES, 'UTF-8');
 }
 
-// Check session expiration on every request
+function isLoggedIn() {
+    return isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true;
+}
+
+function requireLogin() {
+    if (!isLoggedIn()) {
+        header('Location: login.php');
+        exit;
+    }
+}
+
+function requireStudentRole() {
+    if (!isLoggedIn() || $_SESSION['user_type'] !== 'student') {
+        header('Location: login.php');
+        exit;
+    }
+}
+
+/**
+ * Utility Functions
+ */
+function formatDate($date_string, $format = 'M j, Y') {
+    if (empty($date_string)) {
+        return 'N/A';
+    }
+    return date($format, strtotime($date_string));
+}
+
+function calculateGrade($score, $max_score) {
+    if ($max_score <= 0) return 0;
+    return ($score / $max_score) * 100;
+}
+
+function getGPA($grade) {
+    if ($grade >= 89) return 1.00;
+    if ($grade >= 82) return 2.00;
+    if ($grade >= 79) return 2.75;
+    return 3.00;
+}
+
+function getRiskLevel($gpa) {
+    if ($gpa == 1.00) return 'low';
+    if ($gpa == 2.50 || $gpa == 2.75) return 'medium';
+    return 'high';
+}
+
+
 if (isset($_SESSION['created']) && (time() - $_SESSION['created'] > 28800)) {
     session_destroy();
     if (basename($_SERVER['PHP_SELF']) !== 'login.php') {
         header('Location: login.php');
         exit;
     }
+}
+
+if (rand(1, 100) === 1) { 
+    cleanExpiredOTPs();
+}
+
+function cleanExpiredOTPs() {
+    $current_time = date('Y-m-d H:i:s');
 }
 ?>
