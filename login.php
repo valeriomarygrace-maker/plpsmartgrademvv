@@ -180,7 +180,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             font-size: 2.5rem;
             font-weight: 700;
             color: var(--plp-green);
-            margin-bottom: 0.8rem;
+            margin-bottom: 0.5rem;
             margin-top: 0.5rem;
             letter-spacing: 0.5px;
         }
@@ -189,7 +189,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             font-size: 1.1rem;
             color: var(--text-medium);
             font-weight: 500;
-            margin-bottom: 2rem;
+            margin-bottom: 0.75rem;
         }
         
         .main-content-wrapper {
@@ -236,7 +236,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             max-width: 380px;
             background-color: white;
             border-radius: var(--border-radius-lg);
-            padding: 2rem 1.5rem;
+            padding: 2rem 2rem;
             box-shadow: var(--box-shadow-lg);
             border: 1px solid rgba(0, 99, 65, 0.1);
             transition: transform 0.3s ease, box-shadow 0.3s ease;
@@ -596,11 +596,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
                 width: 80%;
                 height: 2px;
                 background: linear-gradient(to right, transparent, var(--plp-green-light), transparent);
-                margin: 1rem 0;
+                margin: 0.5rem 0;
             }
             
             .logo {
-                max-width: 220px;
+                max-width: 150px;
             }
             
             .login-container {
@@ -615,7 +615,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             
             .header p {
                 font-size: 1rem;
-                margin-bottom: 2rem;
+                margin-bottom: 1rem;
             }
 
             .otp-modal, .signup-modal {
