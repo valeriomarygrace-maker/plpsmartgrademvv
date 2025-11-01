@@ -28,6 +28,40 @@ try {
     $error_message = 'Database error: ' . $e->getMessage();
 }
 
+// Initialize subjects if empty - MOVE THIS UP BEFORE ANY OTHER DATABASE OPERATIONS
+try {
+    $check_subjects = supabaseFetch('subjects');
+    $subject_count = $check_subjects ? count($check_subjects) : 0;
+    
+    if ($subject_count == 0) {
+        $actual_subjects = [
+            // First Semester
+            ['subject_code' => 'COMP 104', 'subject_name' => 'Data Structures and Algorithms', 'credits' => 3, 'semester' => 'First Semester'],
+            ['subject_code' => 'COMP 105', 'subject_name' => 'Information Management', 'credits' => 3, 'semester' => 'First Semester'],
+            ['subject_code' => 'IT 102', 'subject_name' => 'Quantitative Methods', 'credits' => 3, 'semester' => 'First Semester'],
+            ['subject_code' => 'IT 201', 'subject_name' => 'IT Elective: Platform Technologies', 'credits' => 3, 'semester' => 'First Semester'],
+            ['subject_code' => 'IT 202', 'subject_name' => 'IT Elective: Object-Oriented Programming (VB.Net)', 'credits' => 3, 'semester' => 'First Semester'],
+            
+            // Second Semester
+            ['subject_code' => 'IT 103', 'subject_name' => 'Advanced Database Systems', 'credits' => 3, 'semester' => 'Second Semester'],
+            ['subject_code' => 'IT 104', 'subject_name' => 'Integrative Programming and Technologies I', 'credits' => 3, 'semester' => 'Second Semester'],
+            ['subject_code' => 'IT 105', 'subject_name' => 'Networking I', 'credits' => 3, 'semester' => 'Second Semester'],
+            ['subject_code' => 'IT 301', 'subject_name' => 'Web Programming', 'credits' => 3, 'semester' => 'Second Semester'],
+            ['subject_code' => 'COMP 106', 'subject_name' => 'Applications Development and Emerging Technologies', 'credits' => 3, 'semester' => 'Second Semester']
+        ];
+        
+        foreach ($actual_subjects as $subject_data) {
+            $subject_data['created_at'] = date('Y-m-d H:i:s');
+            supabaseInsert('subjects', $subject_data);
+        }
+        
+        // Refresh the check after inserting
+        $check_subjects = supabaseFetch('subjects');
+    }
+} catch (Exception $e) {
+    // Silently continue
+}
+
 // Get student's enrolled subjects
 try {
     $subjects_result = supabaseFetch('student_subjects', ['student_id' => $student['id']]);
@@ -49,7 +83,7 @@ try {
     $error_message = 'Database error: ' . $e->getMessage();
 }
 
-// Get available subjects for dropdown 
+// Get available subjects for dropdown - FIXED THIS SECTION
 try {
     $semester_mapping = [
         '1st Semester' => 'First Semester',
@@ -62,22 +96,27 @@ try {
     // Get all subjects for current semester
     $all_subjects = supabaseFetch('subjects', ['semester' => $student_semester]);
     
+    if (!$all_subjects) {
+        $all_subjects = [];
+    }
+    
     // Get enrolled subject IDs
     $enrolled_subject_ids = [];
     foreach ($subjects as $enrolled_subject) {
         $enrolled_subject_ids[] = $enrolled_subject['subject_id'];
     }
     
-    // Filter available subjects
-    if ($all_subjects) {
-        foreach ($all_subjects as $avail_subject) {
-            if (!in_array($avail_subject['id'], $enrolled_subject_ids)) {
-                $available_subjects[] = $avail_subject;
-            }
+    // Filter available subjects - only show subjects from current semester that aren't enrolled
+    $available_subjects = [];
+    foreach ($all_subjects as $avail_subject) {
+        if (!in_array($avail_subject['id'], $enrolled_subject_ids)) {
+            $available_subjects[] = $avail_subject;
         }
     }
+    
 } catch (Exception $e) {
     $available_subjects = [];
+    error_log("Error fetching available subjects: " . $e->getMessage());
 }
 
 // Handle add subject
@@ -107,38 +146,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_subject'])) {
             
             if ($result) {
                 $success_message = 'Subject added successfully!';
-                // Refresh the subjects list
-                $subjects_result = supabaseFetch('student_subjects', ['student_id' => $student['id']]);
-                $subjects = [];
-                if ($subjects_result) {
-                    foreach ($subjects_result as $subject_record) {
-                        $subject_info = supabaseFetch('subjects', ['id' => $subject_record['subject_id']]);
-                        if ($subject_info) {
-                            $subject_info = $subject_info[0];
-                            $subjects[] = array_merge($subject_record, [
-                                'subject_code' => $subject_info['subject_code'],
-                                'subject_name' => $subject_info['subject_name'],
-                                'credits' => $subject_info['credits'],
-                                'semester' => $subject_info['semester']
-                            ]);
-                        }
-                    }
-                }
-                
-                // Refresh available subjects
-                $enrolled_subject_ids = [];
-                foreach ($subjects as $enrolled_subject) {
-                    $enrolled_subject_ids[] = $enrolled_subject['subject_id'];
-                }
-                
-                $available_subjects = [];
-                if ($all_subjects) {
-                    foreach ($all_subjects as $avail_subject) {
-                        if (!in_array($avail_subject['id'], $enrolled_subject_ids)) {
-                            $available_subjects[] = $avail_subject;
-                        }
-                    }
-                }
+                // Refresh the page to show updated lists
+                header("Location: student-subjects.php");
+                exit;
             } else {
                 $error_message = 'Failed to add subject.';
             }
@@ -153,49 +163,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_subject'])) {
     $subject_record_id = $_POST['subject_record_id'];
     
     try {
-        // First delete related records
-        $delete_scores = supabaseUpdate('student_subject_scores', ['student_subject_id' => null], ['student_subject_id' => $subject_record_id]);
-        $delete_categories = supabaseUpdate('student_class_standing_categories', ['student_subject_id' => null], ['student_subject_id' => $subject_record_id]);
-        
-        // Then delete the subject
         $result = supabaseUpdate('student_subjects', ['deleted_at' => date('Y-m-d H:i:s')], ['id' => $subject_record_id, 'student_id' => $student['id']]);
         
         if ($result) {
             $success_message = 'Subject removed successfully!';
-            // Refresh lists
-            $subjects_result = supabaseFetch('student_subjects', ['student_id' => $student['id']]);
-            $subjects = [];
-            if ($subjects_result) {
-                foreach ($subjects_result as $subject_record) {
-                    if (empty($subject_record['deleted_at'])) {
-                        $subject_info = supabaseFetch('subjects', ['id' => $subject_record['subject_id']]);
-                        if ($subject_info) {
-                            $subject_info = $subject_info[0];
-                            $subjects[] = array_merge($subject_record, [
-                                'subject_code' => $subject_info['subject_code'],
-                                'subject_name' => $subject_info['subject_name'],
-                                'credits' => $subject_info['credits'],
-                                'semester' => $subject_info['semester']
-                            ]);
-                        }
-                    }
-                }
-            }
-            
-            // Refresh available subjects
-            $enrolled_subject_ids = [];
-            foreach ($subjects as $enrolled_subject) {
-                $enrolled_subject_ids[] = $enrolled_subject['subject_id'];
-            }
-            
-            $available_subjects = [];
-            if ($all_subjects) {
-                foreach ($all_subjects as $avail_subject) {
-                    if (!in_array($avail_subject['id'], $enrolled_subject_ids)) {
-                        $available_subjects[] = $avail_subject;
-                    }
-                }
-            }
+            header("Location: student-subjects.php");
+            exit;
         } else {
             $error_message = 'Failed to remove subject.';
         }
@@ -209,66 +182,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
     $subject_record_id = $_POST['subject_record_id'];
     
     try {
-        // Get the subject details before archiving
-        $subject_to_archive = null;
-        foreach ($subjects as $subj) {
-            if ($subj['id'] == $subject_record_id) {
-                $subject_to_archive = $subj;
-                break;
-            }
-        }
+        $archive_data = [
+            'archived' => true,
+            'archived_at' => date('Y-m-d H:i:s')
+        ];
         
-        if (!$subject_to_archive) {
-            $error_message = 'Subject not found.';
+        $result = supabaseUpdate('student_subjects', $archive_data, ['id' => $subject_record_id, 'student_id' => $student['id']]);
+        
+        if ($result) {
+            $success_message = 'Subject archived successfully with all records preserved!';
+            header("Location: student-subjects.php");
+            exit;
         } else {
-            // Archive the subject by marking as archived
-            $archive_data = [
-                'archived' => true,
-                'archived_at' => date('Y-m-d H:i:s')
-            ];
-            
-            $result = supabaseUpdate('student_subjects', $archive_data, ['id' => $subject_record_id, 'student_id' => $student['id']]);
-            
-            if ($result) {
-                $success_message = 'Subject archived successfully with all records preserved!';
-                
-                // Refresh the subjects lists
-                $subjects_result = supabaseFetch('student_subjects', ['student_id' => $student['id']]);
-                $subjects = [];
-                if ($subjects_result) {
-                    foreach ($subjects_result as $subject_record) {
-                        if (empty($subject_record['archived'])) {
-                            $subject_info = supabaseFetch('subjects', ['id' => $subject_record['subject_id']]);
-                            if ($subject_info) {
-                                $subject_info = $subject_info[0];
-                                $subjects[] = array_merge($subject_record, [
-                                    'subject_code' => $subject_info['subject_code'],
-                                    'subject_name' => $subject_info['subject_name'],
-                                    'credits' => $subject_info['credits'],
-                                    'semester' => $subject_info['semester']
-                                ]);
-                            }
-                        }
-                    }
-                }
-                
-                // Refresh available subjects
-                $enrolled_subject_ids = [];
-                foreach ($subjects as $enrolled_subject) {
-                    $enrolled_subject_ids[] = $enrolled_subject['subject_id'];
-                }
-                
-                $available_subjects = [];
-                if ($all_subjects) {
-                    foreach ($all_subjects as $avail_subject) {
-                        if (!in_array($avail_subject['id'], $enrolled_subject_ids)) {
-                            $available_subjects[] = $avail_subject;
-                        }
-                    }
-                }
-            } else {
-                $error_message = 'Failed to archive subject.';
-            }
+            $error_message = 'Failed to archive subject.';
         }
     } catch (Exception $e) {
         $error_message = 'Database error during archiving: ' . $e->getMessage();
@@ -297,23 +223,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
             
             if ($result) {
                 $success_message = 'Subject updated successfully!';
-                // Refresh subjects list
-                $subjects_result = supabaseFetch('student_subjects', ['student_id' => $student['id']]);
-                $subjects = [];
-                if ($subjects_result) {
-                    foreach ($subjects_result as $subject_record) {
-                        $subject_info = supabaseFetch('subjects', ['id' => $subject_record['subject_id']]);
-                        if ($subject_info) {
-                            $subject_info = $subject_info[0];
-                            $subjects[] = array_merge($subject_record, [
-                                'subject_code' => $subject_info['subject_code'],
-                                'subject_name' => $subject_info['subject_name'],
-                                'credits' => $subject_info['credits'],
-                                'semester' => $subject_info['semester']
-                            ]);
-                        }
-                    }
-                }
+                header("Location: student-subjects.php");
+                exit;
             } else {
                 $error_message = 'Failed to update subject.';
             }
@@ -321,53 +232,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
             $error_message = 'Database error: ' . $e->getMessage();
         }
     }
-}
-
-// Initialize subjects if empty
-try {
-    $check_subjects = supabaseFetch('subjects');
-    $subject_count = $check_subjects ? count($check_subjects) : 0;
-    
-    if ($subject_count == 0) {
-        $actual_subjects = [
-            // First Semester
-            ['subject_code' => 'COMP 104', 'subject_name' => 'Data Structures and Algorithms', 'credits' => 3, 'semester' => 'First Semester'],
-            ['subject_code' => 'COMP 105', 'subject_name' => 'Information Management', 'credits' => 3, 'semester' => 'First Semester'],
-            ['subject_code' => 'IT 102', 'subject_name' => 'Quantitative Methods', 'credits' => 3, 'semester' => 'First Semester'],
-            ['subject_code' => 'IT 201', 'subject_name' => 'IT Elective: Platform Technologies', 'credits' => 3, 'semester' => 'First Semester'],
-            ['subject_code' => 'IT 202', 'subject_name' => 'IT Elective: Object-Oriented Programming (VB.Net)', 'credits' => 3, 'semester' => 'First Semester'],
-            
-            // Second Semester
-            ['subject_code' => 'IT 103', 'subject_name' => 'Advanced Database Systems', 'credits' => 3, 'semester' => 'Second Semester'],
-            ['subject_code' => 'IT 104', 'subject_name' => 'Integrative Programming and Technologies I', 'credits' => 3, 'semester' => 'Second Semester'],
-            ['subject_code' => 'IT 105', 'subject_name' => 'Networking I', 'credits' => 3, 'semester' => 'Second Semester'],
-            ['subject_code' => 'IT 301', 'subject_name' => 'Web Programming', 'credits' => 3, 'semester' => 'Second Semester'],
-            ['subject_code' => 'COMP 106', 'subject_name' => 'Applications Development and Emerging Technologies', 'credits' => 3, 'semester' => 'Second Semester']
-        ];
-        
-        foreach ($actual_subjects as $subject_data) {
-            $subject_data['created_at'] = date('Y-m-d H:i:s');
-            supabaseInsert('subjects', $subject_data);
-        }
-        
-        // Refresh available subjects
-        $all_subjects = supabaseFetch('subjects', ['semester' => $student_semester]);
-        $enrolled_subject_ids = [];
-        foreach ($subjects as $enrolled_subject) {
-            $enrolled_subject_ids[] = $enrolled_subject['subject_id'];
-        }
-        
-        $available_subjects = [];
-        if ($all_subjects) {
-            foreach ($all_subjects as $avail_subject) {
-                if (!in_array($avail_subject['id'], $enrolled_subject_ids)) {
-                    $available_subjects[] = $avail_subject;
-                }
-            }
-        }
-    }
-} catch (Exception $e) {
-    // Silently continue
 }
 
 $semester_mapping = [
@@ -1281,6 +1145,7 @@ $current_semester_display = $semester_mapping[$student['semester']] ?? 'First Se
             <div class="semester-indicator">
                 <i class="fas fa-calendar-alt"></i>
                 Current Semester: <?php echo htmlspecialchars($student['semester']); ?> 
+                (<?php echo htmlspecialchars($current_semester_display); ?>)
             </div>
         </div>
 
@@ -1435,12 +1300,21 @@ $current_semester_display = $semester_mapping[$student['semester']] ?? 'First Se
                         <label for="subject_id" class="form-label">Subject</label>
                         <select name="subject_id" id="subject_id" class="form-select" required>
                             <option value="">Select a subject</option>
-                            <?php foreach ($available_subjects as $available_subject): ?>
-                                <option value="<?php echo $available_subject['id']; ?>">
-                                    <?php echo htmlspecialchars($available_subject['subject_code'] . ' - ' . $available_subject['subject_name'] . ' (' . $available_subject['credits'] . ' credits)'); ?>
-                                </option>
-                            <?php endforeach; ?>
+                            <?php if (!empty($available_subjects)): ?>
+                                <?php foreach ($available_subjects as $available_subject): ?>
+                                    <option value="<?php echo $available_subject['id']; ?>">
+                                        <?php echo htmlspecialchars($available_subject['subject_code'] . ' - ' . $available_subject['subject_name'] . ' (' . $available_subject['credits'] . ' credits)'); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <option value="" disabled>No subjects available for your semester</option>
+                            <?php endif; ?>
                         </select>
+                        <?php if (empty($available_subjects)): ?>
+                            <p style="color: var(--text-light); font-size: 0.85rem; margin-top: 0.5rem;">
+                                All subjects for <?php echo htmlspecialchars($current_semester_display); ?> have been enrolled.
+                            </p>
+                        <?php endif; ?>
                     </div>
                     
                     <div class="form-group">
@@ -1460,7 +1334,7 @@ $current_semester_display = $semester_mapping[$student['semester']] ?? 'First Se
                     <button type="button" class="modal-btn modal-btn-cancel" id="cancelAddSubject">
                         <i class="fas fa-times"></i> Cancel
                     </button>
-                    <button type="submit" name="add_subject" class="modal-btn modal-btn-confirm">
+                    <button type="submit" name="add_subject" class="modal-btn modal-btn-confirm" <?php echo empty($available_subjects) ? 'disabled' : ''; ?>>
                         <i class="fas fa-plus"></i> Add Subject
                     </button>
                 </div>
