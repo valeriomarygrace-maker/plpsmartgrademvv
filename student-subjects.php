@@ -1186,7 +1186,6 @@ $current_semester_display = $semester_mapping[$student['semester']] ?? 'First Se
             <div class="semester-indicator">
                 <i class="fas fa-calendar-alt"></i>
                 Current Semester: <?php echo htmlspecialchars($student['semester']); ?> 
-                (<?php echo htmlspecialchars($current_semester_display); ?>)
             </div>
         </div>
 

@@ -1,429 +1,215 @@
-<?php
-// ml-helpers.php
+# ml_helpers.py
+from supabase import create_client, Client
+from datetime import datetime, timedelta
+import json
 
-class InterventionSystem {
-    
-    /**
-     * Log student behavior for analysis
-     */
-    public static function logBehavior($studentId, $behaviorType, $data, $pdo) {
-        try {
-            // For Supabase implementation, we'll use direct API calls
-            // Since we don't have PDO in your current setup
-            $logData = [
-                'student_id' => $studentId,
-                'behavior_type' => $behaviorType,
-                'behavior_data' => $data,
-                'created_at' => date('Y-m-d H:i:s')
-            ];
-            
-            $result = supabaseInsert('student_behavior_logs', $logData);
-            return $result !== false;
-        } catch (Exception $e) {
-            error_log("Behavior logging error: " . $e->getMessage());
-            return false;
-        }
-    }
-    
-    /**
-     * Get behavioral insights based on student performance patterns
-     */
-    public static function getBehavioralInsights($studentId, $subjectId, $pdo = null) {
-        $insights = [];
-        
-        try {
-            // Get recent activity patterns from Supabase
-            $activities = supabaseFetch('student_behavior_logs', [
-                'student_id' => $studentId
-            ]);
-            
-            // Filter activities for this subject
-            $subjectActivities = array_filter($activities ?: [], function($activity) use ($subjectId) {
-                $data = $activity['behavior_data'] ?? [];
-                if (is_string($data)) {
-                    $data = json_decode($data, true);
-                }
-                return isset($data['subject_id']) && $data['subject_id'] == $subjectId;
-            });
-            
-            // Get score submission patterns
-            $studentSubjects = supabaseFetch('student_subjects', [
-                'student_id' => $studentId,
-                'id' => $subjectId
-            ]);
-            
-            if ($studentSubjects && count($studentSubjects) > 0) {
-                $studentSubject = $studentSubjects[0];
-                $scores = supabaseFetch('student_subject_scores', [
-                    'student_subject_id' => $studentSubject['id']
-                ]);
-                
-                $scorePatterns = [
-                    'total_scores' => count($scores ?: []),
-                    'avg_score' => 0,
-                    'first_score' => null,
-                    'last_score' => null
-                ];
-                
-                if ($scorePatterns['total_scores'] > 0) {
-                    $totalScore = 0;
-                    $totalMax = 0;
-                    $dates = [];
-                    
-                    foreach ($scores as $score) {
-                        $totalScore += $score['score_value'];
-                        $totalMax += $score['max_score'];
-                        $dates[] = $score['score_date'];
-                    }
-                    
-                    $scorePatterns['avg_score'] = $totalMax > 0 ? ($totalScore / $totalMax) * 100 : 0;
-                    $scorePatterns['first_score'] = !empty($dates) ? min($dates) : null;
-                    $scorePatterns['last_score'] = !empty($dates) ? max($dates) : null;
-                }
-                
-                // Generate insights based on patterns
-                
-                // Insight 1: Activity frequency
-                $totalActivities = count($subjectActivities);
-                if ($totalActivities > 10) {
-                    $insights[] = [
-                        'message' => 'You maintain consistent engagement with this subject with regular score updates.',
-                        'priority' => 'low'
-                    ];
-                } elseif ($totalActivities > 0) {
-                    $insights[] = [
-                        'message' => 'Consider increasing your engagement frequency for better performance tracking.',
-                        'priority' => 'medium'
-                    ];
-                }
-                
-                // Insight 2: Score submission timeliness
-                if ($scorePatterns['total_scores'] > 0 && $scorePatterns['first_score'] && $scorePatterns['last_score']) {
-                    $firstScore = strtotime($scorePatterns['first_score']);
-                    $lastScore = strtotime($scorePatterns['last_score']);
-                    $daysBetween = ($lastScore - $firstScore) / (60 * 60 * 24);
-                    
-                    if ($daysBetween > 30 && $scorePatterns['total_scores'] < 5) {
-                        $insights[] = [
-                            'message' => 'Long gaps between score submissions detected. Try to update scores more regularly.',
-                            'priority' => 'medium'
-                        ];
-                    }
-                    
-                    // Insight 3: Score consistency
-                    if ($scorePatterns['avg_score'] < 70) {
-                        $insights[] = [
-                            'message' => 'Your average scores suggest areas for improvement. Focus on understanding core concepts.',
-                            'priority' => 'high'
-                        ];
-                    }
-                }
-            }
-            
-            // Insight 4: Recent activity
-            if (!empty($subjectActivities)) {
-                $lastActivity = end($subjectActivities);
-                $lastActivityTime = strtotime($lastActivity['created_at']);
-                $daysSinceLast = (time() - $lastActivityTime) / (60 * 60 * 24);
-                
-                if ($daysSinceLast > 7) {
-                    $insights[] = [
-                        'message' => "It's been " . round($daysSinceLast) . " days since your last activity. Regular engagement helps maintain progress.",
-                        'priority' => 'medium'
-                    ];
-                }
-            }
-            
-        } catch (Exception $e) {
-            error_log("Behavioral insights error: " . $e->getMessage());
-        }
-        
-        // Default insight if no specific patterns detected
-        if (empty($insights)) {
-            $insights[] = [
-                'message' => 'Continue tracking your scores regularly to generate personalized insights.',
-                'priority' => 'low'
-            ];
-        }
-        
-        return $insights;
-    }
-    
-    /**
-     * Get interventions based on risk level and performance
-     */
-    public static function getInterventions($studentId, $subjectId, $riskLevel, $pdo = null) {
-        $interventions = [];
-        
-        try {
-            // Get subject details
-            $studentSubjects = supabaseFetch('student_subjects', ['id' => $subjectId]);
-            $subject = null;
-            
-            if ($studentSubjects && count($studentSubjects) > 0) {
-                $studentSubject = $studentSubjects[0];
-                $subjects = supabaseFetch('subjects', ['id' => $studentSubject['subject_id']]);
-                $subject = $subjects && count($subjects) > 0 ? $subjects[0] : null;
-            }
-            
-            $subjectName = $subject ? $subject['subject_name'] : 'this subject';
-            
-            switch ($riskLevel) {
-                case 'high':
-                    $interventions[] = [
-                        'message' => "Immediate academic advising recommended for $subjectName. Contact your instructor.",
-                        'priority' => 'high'
-                    ];
-                    $interventions[] = [
-                        'message' => 'Consider forming a study group or seeking tutoring support.',
-                        'priority' => 'high'
-                    ];
-                    $interventions[] = [
-                        'message' => 'Focus on foundational concepts before attempting advanced topics.',
-                        'priority' => 'medium'
-                    ];
-                    break;
-                    
-                case 'medium':
-                    $interventions[] = [
-                        'message' => "Schedule regular review sessions for $subjectName to prevent further decline.",
-                        'priority' => 'medium'
-                    ];
-                    $interventions[] = [
-                        'message' => 'Identify specific areas of difficulty and seek clarification.',
-                        'priority' => 'medium'
-                    ];
-                    $interventions[] = [
-                        'message' => 'Increase practice with problem sets and past assignments.',
-                        'priority' => 'low'
-                    ];
-                    break;
-                    
-                case 'low':
-                    $interventions[] = [
-                        'message' => 'Maintain your current study habits and regular review schedule.',
-                        'priority' => 'low'
-                    ];
-                    $interventions[] = [
-                        'message' => 'Consider challenging yourself with advanced topics or helping peers.',
-                        'priority' => 'low'
-                    ];
-                    break;
-                    
-                default:
-                    $interventions[] = [
-                        'message' => 'Continue tracking your progress and maintain consistent study habits.',
-                        'priority' => 'low'
-                    ];
-                    break;
-            }
-            
-            // Add attendance-based intervention if applicable
-            $categories = supabaseFetch('student_class_standing_categories', [
-                'student_subject_id' => $subjectId
-            ]);
-            
-            $attendanceCategory = null;
-            foreach ($categories ?: [] as $category) {
-                if (strtolower($category['category_name']) === 'attendance') {
-                    $attendanceCategory = $category;
-                    break;
-                }
-            }
-            
-            if ($attendanceCategory) {
-                $scores = supabaseFetch('student_subject_scores', [
-                    'category_id' => $attendanceCategory['id']
-                ]);
-                
-                $totalClasses = count($scores ?: []);
-                $absences = 0;
-                
-                foreach ($scores ?: [] as $score) {
-                    if ($score['score_name'] === 'Absent') {
-                        $absences++;
-                    }
-                }
-                
-                if ($totalClasses > 0) {
-                    $absenceRate = ($absences / $totalClasses) * 100;
-                    if ($absenceRate > 20) {
-                        $interventions[] = [
-                            'message' => "High absence rate (" . round($absenceRate) . "%) detected. Regular attendance is crucial for success.",
-                            'priority' => 'high'
-                        ];
-                    }
-                }
-            }
-            
-        } catch (Exception $e) {
-            error_log("Interventions error: " . $e->getMessage());
-        }
-        
-        // Return default interventions on error
-        if (empty($interventions)) {
-            $interventions[] = [
-                'message' => 'Focus on consistent study habits and regular progress tracking.',
-                'priority' => 'medium'
-            ];
-        }
-        
-        return $interventions;
-    }
-    
-    /**
-     * Get personalized recommendations based on performance
-     */
-    public static function getRecommendations($studentId, $subjectId, $overallGrade, $pdo = null) {
-        $recommendations = [];
-        
-        try {
-            // Get category performance breakdown
-            $categories = supabaseFetch('student_class_standing_categories', [
-                'student_subject_id' => $subjectId
-            ]);
-            
-            $categoryPerformance = [];
-            foreach ($categories ?: [] as $category) {
-                $scores = supabaseFetch('student_subject_scores', [
-                    'category_id' => $category['id']
-                ]);
-                
-                $totalScore = 0;
-                $totalMax = 0;
-                
-                foreach ($scores ?: [] as $score) {
-                    $totalScore += $score['score_value'];
-                    $totalMax += $score['max_score'];
-                }
-                
-                $avgPercentage = $totalMax > 0 ? ($totalScore / $totalMax) * 100 : 0;
-                $categoryPerformance[] = [
-                    'category_name' => $category['category_name'],
-                    'score_count' => count($scores ?: []),
-                    'avg_percentage' => $avgPercentage
-                ];
-            }
-            
-            // Get subject details
-            $studentSubjects = supabaseFetch('student_subjects', ['id' => $subjectId]);
-            $subject = null;
-            
-            if ($studentSubjects && count($studentSubjects) > 0) {
-                $studentSubject = $studentSubjects[0];
-                $subjects = supabaseFetch('subjects', ['id' => $studentSubject['subject_id']]);
-                $subject = $subjects && count($subjects) > 0 ? $subjects[0] : null;
-            }
-            
-            $subjectName = $subject ? $subject['subject_name'] : 'this subject';
-            
-            // Grade-based recommendations
-            if ($overallGrade >= 90) {
-                $recommendations[] = [
-                    'message' => "Excellent performance in $subjectName! Consider mentoring peers or exploring advanced topics.",
-                    'priority' => 'low'
-                ];
-            } elseif ($overallGrade >= 80) {
-                $recommendations[] = [
-                    'message' => "Strong performance. Focus on maintaining consistency and addressing minor gaps.",
-                    'priority' => 'low'
-                ];
-            } elseif ($overallGrade >= 70) {
-                $recommendations[] = [
-                    'message' => "Solid foundation. Identify specific areas for improvement to reach the next level.",
-                    'priority' => 'medium'
-                ];
-            } else {
-                $recommendations[] = [
-                    'message' => "Focus on core concepts and seek additional help to improve understanding.",
-                    'priority' => 'high'
-                ];
-            }
-            
-            // Category-specific recommendations
-            $weakCategories = [];
-            foreach ($categoryPerformance as $category) {
-                if ($category['avg_percentage'] < 70 && $category['score_count'] > 0) {
-                    $weakCategories[] = $category['category_name'];
-                }
-            }
-            
-            if (!empty($weakCategories)) {
-                $categoryList = implode(', ', $weakCategories);
-                $recommendations[] = [
-                    'message' => "Focus improvement efforts on: $categoryList. These areas show the most opportunity for growth.",
-                    'priority' => 'high'
-                ];
-            }
-            
-            // Study habit recommendations
-            $scores = supabaseFetch('student_subject_scores', [
-                'student_subject_id' => $subjectId
-            ]);
-            
-            $recentScores = 0;
-            $oneWeekAgo = date('Y-m-d', strtotime('-7 days'));
-            
-            foreach ($scores ?: [] as $score) {
-                if ($score['score_date'] >= $oneWeekAgo) {
-                    $recentScores++;
-                }
-            }
-            
-            if ($recentScores == 0) {
-                $recommendations[] = [
-                    'message' => 'No recent score updates. Regular tracking helps identify problems early.',
-                    'priority' => 'medium'
-                ];
-            }
-            
-        } catch (Exception $e) {
-            error_log("Recommendations error: " . $e->getMessage());
-        }
-        
-        // Default recommendation if none generated
-        if (empty($recommendations)) {
-            $recommendations[] = [
-                'message' => 'Continue your current study approach and monitor progress regularly.',
-                'priority' => 'low'
-            ];
-        }
-        
-        return $recommendations;
-    }
-}
+# 🔗 Connect to Supabase
+url = "https://YOUR_SUPABASE_URL.supabase.co"
+key = "YOUR_SUPABASE_API_KEY"
+supabase: Client = create_client(url, key)
 
-/**
- * Utility functions for grade calculations and predictions
- */
-class GradeCalculator {
-    
-    /**
-     * Predict final grade based on current performance
-     */
-    public static function predictFinalGrade($currentGrade, $remainingWeight, $expectedPerformance = 'maintain') {
-        $performanceMultipliers = [
-            'improve' => 1.1,      // 10% improvement
-            'maintain' => 1.0,     // Same performance
-            'decline' => 0.9       // 10% decline
-        ];
-        
-        $multiplier = $performanceMultipliers[$expectedPerformance] ?? 1.0;
-        $predictedRemaining = $remainingWeight * $multiplier;
-        
-        return min(100, $currentGrade + $predictedRemaining);
-    }
-    
-    /**
-     * Calculate required performance for target grade
-     */
-    public static function calculateRequiredPerformance($currentGrade, $remainingWeight, $targetGrade) {
-        if ($remainingWeight <= 0) return 0;
-        
-        $pointsNeeded = max(0, $targetGrade - $currentGrade);
-        $requiredPercentage = ($pointsNeeded / $remainingWeight) * 100;
-        
-        return min(100, $requiredPercentage);
-    }
-}
-?>
+
+class InterventionSystem:
+
+    @staticmethod
+    def log_behavior(student_id, behavior_type, data):
+        """Log student behavior for analysis"""
+        try:
+            log_data = {
+                "student_id": student_id,
+                "behavior_type": behavior_type,
+                "behavior_data": data,
+                "created_at": datetime.now().isoformat()
+            }
+            supabase.table("student_behavior_logs").insert(log_data).execute()
+            return True
+        except Exception as e:
+            print(f"❌ Behavior logging error: {e}")
+            return False
+
+    @staticmethod
+    def get_behavioral_insights(student_id, subject_id):
+        """Analyze behavioral patterns and generate insights"""
+        insights = []
+        try:
+            activities = supabase.table("student_behavior_logs").select("*").eq("student_id", student_id).execute().data
+            subject_activities = [a for a in activities if a.get("behavior_data", {}).get("subject_id") == subject_id]
+
+            # Fetch student subject and related scores
+            student_subject = supabase.table("student_subjects").select("*").eq("student_id", student_id).eq("id", subject_id).execute().data
+            if student_subject:
+                subject_ref = student_subject[0]
+                scores = supabase.table("student_subject_scores").select("*").eq("student_subject_id", subject_ref["id"]).execute().data
+
+                if scores:
+                    total_score = sum(s["score_value"] for s in scores)
+                    total_max = sum(s["max_score"] for s in scores)
+                    avg_score = (total_score / total_max) * 100 if total_max else 0
+                    dates = [s["score_date"] for s in scores if s.get("score_date")]
+                    first_score = min(dates) if dates else None
+                    last_score = max(dates) if dates else None
+
+                    # Activity frequency
+                    if len(subject_activities) > 10:
+                        insights.append({"message": "Consistent engagement with regular score updates.", "priority": "low"})
+                    elif len(subject_activities) > 0:
+                        insights.append({"message": "Increase engagement frequency for better tracking.", "priority": "medium"})
+
+                    # Score timeliness
+                    if first_score and last_score:
+                        days_between = (datetime.fromisoformat(last_score) - datetime.fromisoformat(first_score)).days
+                        if days_between > 30 and len(scores) < 5:
+                            insights.append({"message": "Long gaps between submissions detected.", "priority": "medium"})
+                        if avg_score < 70:
+                            insights.append({"message": "Low average score detected. Focus on core concepts.", "priority": "high"})
+
+            # Recent activity
+            if subject_activities:
+                last_activity = subject_activities[-1]
+                last_time = datetime.fromisoformat(last_activity["created_at"])
+                days_since = (datetime.now() - last_time).days
+                if days_since > 7:
+                    insights.append({
+                        "message": f"It's been {days_since} days since your last activity. Stay engaged.",
+                        "priority": "medium"
+                    })
+
+        except Exception as e:
+            print(f"❌ Behavioral insights error: {e}")
+
+        if not insights:
+            insights.append({
+                "message": "Continue tracking your scores regularly to generate personalized insights.",
+                "priority": "low"
+            })
+        return insights
+
+    @staticmethod
+    def get_interventions(student_id, subject_id, risk_level):
+        """Generate intervention recommendations based on risk"""
+        interventions = []
+        try:
+            # Get subject name
+            subj_data = supabase.table("student_subjects").select("*").eq("id", subject_id).execute().data
+            subject_name = "this subject"
+            if subj_data:
+                subject_ref = subj_data[0]
+                subj_detail = supabase.table("subjects").select("*").eq("id", subject_ref["subject_id"]).execute().data
+                if subj_detail:
+                    subject_name = subj_detail[0]["subject_name"]
+
+            if risk_level == "high":
+                interventions += [
+                    {"message": f"Immediate advising recommended for {subject_name}.", "priority": "high"},
+                    {"message": "Form a study group or seek tutoring support.", "priority": "high"},
+                    {"message": "Focus on foundational concepts before advanced topics.", "priority": "medium"}
+                ]
+            elif risk_level == "medium":
+                interventions += [
+                    {"message": f"Schedule review sessions for {subject_name}.", "priority": "medium"},
+                    {"message": "Identify areas of difficulty and seek clarification.", "priority": "medium"},
+                    {"message": "Increase practice with problem sets.", "priority": "low"}
+                ]
+            elif risk_level == "low":
+                interventions += [
+                    {"message": "Maintain current study habits.", "priority": "low"},
+                    {"message": "Challenge yourself with advanced topics.", "priority": "low"}
+                ]
+            else:
+                interventions.append({"message": "Keep tracking your progress.", "priority": "low"})
+
+            # Attendance-based check
+            categories = supabase.table("student_class_standing_categories").select("*").eq("student_subject_id", subject_id).execute().data
+            attendance_cat = next((c for c in categories if c["category_name"].lower() == "attendance"), None)
+            if attendance_cat:
+                scores = supabase.table("student_subject_scores").select("*").eq("category_id", attendance_cat["id"]).execute().data
+                total_classes = len(scores)
+                absences = sum(1 for s in scores if s["score_name"].lower() == "absent")
+                if total_classes > 0:
+                    absence_rate = (absences / total_classes) * 100
+                    if absence_rate > 20:
+                        interventions.append({
+                            "message": f"High absence rate ({round(absence_rate)}%). Regular attendance is crucial.",
+                            "priority": "high"
+                        })
+
+        except Exception as e:
+            print(f"❌ Interventions error: {e}")
+
+        if not interventions:
+            interventions.append({"message": "Maintain consistent study habits.", "priority": "medium"})
+        return interventions
+
+    @staticmethod
+    def get_recommendations(student_id, subject_id, overall_grade):
+        """Generate personalized study recommendations"""
+        recommendations = []
+        try:
+            # Subject details
+            subj_data = supabase.table("student_subjects").select("*").eq("id", subject_id).execute().data
+            subject_name = "this subject"
+            if subj_data:
+                subject_ref = subj_data[0]
+                subj_detail = supabase.table("subjects").select("*").eq("id", subject_ref["subject_id"]).execute().data
+                if subj_detail:
+                    subject_name = subj_detail[0]["subject_name"]
+
+            # Grade-based advice
+            if overall_grade >= 90:
+                recommendations.append({"message": f"Excellent work in {subject_name}!", "priority": "low"})
+            elif overall_grade >= 80:
+                recommendations.append({"message": "Strong performance. Maintain consistency.", "priority": "low"})
+            elif overall_grade >= 70:
+                recommendations.append({"message": "Solid base. Improve specific weak areas.", "priority": "medium"})
+            else:
+                recommendations.append({"message": "Focus on core concepts and seek help.", "priority": "high"})
+
+            # Category-specific checks
+            categories = supabase.table("student_class_standing_categories").select("*").eq("student_subject_id", subject_id).execute().data
+            weak_categories = []
+            for cat in categories:
+                scores = supabase.table("student_subject_scores").select("*").eq("category_id", cat["id"]).execute().data
+                if scores:
+                    total_score = sum(s["score_value"] for s in scores)
+                    total_max = sum(s["max_score"] for s in scores)
+                    avg = (total_score / total_max) * 100 if total_max else 0
+                    if avg < 70:
+                        weak_categories.append(cat["category_name"])
+            if weak_categories:
+                recommendations.append({
+                    "message": f"Focus improvement on: {', '.join(weak_categories)}.",
+                    "priority": "high"
+                })
+
+            # Study habit check (recent activity)
+            scores = supabase.table("student_subject_scores").select("*").eq("student_subject_id", subject_id).execute().data
+            one_week_ago = datetime.now() - timedelta(days=7)
+            recent_scores = [s for s in scores if s.get("score_date") and datetime.fromisoformat(s["score_date"]) >= one_week_ago]
+            if not recent_scores:
+                recommendations.append({"message": "No recent score updates. Stay consistent!", "priority": "medium"})
+
+        except Exception as e:
+            print(f"❌ Recommendations error: {e}")
+
+        if not recommendations:
+            recommendations.append({"message": "Continue your study habits and track progress.", "priority": "low"})
+        return recommendations
+
+
+class GradeCalculator:
+    """Grade computation and prediction logic"""
+
+    @staticmethod
+    def predict_final_grade(current_grade, remaining_weight, expected_performance="maintain"):
+        multipliers = {"improve": 1.1, "maintain": 1.0, "decline": 0.9}
+        multiplier = multipliers.get(expected_performance, 1.0)
+        predicted_remaining = remaining_weight * multiplier
+        return min(100, current_grade + predicted_remaining)
+
+    @staticmethod
+    def calculate_required_performance(current_grade, remaining_weight, target_grade):
+        if remaining_weight <= 0:
+            return 0
+        points_needed = max(0, target_grade - current_grade)
+        required_percentage = (points_needed / remaining_weight) * 100
+        return min(100, required_percentage)
