@@ -93,12 +93,23 @@ try {
     $semester_mapping = [
         '1st Semester' => 'First Semester',
         '2nd Semester' => 'Second Semester',
-        'Summer' => 'Summer'
+        'Summer' => 'Summer',
+        'First Semester' => 'First Semester',
+        'Second Semester' => 'Second Semester'
     ];
     
-    $student_semester = $semester_mapping[$student['semester']] ?? 'First Semester';
+    $student_semester = $semester_mapping[$student['semester']] ?? $student['semester'];
     
-    $all_subjects = supabaseFetch('subjects', ['semester' => $student_semester]);
+    // Get ALL subjects first to see what's available
+    $all_subjects = supabaseFetch('subjects');
+    
+    // Filter by semester manually to handle case sensitivity
+    $filtered_subjects = [];
+    foreach ($all_subjects as $subject) {
+        if (strtolower(trim($subject['semester'])) === strtolower(trim($student_semester))) {
+            $filtered_subjects[] = $subject;
+        }
+    }
     
     $enrolled_subject_ids = [];
     if ($student_subjects) {
@@ -108,11 +119,9 @@ try {
     }
     
     $available_subjects = [];
-    if ($all_subjects) {
-        foreach ($all_subjects as $subject) {
-            if (!in_array($subject['id'], $enrolled_subject_ids)) {
-                $available_subjects[] = $subject;
-            }
+    foreach ($filtered_subjects as $subject) {
+        if (!in_array($subject['id'], $enrolled_subject_ids)) {
+            $available_subjects[] = $subject;
         }
     }
 } catch (Exception $e) {
@@ -1305,41 +1314,51 @@ $current_semester_display = $semester_mapping[$student['semester']] ?? 'First Se
         <div class="modal-content">
             <h3 class="modal-title">
                 <i class="fas fa-plus"></i>
-                Add New Subject
+                Add New Subject - <?php echo htmlspecialchars($current_semester_display); ?>
             </h3>
             
             <form action="student-subjects.php" method="POST" id="addSubjectForm">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="subject_id" class="form-label">Subject</label>
-                        <select name="subject_id" id="subject_id" class="form-select" required>
+                <div class="form-group">
+                    <label for="subject_id" class="form-label">Subject</label>
+                    <select name="subject_id" id="subject_id" class="form-select" required <?php echo empty($available_subjects) ? 'disabled' : ''; ?>>
+                        <?php if (empty($available_subjects)): ?>
+                            <option value="">No subjects available for <?php echo htmlspecialchars($current_semester_display); ?></option>
+                        <?php else: ?>
                             <option value="">Select a subject</option>
                             <?php foreach ($available_subjects as $available_subject): ?>
                                 <option value="<?php echo $available_subject['id']; ?>">
                                     <?php echo htmlspecialchars($available_subject['subject_code'] . ' - ' . $available_subject['subject_name'] . ' (' . $available_subject['credits'] . ' credits)'); ?>
                                 </option>
                             <?php endforeach; ?>
-                        </select>
-                    </div>
-                    
+                        <?php endif; ?>
+                    </select>
+                    <?php if (empty($available_subjects)): ?>
+                        <small style="color: var(--text-light); display: block; margin-top: 0.5rem;">
+                            You have enrolled in all available subjects for <?php echo htmlspecialchars($current_semester_display); ?> or no subjects are configured for this semester.
+                        </small>
+                    <?php endif; ?>
+                </div>
+                
+                <div class="form-row">
                     <div class="form-group">
                         <label for="professor_name" class="form-label">Professor Name</label>
                         <input type="text" name="professor_name" id="professor_name" class="form-input" 
-                               placeholder="Enter professor's name" required>
+                               placeholder="Enter professor's name" required <?php echo empty($available_subjects) ? 'disabled' : ''; ?>>
                     </div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="schedule" class="form-label">Schedule</label>
-                    <input type="text" name="schedule" id="schedule" class="form-input" 
-                           placeholder="Day-Day Time" required>
+                    
+                    <div class="form-group">
+                        <label for="schedule" class="form-label">Schedule</label>
+                        <input type="text" name="schedule" id="schedule" class="form-input" 
+                               placeholder="e.g., Mon-Wed 9:00-10:30 AM" required <?php echo empty($available_subjects) ? 'disabled' : ''; ?>>
+                    </div>
                 </div>
                 
                 <div class="modal-actions">
                     <button type="button" class="modal-btn modal-btn-cancel" id="cancelAddSubject">
                         <i class="fas fa-times"></i> Cancel
                     </button>
-                    <button type="submit" name="add_subject" class="modal-btn modal-btn-confirm">
+                    <button type="submit" name="add_subject" class="modal-btn modal-btn-confirm" 
+                            <?php echo empty($available_subjects) ? 'disabled' : ''; ?>>
                         <i class="fas fa-plus"></i> Add Subject
                     </button>
                 </div>
