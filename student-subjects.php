@@ -281,19 +281,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
             }
         }
         
-        // 3. Archive exam scores (scores without category_id)
         $exam_scores = supabaseFetch('student_subject_scores', [
             'student_subject_id' => $subject_record_id, 
             'category_id' => NULL
         ]);
-        
+
         if ($exam_scores && is_array($exam_scores)) {
             foreach ($exam_scores as $score) {
-                // For exam scores, we need to create a placeholder category or handle them differently
-                // For now, we'll create a temporary category for exam scores
+                // For exam scores, we'll create a temporary category for archiving purposes only
+                // But we'll skip this during restoration
                 $exam_category = supabaseInsert('archived_class_standing_categories', [
                     'archived_subject_id' => $archived_subject_id,
-                    'category_name' => 'Exam Scores',
+                    'category_name' => 'Exam Scores', // This will be skipped during restoration
                     'category_percentage' => 0,
                     'archived_at' => date('Y-m-d H:i:s')
                 ]);
@@ -311,7 +310,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
                 }
             }
         }
-        
+                
         // 4. Archive performance data
         $performance_data = supabaseFetch('subject_performance', ['student_subject_id' => $subject_record_id]);
         if ($performance_data && count($performance_data) > 0) {

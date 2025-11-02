@@ -75,14 +75,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_subject'])) {
         
         $restored_subject_id = $restored_subject['id'];
         
-        // Get archived categories
+        // Get archived categories (EXCLUDE Exam Scores category)
         $archived_categories = supabaseFetch('archived_class_standing_categories', ['archived_subject_id' => $archived_subject_id]);
         
         $category_mapping = [];
         
-        // Restore categories
+        // Restore categories (ONLY non-exam categories)
         if ($archived_categories && is_array($archived_categories)) {
             foreach ($archived_categories as $archived_category) {
+                // SKIP Exam Scores category - exam scores should not have categories
+                if (strtolower($archived_category['category_name']) === 'exam scores') {
+                    continue;
+                }
+                
                 $category_data = [
                     'student_subject_id' => $restored_subject_id,
                     'category_name' => $archived_category['category_name'],
@@ -98,47 +103,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_subject'])) {
             }
         }
         
-        // Restore scores
+        // Restore class standing scores (with categories)
         if (!empty($category_mapping)) {
             foreach ($category_mapping as $old_category_id => $new_category_id) {
                 $archived_scores = supabaseFetch('archived_subject_scores', ['archived_category_id' => $old_category_id]);
                 
                 if ($archived_scores && is_array($archived_scores)) {
                     foreach ($archived_scores as $score) {
-                        if (strpos($score['score_type'], 'exam') !== false) {
-                            continue;
+                        // Only restore class standing scores (NOT exam scores)
+                        if ($score['score_type'] === 'class_standing') {
+                            $score_data = [
+                                'student_subject_id' => $restored_subject_id,
+                                'category_id' => $new_category_id,
+                                'score_type' => $score['score_type'],
+                                'score_name' => $score['score_name'],
+                                'score_value' => $score['score_value'],
+                                'max_score' => $score['max_score'],
+                                'score_date' => $score['score_date'],
+                                'created_at' => date('Y-m-d H:i:s')
+                            ];
+                            
+                            supabaseInsert('student_subject_scores', $score_data);
                         }
-                        
-                        // Only restore class standing scores with categories
-                        $score_data = [
-                            'student_subject_id' => $restored_subject_id,
-                            'category_id' => $new_category_id,
-                            'score_type' => $score['score_type'],
-                            'score_name' => $score['score_name'],
-                            'score_value' => $score['score_value'],
-                            'max_score' => $score['max_score'],
-                            'score_date' => $score['score_date'],
-                            'created_at' => date('Y-m-d H:i:s')
-                        ];
-                        
-                        supabaseInsert('student_subject_scores', $score_data);
                     }
                 }
             }
         }
 
-        // Restore exam scores separately (without categories)
+        // Restore exam scores separately (WITHOUT categories - category_id should be NULL)
         $all_archived_scores = supabaseFetch('archived_subject_scores');
         if ($all_archived_scores && is_array($all_archived_scores)) {
             foreach ($all_archived_scores as $score) {
                 // Check if this score belongs to our archived subject
                 $score_category = supabaseFetch('archived_class_standing_categories', ['id' => $score['archived_category_id']]);
                 if ($score_category && count($score_category) > 0 && $score_category[0]['archived_subject_id'] == $archived_subject_id) {
-                    // Only restore exam scores
-                    if (strpos($score['score_type'], 'exam') !== false) {
+                    // Only restore exam scores (midterm_exam and final_exam)
+                    if ($score['score_type'] === 'midterm_exam' || $score['score_type'] === 'final_exam') {
                         $exam_score_data = [
                             'student_subject_id' => $restored_subject_id,
-                            'category_id' => NULL, // Exam scores should have NULL category_id
+                            'category_id' => NULL, // Exam scores MUST have NULL category_id
                             'score_type' => $score['score_type'],
                             'score_name' => $score['score_name'],
                             'score_value' => $score['score_value'],
@@ -161,6 +164,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_subject'])) {
                 }
             }
         }
+
+        // Delete archived data
         // Delete categories
         supabaseDelete('archived_class_standing_categories', ['archived_subject_id' => $archived_subject_id]);
         
@@ -184,7 +189,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_subject'])) {
         error_log("Restore error: " . $e->getMessage());
     }
 }
-
 // Fetch archived subjects with calculated performance data
 try {
     // Get all archived subjects for this student
