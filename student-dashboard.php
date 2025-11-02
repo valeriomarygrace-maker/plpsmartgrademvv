@@ -485,11 +485,9 @@ function calculateGWA($grade) {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 1.5rem;
-            margin-bottom: 2rem;
         }
 
         .card {
-            background: white;
             padding: 1.5rem;
             border-radius: var(--border-radius);
             box-shadow: var(--box-shadow);
@@ -502,24 +500,6 @@ function calculateGWA($grade) {
             box-shadow: var(--box-shadow-lg);
         }
 
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-            padding-bottom: 0.75rem;
-            border-bottom: 1px solid var(--plp-green-lighter);
-        }
-
-        .card-title {
-            color: var(--plp-green);
-            font-size: 1.1rem;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
         .metrics-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -529,7 +509,7 @@ function calculateGWA($grade) {
         .metric-card {
             text-align: center;
             padding: 1rem;
-            background: var(--plp-green-pale);
+            background: white;
             border-radius: var(--border-radius);
             transition: var(--transition);
         }
@@ -919,23 +899,11 @@ function calculateGWA($grade) {
         
         <div class="header">
             <div class="welcome">Welcome back, <?php echo htmlspecialchars(explode(' ', $student['fullname'])[0]); ?>!</div>
-            <div style="display: flex; align-items: center; gap: 1rem;">
-                <div style="background: rgba(255,255,255,0.2); padding: 0.5rem 1rem; border-radius: 20px; font-weight: 600;">
-                    <i class="fas fa-calendar-alt"></i>
-                    <?php echo date('F j, Y'); ?>
-                </div>
-            </div>
         </div>
 
         <!-- Academic Statistics -->
         <div class="dashboard-grid">
             <div class="card">
-                <div class="card-header">
-                    <div class="card-title">
-                        <i class="fas fa-chart-bar"></i>
-                        Academic Statistics
-                    </div>
-                </div>
                 <div class="metrics-grid">
                     <div class="metric-card">
                         <div class="metric-value"><?php echo $performance_metrics['total_subjects']; ?></div>
