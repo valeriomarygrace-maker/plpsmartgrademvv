@@ -342,4 +342,103 @@ if (rand(1, 100) === 1) {
 function cleanExpiredOTPs() {
     $current_time = date('Y-m-d H:i:s');
 }
+
+/**
+ * Calculate performance for archived subject from scores
+ */
+function calculateArchivedSubjectPerformance($archived_subject_id) {
+    try {
+        // Get all categories for this archived subject
+        $categories = supabaseFetch('archived_class_standing_categories', ['archived_subject_id' => $archived_subject_id]);
+        
+        if (empty($categories)) {
+            return null;
+        }
+        
+        $totalClassStanding = 0;
+        $midtermScore = 0;
+        $finalScore = 0;
+        $hasScores = false;
+        
+        // Calculate class standing from categories
+        foreach ($categories as $category) {
+            $scores = supabaseFetch('archived_subject_scores', ['archived_category_id' => $category['id'], 'score_type' => 'class_standing']);
+            
+            if (!empty($scores)) {
+                $hasScores = true;
+                $categoryTotal = 0;
+                $categoryMax = 0;
+                
+                foreach ($scores as $score) {
+                    $categoryTotal += $score['score_value'];
+                    $categoryMax += $score['max_score'];
+                }
+                
+                if ($categoryMax > 0) {
+                    $categoryPercentage = ($categoryTotal / $categoryMax) * 100;
+                    $weightedScore = ($categoryPercentage * $category['category_percentage']) / 100;
+                    $totalClassStanding += $weightedScore;
+                }
+            }
+        }
+        
+        // Ensure Class Standing doesn't exceed 60%
+        if ($totalClassStanding > 60) {
+            $totalClassStanding = 60;
+        }
+        
+        // Get exam scores
+        $midterm_exams = supabaseFetch('archived_subject_scores', ['score_type' => 'midterm_exam']);
+        $final_exams = supabaseFetch('archived_subject_scores', ['score_type' => 'final_exam']);
+        $exam_scores = array_merge($midterm_exams ?: [], $final_exams ?: []);
+        
+        foreach ($exam_scores as $exam) {
+            if ($exam['max_score'] > 0) {
+                $examPercentage = ($exam['score_value'] / $exam['max_score']) * 100;
+                if ($exam['score_type'] === 'midterm_exam') {
+                    $midtermScore = ($examPercentage * 20) / 100;
+                } elseif ($exam['score_type'] === 'final_exam') {
+                    $finalScore = ($examPercentage * 20) / 100;
+                }
+            }
+        }
+        
+        if (!$hasScores && $midtermScore == 0 && $finalScore == 0) {
+            return [
+                'overall_grade' => 0,
+                'gpa' => 0,
+                'class_standing' => 0,
+                'exams_score' => 0,
+                'risk_level' => 'no-data',
+                'risk_description' => 'No Data Inputted',
+                'has_scores' => false
+            ];
+        }
+        
+        // Calculate overall grade
+        $overallGrade = $totalClassStanding + $midtermScore + $finalScore;
+        if ($overallGrade > 100) {
+            $overallGrade = 100;
+        }
+        
+        // Calculate GPA and risk level
+        $gpa = getGPA($overallGrade);
+        $riskLevel = getRiskLevel($gpa);
+        $riskDescription = ucfirst($riskLevel) . ' Risk';
+        
+        return [
+            'overall_grade' => $overallGrade,
+            'gpa' => $gpa,
+            'class_standing' => $totalClassStanding,
+            'exams_score' => $midtermScore + $finalScore,
+            'risk_level' => $riskLevel,
+            'risk_description' => $riskDescription,
+            'has_scores' => true
+        ];
+        
+    } catch (Exception $e) {
+        error_log("Error calculating archived subject performance: " . $e->getMessage());
+        return null;
+    }
+}
 ?>

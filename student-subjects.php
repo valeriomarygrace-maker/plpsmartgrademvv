@@ -223,22 +223,135 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
     $subject_record_id = $_POST['subject_record_id'];
     
     try {
-        $archive_data = [
-            'archived' => true,
+        // Get the subject details from student_subjects
+        $subject_data = supabaseFetch('student_subjects', ['id' => $subject_record_id, 'student_id' => $student['id']]);
+        if (!$subject_data || count($subject_data) === 0) {
+            throw new Exception("Subject not found.");
+        }
+        
+        $subject_to_archive = $subject_data[0];
+        
+        // 1. Archive the main subject record
+        $archived_subject = supabaseInsert('archived_subjects', [
+            'student_id' => $subject_to_archive['student_id'],
+            'subject_id' => $subject_to_archive['subject_id'],
+            'professor_name' => $subject_to_archive['professor_name'],
+            'schedule' => $subject_to_archive['schedule'],
             'archived_at' => date('Y-m-d H:i:s')
-        ];
+        ]);
         
-        $result = supabaseUpdate('student_subjects', $archive_data, ['id' => $subject_record_id, 'student_id' => $student['id']]);
+        if (!$archived_subject) {
+            throw new Exception("Failed to archive subject.");
+        }
         
-        if ($result) {
+        $archived_subject_id = $archived_subject['id'];
+        
+        // 2. Archive categories and scores
+        $categories = supabaseFetch('student_class_standing_categories', ['student_subject_id' => $subject_record_id]);
+        
+        if ($categories && is_array($categories)) {
+            foreach ($categories as $category) {
+                // Archive category
+                $archived_category = supabaseInsert('archived_class_standing_categories', [
+                    'archived_subject_id' => $archived_subject_id,
+                    'category_name' => $category['category_name'],
+                    'category_percentage' => $category['category_percentage'],
+                    'archived_at' => date('Y-m-d H:i:s')
+                ]);
+                
+                if ($archived_category) {
+                    $archived_category_id = $archived_category['id'];
+                    
+                    // Archive scores for this category
+                    $scores = supabaseFetch('student_subject_scores', ['category_id' => $category['id']]);
+                    if ($scores && is_array($scores)) {
+                        foreach ($scores as $score) {
+                            supabaseInsert('archived_subject_scores', [
+                                'archived_category_id' => $archived_category_id,
+                                'score_type' => $score['score_type'],
+                                'score_name' => $score['score_name'],
+                                'score_value' => $score['score_value'],
+                                'max_score' => $score['max_score'],
+                                'score_date' => $score['score_date'],
+                                'archived_at' => date('Y-m-d H:i:s')
+                            ]);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 3. Archive exam scores (scores without category_id)
+        $exam_scores = supabaseFetch('student_subject_scores', [
+            'student_subject_id' => $subject_record_id, 
+            'category_id' => NULL
+        ]);
+        
+        if ($exam_scores && is_array($exam_scores)) {
+            foreach ($exam_scores as $score) {
+                // For exam scores, we need to create a placeholder category or handle them differently
+                // For now, we'll create a temporary category for exam scores
+                $exam_category = supabaseInsert('archived_class_standing_categories', [
+                    'archived_subject_id' => $archived_subject_id,
+                    'category_name' => 'Exam Scores',
+                    'category_percentage' => 0,
+                    'archived_at' => date('Y-m-d H:i:s')
+                ]);
+                
+                if ($exam_category) {
+                    supabaseInsert('archived_subject_scores', [
+                        'archived_category_id' => $exam_category['id'],
+                        'score_type' => $score['score_type'],
+                        'score_name' => $score['score_name'],
+                        'score_value' => $score['score_value'],
+                        'max_score' => $score['max_score'],
+                        'score_date' => $score['score_date'],
+                        'archived_at' => date('Y-m-d H:i:s')
+                    ]);
+                }
+            }
+        }
+        
+        // 4. Archive performance data
+        $performance_data = supabaseFetch('subject_performance', ['student_subject_id' => $subject_record_id]);
+        if ($performance_data && count($performance_data) > 0) {
+            $performance = $performance_data[0];
+            supabaseInsert('archived_subject_performance', [
+                'archived_subject_id' => $archived_subject_id,
+                'overall_grade' => $performance['overall_grade'],
+                'gpa' => $performance['gpa'],
+                'class_standing' => $performance['class_standing'],
+                'exams_score' => $performance['exams_score'],
+                'risk_level' => $performance['risk_level'],
+                'risk_description' => $performance['risk_description'],
+                'archived_at' => date('Y-m-d H:i:s')
+            ]);
+        }
+        
+        // 5. Delete from active tables
+        // Delete scores first (due to foreign key constraints)
+        supabaseDelete('student_subject_scores', ['student_subject_id' => $subject_record_id]);
+        
+        // Delete categories
+        supabaseDelete('student_class_standing_categories', ['student_subject_id' => $subject_record_id]);
+        
+        // Delete performance
+        supabaseDelete('subject_performance', ['student_subject_id' => $subject_record_id]);
+        
+        // Finally delete the subject
+        $delete_result = supabaseDelete('student_subjects', ['id' => $subject_record_id]);
+        
+        if ($delete_result) {
             $success_message = 'Subject archived successfully with all records preserved!';
             header("Location: student-subjects.php");
             exit;
         } else {
-            $error_message = 'Failed to archive subject.';
+            throw new Exception("Failed to delete subject from active records.");
         }
+        
     } catch (Exception $e) {
         $error_message = 'Database error during archiving: ' . $e->getMessage();
+        error_log("Archive error: " . $e->getMessage());
     }
 }
 
