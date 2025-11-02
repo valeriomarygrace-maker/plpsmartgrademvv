@@ -17,7 +17,7 @@ $student = null;
 $active_subjects = [];
 $recent_scores = [];
 $performance_metrics = [];
-$upcoming_deadlines = [];
+$semester_risk_data = [];
 $error_message = '';
 
 try {
@@ -70,8 +70,8 @@ try {
         // Calculate overall performance metrics
         $performance_metrics = calculatePerformanceMetrics($student['id']);
         
-        // Get upcoming deadlines (simulated - you can implement this with actual deadlines)
-        $upcoming_deadlines = getUpcomingDeadlines($student['id']);
+        // Get semester risk data for the graph
+        $semester_risk_data = getSemesterRiskData($student['id']);
         
     }
 } catch (Exception $e) {
@@ -144,34 +144,104 @@ function calculatePerformanceMetrics($student_id) {
 }
 
 /**
- * Get upcoming deadlines (simulated data - you can implement with actual deadlines)
+ * Get semester risk data for the graph
  */
-function getUpcomingDeadlines($student_id) {
-    $deadlines = [];
+function getSemesterRiskData($student_id) {
+    $semester_data = [];
     
-    // This is simulated data - you can replace with actual deadline tracking
-    $simulated_deadlines = [
-        ['title' => 'Programming Project Submission', 'subject' => 'COMP 104', 'due_date' => date('Y-m-d', strtotime('+3 days')), 'type' => 'project'],
-        ['title' => 'Database Design Quiz', 'subject' => 'COMP 105', 'due_date' => date('Y-m-d', strtotime('+1 day')), 'type' => 'quiz'],
-        ['title' => 'Math Problem Set', 'subject' => 'IT 102', 'due_date' => date('Y-m-d', strtotime('+5 days')), 'type' => 'assignment']
-    ];
-    
-    foreach ($simulated_deadlines as $deadline) {
-        $deadlines[] = [
-            'title' => $deadline['title'],
-            'subject' => $deadline['subject'],
-            'due_date' => $deadline['due_date'],
-            'type' => $deadline['type'],
-            'days_remaining' => ceil((strtotime($deadline['due_date']) - time()) / (60 * 60 * 24))
-        ];
+    try {
+        // Get all archived subjects with performance data
+        $archived_subjects = supabaseFetch('archived_subjects', ['student_id' => $student_id]);
+        
+        if ($archived_subjects && is_array($archived_subjects)) {
+            $semester_subjects = [];
+            
+            // Group subjects by semester
+            foreach ($archived_subjects as $archived_subject) {
+                $subject_data = supabaseFetch('subjects', ['id' => $archived_subject['subject_id']]);
+                if ($subject_data && count($subject_data) > 0) {
+                    $subject = $subject_data[0];
+                    $semester = $subject['semester'];
+                    
+                    if (!isset($semester_subjects[$semester])) {
+                        $semester_subjects[$semester] = [];
+                    }
+                    
+                    // Get performance data
+                    $performance_data = supabaseFetch('archived_subject_performance', ['archived_subject_id' => $archived_subject['id']]);
+                    $performance = $performance_data && count($performance_data) > 0 ? $performance_data[0] : null;
+                    
+                    $risk_level = 'no-data';
+                    if ($performance) {
+                        $risk_level = $performance['risk_level'] ?? 'no-data';
+                    } else {
+                        // Calculate risk level from overall grade if no performance data
+                        $overall_grade = $performance['overall_grade'] ?? 0;
+                        if ($overall_grade > 0) {
+                            $gwa = $performance['gwa'] ?? calculateGWA($overall_grade);
+                            if ($gwa <= 1.75) $risk_level = 'low';
+                            elseif ($gwa <= 2.50) $risk_level = 'medium';
+                            else $risk_level = 'high';
+                        }
+                    }
+                    
+                    $semester_subjects[$semester][] = [
+                        'subject_code' => $subject['subject_code'],
+                        'risk_level' => $risk_level
+                    ];
+                }
+            }
+            
+            // Calculate high-risk percentage for each semester
+            foreach ($semester_subjects as $semester => $subjects) {
+                $total_subjects = count($subjects);
+                $high_risk_count = 0;
+                
+                foreach ($subjects as $subject) {
+                    if ($subject['risk_level'] === 'high') {
+                        $high_risk_count++;
+                    }
+                }
+                
+                $high_risk_percentage = $total_subjects > 0 ? round(($high_risk_count / $total_subjects) * 100) : 0;
+                
+                $semester_data[] = [
+                    'semester' => $semester,
+                    'total_subjects' => $total_subjects,
+                    'high_risk_count' => $high_risk_count,
+                    'high_risk_percentage' => $high_risk_percentage,
+                    'subjects' => $subjects
+                ];
+            }
+            
+            // Sort semesters logically
+            usort($semester_data, function($a, $b) {
+                $order = ['First Semester' => 1, 'Second Semester' => 2, 'Summer' => 3];
+                return ($order[$a['semester']] ?? 4) - ($order[$b['semester']] ?? 4);
+            });
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error getting semester risk data: " . $e->getMessage());
     }
     
-    // Sort by days remaining
-    usort($deadlines, function($a, $b) {
-        return $a['days_remaining'] - $b['days_remaining'];
-    });
-    
-    return array_slice($deadlines, 0, 5); // Return only 5 nearest deadlines
+    return $semester_data;
+}
+
+/**
+ * Calculate GWA from grade (Philippine system)
+ */
+function calculateGWA($grade) {
+    if ($grade >= 90) return 1.00;
+    elseif ($grade >= 85) return 1.25;
+    elseif ($grade >= 80) return 1.50;
+    elseif ($grade >= 75) return 1.75;
+    elseif ($grade >= 70) return 2.00;
+    elseif ($grade >= 65) return 2.25;
+    elseif ($grade >= 60) return 2.50;
+    elseif ($grade >= 55) return 2.75;
+    elseif ($grade >= 50) return 3.00;
+    else return 5.00;
 }
 ?>
 
@@ -183,6 +253,7 @@ function getUpcomingDeadlines($student_id) {
     <title>Dashboard - PLP SmartGrade</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
             --plp-green: #006341;
@@ -529,52 +600,6 @@ function getUpcomingDeadlines($student_id) {
             color: var(--plp-green);
         }
 
-        .deadline-item {
-            padding: 0.75rem;
-            border-bottom: 1px solid var(--plp-green-lighter);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .deadline-item:last-child {
-            border-bottom: none;
-        }
-
-        .deadline-info {
-            flex: 1;
-        }
-
-        .deadline-title {
-            font-weight: 600;
-            color: var(--text-dark);
-            font-size: 0.9rem;
-        }
-
-        .deadline-subject {
-            color: var(--text-medium);
-            font-size: 0.8rem;
-        }
-
-        .deadline-date {
-            text-align: right;
-        }
-
-        .days-remaining {
-            font-weight: 700;
-            font-size: 0.9rem;
-        }
-
-        .days-urgent { color: var(--danger); }
-        .days-warning { color: var(--warning); }
-        .days-normal { color: var(--success); }
-
-        .deadline-type {
-            font-size: 0.8rem;
-            color: var(--text-medium);
-            text-transform: capitalize;
-        }
-
         .empty-state {
             text-align: center;
             padding: 2rem;
@@ -634,6 +659,89 @@ function getUpcomingDeadlines($student_id) {
             color: #718096;
         }
 
+        /* Graph Styles */
+        .graph-container {
+            height: 250px;
+            position: relative;
+            margin-top: 1rem;
+        }
+
+        .semester-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+
+        .stat-card {
+            background: var(--plp-green-pale);
+            padding: 0.75rem;
+            border-radius: var(--border-radius);
+            text-align: center;
+            border-left: 3px solid var(--plp-green);
+        }
+
+        .stat-value {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--plp-green);
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-medium);
+            font-weight: 500;
+        }
+
+        .semester-list {
+            margin-top: 1rem;
+        }
+
+        .semester-item {
+            padding: 0.75rem;
+            border-bottom: 1px solid var(--plp-green-lighter);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .semester-item:last-child {
+            border-bottom: none;
+        }
+
+        .semester-name {
+            font-weight: 600;
+            color: var(--text-dark);
+            font-size: 0.9rem;
+        }
+
+        .semester-risk {
+            text-align: right;
+        }
+
+        .risk-percentage {
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+
+        .risk-percentage.high {
+            color: var(--danger);
+        }
+
+        .risk-percentage.medium {
+            color: var(--warning);
+        }
+
+        .risk-percentage.low {
+            color: var(--success);
+        }
+
+        .subject-count {
+            font-size: 0.8rem;
+            color: var(--text-light);
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             body {
@@ -662,6 +770,10 @@ function getUpcomingDeadlines($student_id) {
             
             .metrics-grid {
                 grid-template-columns: 1fr;
+            }
+            
+            .semester-stats {
+                grid-template-columns: repeat(2, 1fr);
             }
         }
     </style>
@@ -861,47 +973,75 @@ function getUpcomingDeadlines($student_id) {
                 <?php endif; ?>
             </div>
 
-            <!-- Upcoming Deadlines -->
+            <!-- Semester Risk Graph -->
             <div class="card">
                 <div class="card-header">
                     <div class="card-title">
-                        <i class="fas fa-clock"></i>
-                        Upcoming Deadlines
+                        <i class="fas fa-chart-line"></i>
+                        Semester Risk Trend
                     </div>
                 </div>
-                <?php if (!empty($upcoming_deadlines)): ?>
-                    <ul class="subject-list">
-                        <?php foreach ($upcoming_deadlines as $deadline): ?>
-                            <li class="deadline-item">
-                                <div class="deadline-info">
-                                    <div class="deadline-title"><?php echo htmlspecialchars($deadline['title']); ?></div>
-                                    <div class="deadline-subject">
-                                        <?php echo htmlspecialchars($deadline['subject']); ?> • 
-                                        <span class="deadline-type"><?php echo $deadline['type']; ?></span>
-                                    </div>
-                                </div>
-                                <div class="deadline-date">
-                                    <div class="days-remaining 
+                <?php if (!empty($semester_risk_data)): ?>
+                    <div class="graph-container">
+                        <canvas id="semesterRiskChart"></canvas>
+                    </div>
+                    <div class="semester-stats">
+                        <?php 
+                        $total_high_risk = 0;
+                        $total_subjects = 0;
+                        foreach ($semester_risk_data as $semester) {
+                            $total_high_risk += $semester['high_risk_count'];
+                            $total_subjects += $semester['total_subjects'];
+                        }
+                        $overall_high_risk_percentage = $total_subjects > 0 ? round(($total_high_risk / $total_subjects) * 100) : 0;
+                        ?>
+                        <div class="stat-card">
+                            <div class="stat-value"><?php echo count($semester_risk_data); ?></div>
+                            <div class="stat-label">Semesters</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value"><?php echo $total_subjects; ?></div>
+                            <div class="stat-label">Total Subjects</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value"><?php echo $total_high_risk; ?></div>
+                            <div class="stat-label">High Risk</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value"><?php echo $overall_high_risk_percentage; ?>%</div>
+                            <div class="stat-label">Overall Risk Rate</div>
+                        </div>
+                    </div>
+                    <div class="semester-list">
+                        <?php foreach ($semester_risk_data as $semester): ?>
+                            <div class="semester-item">
+                                <div class="semester-name"><?php echo htmlspecialchars($semester['semester']); ?></div>
+                                <div class="semester-risk">
+                                    <div class="risk-percentage 
                                         <?php 
-                                        if ($deadline['days_remaining'] <= 1) echo 'days-urgent';
-                                        elseif ($deadline['days_remaining'] <= 3) echo 'days-warning';
-                                        else echo 'days-normal';
+                                        if ($semester['high_risk_percentage'] >= 50) echo 'high';
+                                        elseif ($semester['high_risk_percentage'] >= 25) echo 'medium';
+                                        else echo 'low';
                                         ?>
                                     ">
-                                        <?php echo $deadline['days_remaining']; ?> day<?php echo $deadline['days_remaining'] != 1 ? 's' : ''; ?>
+                                        <?php echo $semester['high_risk_percentage']; ?>% High Risk
                                     </div>
-                                    <div style="font-size: 0.8rem; color: var(--text-light);">
-                                        <?php echo date('M j', strtotime($deadline['due_date'])); ?>
+                                    <div class="subject-count">
+                                        <?php echo $semester['high_risk_count']; ?>/<?php echo $semester['total_subjects']; ?> subjects
                                     </div>
                                 </div>
-                            </li>
+                            </div>
                         <?php endforeach; ?>
-                    </ul>
+                    </div>
                 <?php else: ?>
                     <div class="empty-state">
-                        <i class="fas fa-check-circle"></i>
-                        <p>No upcoming deadlines</p>
-                        <small>All caught up for now!</small>
+                        <i class="fas fa-chart-line"></i>
+                        <p>No semester data available</p>
+                        <small>Complete and archive subjects to see semester risk trends</small>
+                        <br>
+                        <a href="student-semester-grades.php" style="color: var(--plp-green); text-decoration: none; font-size: 0.9rem; margin-top: 0.5rem; display: inline-block;">
+                            View History Records
+                        </a>
                     </div>
                 <?php endif; ?>
             </div>
@@ -931,6 +1071,123 @@ function getUpcomingDeadlines($student_id) {
                 card.style.animation = 'fadeInUp 0.6s ease-out';
             });
         });
+
+        // Semester Risk Chart
+        <?php if (!empty($semester_risk_data)): ?>
+        document.addEventListener('DOMContentLoaded', function() {
+            const ctx = document.getElementById('semesterRiskChart').getContext('2d');
+            const semesterData = <?php echo json_encode($semester_risk_data); ?>;
+            
+            const labels = semesterData.map(semester => semester.semester);
+            const highRiskData = semesterData.map(semester => semester.high_risk_percentage);
+            
+            // Calculate trend line
+            const trendLine = calculateTrendLine(highRiskData);
+            
+            const chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'High Risk Percentage',
+                            data: highRiskData,
+                            borderColor: '#dc3545',
+                            backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.4,
+                            pointBackgroundColor: '#dc3545',
+                            pointBorderColor: '#ffffff',
+                            pointBorderWidth: 2,
+                            pointRadius: 6,
+                            pointHoverRadius: 8
+                        },
+                        {
+                            label: 'Trend',
+                            data: trendLine,
+                            borderColor: '#6c757d',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            fill: false,
+                            pointRadius: 0,
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                usePointStyle: true,
+                                padding: 20
+                            }
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed.y !== null) {
+                                        label += context.parsed.y + '%';
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(0, 99, 65, 0.1)'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                color: 'rgba(0, 99, 65, 0.1)'
+                            }
+                        }
+                    },
+                    interaction: {
+                        mode: 'nearest',
+                        axis: 'x',
+                        intersect: false
+                    }
+                }
+            });
+            
+            function calculateTrendLine(data) {
+                const n = data.length;
+                let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+                
+                for (let i = 0; i < n; i++) {
+                    sumX += i;
+                    sumY += data[i];
+                    sumXY += i * data[i];
+                    sumXX += i * i;
+                }
+                
+                const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+                const intercept = (sumY - slope * sumX) / n;
+                
+                return data.map((_, i) => intercept + slope * i);
+            }
+        });
+        <?php endif; ?>
     </script>
 </body>
 </html>
