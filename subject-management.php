@@ -1570,7 +1570,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <div class="performance-label">
                             <?php 
                             if ($gwa <= 1.00) echo 'Excellent';
-                            elseif ($gwa <= 1.25) echo 'Very Good';
+                            elseif ($gwa <= 1.25) echo 'Very Good ';
                             elseif ($gwa <= 1.50) echo 'Good';
                             elseif ($gwa <= 1.75) echo 'Satisfactory';
                             elseif ($gwa <= 2.00) echo 'Passing';
@@ -1759,19 +1759,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <?php if (!empty($midtermExam)): ?>
                         <?php 
                         $midterm = reset($midtermExam);
-                        if (is_array($midterm) && isset($midterm['score_value']) && isset($midterm['max_score'])):
+                        // Ensure we have valid score data
+                        if (isset($midterm['score_value']) && isset($midterm['max_score']) && $midterm['max_score'] > 0):
                         ?>
                             <p style="color: var(--text-medium); margin-top: 0.5rem; font-size: 0.9rem;">
-                                Score: <?php echo $midterm['score_value']; ?>/<?php echo $midterm['max_score']; ?>
+                                Score: <?php echo floatval($midterm['score_value']); ?>/<?php echo floatval($midterm['max_score']); ?>
                             </p>
                             <p style="color: var(--text-light); font-size: 0.75rem; margin-top: 0.3rem;">
                                 Weighted: <?php echo number_format($midtermScore, 1); ?>%
                             </p>
-                            <?php if ($midterm['max_score'] > 0): ?>
-                                <p style="color: var(--text-light); font-size: 0.7rem; margin-top: 0.2rem;">
-                                    Percentage: <?php echo number_format(($midterm['score_value'] / $midterm['max_score']) * 100, 1); ?>%
-                                </p>
-                            <?php endif; ?>
                         <?php else: ?>
                             <p style="color: var(--text-light); margin-top: 0.5rem; font-size: 0.9rem;">
                                 Invalid score data
@@ -1791,20 +1787,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <?php if (!empty($finalExam)): ?>
                         <?php 
                         $final = reset($finalExam);
-                        // Check if it's a valid exam entry
-                        if (is_array($final) && isset($final['score_value']) && isset($final['max_score'])):
+                        // Ensure we have valid score data
+                        if (isset($final['score_value']) && isset($final['max_score']) && $final['max_score'] > 0):
                         ?>
                             <p style="color: var(--text-medium); margin-top: 0.5rem; font-size: 0.9rem;">
-                                Score: <?php echo $final['score_value']; ?>/<?php echo $final['max_score']; ?>
+                                Score: <?php echo floatval($final['score_value']); ?>/<?php echo floatval($final['max_score']); ?>
                             </p>
                             <p style="color: var(--text-light); font-size: 0.75rem; margin-top: 0.3rem;">
                                 Weighted: <?php echo number_format($finalScore, 1); ?>%
                             </p>
-                            <?php if ($final['max_score'] > 0): ?>
-                                <p style="color: var(--text-light); font-size: 0.7rem; margin-top: 0.2rem;">
-                                    Percentage: <?php echo number_format(($final['score_value'] / $final['max_score']) * 100, 1); ?>%
-                                </p>
-                            <?php endif; ?>
                         <?php else: ?>
                             <p style="color: var(--text-light); margin-top: 0.5rem; font-size: 0.9rem;">
                                 Invalid score data
@@ -1823,10 +1814,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="insights-section">
                 <div class="insights-tabs">
                     <button class="insight-tab active" data-tab="insights">
-                        <i class="fas fa-lightbulb"></i> Insights
+                        <i class="fas fa-lightbulb"></i> Behavioral
                     </button>
                     <button class="insight-tab" data-tab="interventions">
-                        <i class="fas fa-hands-helping"></i> Support
+                        <i class="fas fa-hands-helping"></i> Interventions
                     </button>
                     <button class="insight-tab" data-tab="recommendations">
                         <i class="fas fa-graduation-cap"></i> Recommendations
@@ -2177,30 +2168,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         document.getElementById('examModalTitle').textContent = 
             examType === 'midterm_exam' ? 'Add Midterm Exam Score' : 'Add Final Exam Score';
         
-        // Reset form values first
+        // Reset form values
         document.getElementById('exam_score').value = '';
         document.getElementById('max_score').value = '';
         
-        <?php if (!empty($midtermExam)): ?>
-        if (examType === 'midterm_exam') {
-            const midterm = <?php echo json_encode(reset($midtermExam)); ?>;
-            // Only populate if it's a valid exam entry (not a duplicate)
-            if (midterm && midterm.score_name && midterm.score_name !== 'midterm_exam_exam') {
-                document.getElementById('exam_score').value = midterm.score_value;
-                document.getElementById('max_score').value = midterm.max_score;
-            }
+        // Get existing exam data
+        let examData = null;
+        if (examType === 'midterm_exam' && <?php echo !empty($midtermExam) ? 'true' : 'false'; ?>) {
+            examData = <?php echo !empty($midtermExam) ? json_encode(reset($midtermExam)) : 'null'; ?>;
+        } else if (examType === 'final_exam' && <?php echo !empty($finalExam) ? 'true' : 'false'; ?>) {
+            examData = <?php echo !empty($finalExam) ? json_encode(reset($finalExam)) : 'null'; ?>;
         }
-        <?php endif; ?>
         
-        <?php if (!empty($finalExam)): ?>
-        if (examType === 'final_exam') {
-            const final = <?php echo json_encode(reset($finalExam)); ?>;
-            if (final && final.score_name && final.score_name !== 'final_exam_exam') {
-                document.getElementById('exam_score').value = final.score_value;
-                document.getElementById('max_score').value = final.max_score;
-            }
+        // Populate form with existing data
+        if (examData && examData.score_value !== undefined && examData.max_score !== undefined) {
+            document.getElementById('exam_score').value = examData.score_value;
+            document.getElementById('max_score').value = examData.max_score;
         }
-        <?php endif; ?>
         
         document.getElementById('examModal').classList.add('show');
     }
