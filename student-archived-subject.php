@@ -105,12 +105,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_subject'])) {
                 
                 if ($archived_scores && is_array($archived_scores)) {
                     foreach ($archived_scores as $score) {
-                        // For exam scores, category_id should be NULL
-                        $category_id_for_score = (strpos($score['score_type'], 'exam') !== false) ? NULL : $new_category_id;
+                        // Skip exam scores here - they will be handled separately
+                        if (strpos($score['score_type'], 'exam') !== false) {
+                            continue;
+                        }
                         
+                        // Only restore class standing scores with categories
                         $score_data = [
                             'student_subject_id' => $restored_subject_id,
-                            'category_id' => $category_id_for_score,
+                            'category_id' => $new_category_id,
                             'score_type' => $score['score_type'],
                             'score_name' => $score['score_name'],
                             'score_value' => $score['score_value'],
@@ -124,19 +127,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_subject'])) {
                 }
             }
         }
-        
-        // Also restore any exam scores that might be in separate categories
+
+        // Restore exam scores separately (without categories)
         $all_archived_scores = supabaseFetch('archived_subject_scores');
         if ($all_archived_scores && is_array($all_archived_scores)) {
             foreach ($all_archived_scores as $score) {
-                // Check if this score belongs to our archived subject through its category
+                // Check if this score belongs to our archived subject
                 $score_category = supabaseFetch('archived_class_standing_categories', ['id' => $score['archived_category_id']]);
                 if ($score_category && count($score_category) > 0 && $score_category[0]['archived_subject_id'] == $archived_subject_id) {
-                    // For exam scores, add directly without category
+                    // Only restore exam scores
                     if (strpos($score['score_type'], 'exam') !== false) {
                         $exam_score_data = [
                             'student_subject_id' => $restored_subject_id,
-                            'category_id' => NULL,
+                            'category_id' => NULL, // Exam scores should have NULL category_id
                             'score_type' => $score['score_type'],
                             'score_name' => $score['score_name'],
                             'score_value' => $score['score_value'],
@@ -144,20 +147,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_subject'])) {
                             'score_date' => $score['score_date'],
                             'created_at' => date('Y-m-d H:i:s')
                         ];
-                        supabaseInsert('student_subject_scores', $exam_score_data);
+                        
+                        // Check if this exam score already exists to avoid duplicates
+                        $existing_exam = supabaseFetch('student_subject_scores', [
+                            'student_subject_id' => $restored_subject_id,
+                            'score_type' => $score['score_type'],
+                            'category_id' => NULL
+                        ]);
+                        
+                        if (!$existing_exam || count($existing_exam) === 0) {
+                            supabaseInsert('student_subject_scores', $exam_score_data);
+                        }
                     }
                 }
             }
         }
-        
-        // Delete from archived tables
-        // Delete scores first
-        if ($archived_categories && is_array($archived_categories)) {
-            foreach ($archived_categories as $category) {
-                supabaseDelete('archived_subject_scores', ['archived_category_id' => $category['id']]);
-            }
-        }
-        
         // Delete categories
         supabaseDelete('archived_class_standing_categories', ['archived_subject_id' => $archived_subject_id]);
         
