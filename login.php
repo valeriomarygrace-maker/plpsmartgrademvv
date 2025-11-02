@@ -14,7 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && isset($_P
     
     // Validate PLP email
     if (!isValidPLPEmail($email)) {
-        $error = 'Please use your valid @plpasig.edu.ph email address.';
+        $error = 'Your email address is not valid.';
     } else {
         // Check if email exists in students table
         $student = getStudentByEmail($email);
@@ -672,7 +672,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
                         
                         <div class="input-group">
                             <i class="fas fa-envelope input-icon"></i>
-                            <input type="email" id="email" name="email" placeholder="Enter your @plpasig.edu.ph" required value="<?php echo isset($_POST['email']) && !isset($_POST['signup']) ? htmlspecialchars($_POST['email']) : ''; ?>">
+                            <input type="email" id="email" name="email" placeholder="Enter your email address" required value="<?php echo isset($_POST['email']) && !isset($_POST['signup']) ? htmlspecialchars($_POST['email']) : ''; ?>">
                         </div>
 
                         <div class="input-group">
@@ -735,7 +735,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
                     <div class="form-group">
                         <div class="input-group">
                             <i class="fas fa-envelope input-icon"></i>
-                            <input type="email" id="signup_email" name="email" placeholder="Email (@plpasig.edu.ph)" required value="<?php echo isset($_POST['email']) && isset($_POST['signup']) ? htmlspecialchars($_POST['email']) : ''; ?>">
+                            <input type="email" id="signup_email" name="email" placeholder="Email Address" required value="<?php echo isset($_POST['email']) && isset($_POST['signup']) ? htmlspecialchars($_POST['email']) : ''; ?>">
                         </div>
                     </div>
                 </div>
