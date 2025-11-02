@@ -1621,7 +1621,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <?php if ($canAddCategory): ?>
                     <div class="allocation-info">
                         <span class="remaining-allocation">
-                            <i class="fas fa-percentage"></i>
                             Remaining: <strong><?php echo $remainingAllocation; ?>%</strong>
                         </span>
                         <button class="btn btn-primary" onclick="openAddCategoryModal()">
