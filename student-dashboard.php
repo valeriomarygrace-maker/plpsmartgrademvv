@@ -604,48 +604,6 @@ function getUpcomingDeadlines($student_id) {
             gap: 0.75rem;
         }
 
-        .quick-actions {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-            margin-top: 2rem;
-        }
-
-        .action-card {
-            background: white;
-            padding: 1.5rem;
-            border-radius: var(--border-radius);
-            box-shadow: var(--box-shadow);
-            text-align: center;
-            text-decoration: none;
-            color: var(--text-dark);
-            transition: var(--transition);
-            border: 2px solid transparent;
-        }
-
-        .action-card:hover {
-            transform: translateY(-3px);
-            box-shadow: var(--box-shadow-lg);
-            border-color: var(--plp-green);
-            color: var(--plp-green);
-        }
-
-        .action-icon {
-            font-size: 2rem;
-            margin-bottom: 1rem;
-            color: var(--plp-green);
-        }
-
-        .action-title {
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-        }
-
-        .action-description {
-            font-size: 0.85rem;
-            color: var(--text-medium);
-        }
-
         /* Risk badges */
         .risk-badge {
             display: inline-block;
@@ -703,10 +661,6 @@ function getUpcomingDeadlines($student_id) {
             }
             
             .metrics-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .quick-actions {
                 grid-template-columns: 1fr;
             }
         }
@@ -789,37 +743,8 @@ function getUpcomingDeadlines($student_id) {
             </div>
         </div>
 
-        <!-- Performance Overview -->
+        <!-- Risk Distribution -->
         <div class="dashboard-grid">
-            <!-- Overall Metrics -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title">
-                        <i class="fas fa-chart-bar"></i>
-                        Academic Overview
-                    </div>
-                </div>
-                <div class="metrics-grid">
-                    <div class="metric-card">
-                        <div class="metric-value"><?php echo $performance_metrics['total_subjects']; ?></div>
-                        <div class="metric-label">Total Subjects</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-value"><?php echo $performance_metrics['subjects_with_scores']; ?></div>
-                        <div class="metric-label">With Grades</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-value"><?php echo $performance_metrics['average_grade']; ?>%</div>
-                        <div class="metric-label">Average Grade</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-value"><?php echo $performance_metrics['average_gwa']; ?></div>
-                        <div class="metric-label">Average GWA</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Risk Distribution -->
             <div class="card">
                 <div class="card-header">
                     <div class="card-title">
@@ -980,41 +905,6 @@ function getUpcomingDeadlines($student_id) {
                     </div>
                 <?php endif; ?>
             </div>
-        </div>
-
-        <!-- Quick Actions -->
-        <div class="quick-actions">
-            <a href="student-subjects.php" class="action-card">
-                <div class="action-icon">
-                    <i class="fas fa-plus-circle"></i>
-                </div>
-                <div class="action-title">Add Subject</div>
-                <div class="action-description">Enroll in new subjects</div>
-            </a>
-            
-            <a href="student-subjects.php" class="action-card">
-                <div class="action-icon">
-                    <i class="fas fa-chart-line"></i>
-                </div>
-                <div class="action-title">Track Grades</div>
-                <div class="action-description">Update your scores</div>
-            </a>
-            
-            <a href="student-archived-subject.php" class="action-card">
-                <div class="action-icon">
-                    <i class="fas fa-archive"></i>
-                </div>
-                <div class="action-title">View Archives</div>
-                <div class="action-description">Check completed subjects</div>
-            </a>
-            
-            <a href="student-semester-grades.php" class="action-card">
-                <div class="action-icon">
-                    <i class="fas fa-history"></i>
-                </div>
-                <div class="action-title">History</div>
-                <div class="action-description">View past performance</div>
-            </a>
         </div>
     </div>
 
