@@ -105,7 +105,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_subject'])) {
                 
                 if ($archived_scores && is_array($archived_scores)) {
                     foreach ($archived_scores as $score) {
-                        // Skip exam scores here - they will be handled separately
                         if (strpos($score['score_type'], 'exam') !== false) {
                             continue;
                         }
