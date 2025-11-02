@@ -532,9 +532,6 @@ function calculateGWA($grade) {
             transition: var(--transition);
         }
 
-        .metric-card:hover {
-            background: var(--plp-green-lighter);
-        }
 
         .metric-value {
             font-size: 1.8rem;
@@ -931,6 +928,8 @@ function calculateGWA($grade) {
                         <div class="metric-label">Professors</div>
                     </div>
                 </div>
+            </div>
+        
 
         <!-- Main Content Grid -->
         <div class="dashboard-grid">
