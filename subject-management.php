@@ -1503,12 +1503,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     History Records
                 </a>
             </li>
-            <li class="nav-item">
-                <a href="student-reminder.php" class="nav-link">
-                    <i class="fas fa-bell"></i>
-                    Reminder
-                </a>
-            </li>
         </ul>
 
         <div class="sidebar-footer">
