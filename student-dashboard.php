@@ -924,12 +924,6 @@ function calculateGWA($grade) {
         <!-- Academic Statistics -->
         <div class="dashboard-grid">
             <div class="card">
-                <div class="card-header">
-                    <div class="card-title">
-                        <i class="fas fa-chart-bar"></i>
-                        Academic Statistics
-                    </div>
-                </div>
                 <div class="metrics-grid">
                     <div class="metric-card">
                         <div class="metric-value"><?php echo $performance_metrics['total_subjects']; ?></div>
