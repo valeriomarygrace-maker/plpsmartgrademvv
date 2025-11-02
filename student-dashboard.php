@@ -1051,45 +1051,6 @@ function calculateGWA($grade) {
                         $medium_risk_percentage = $total_subjects > 0 ? round(($total_medium_risk / $total_subjects) * 100) : 0;
                         $low_risk_percentage = $total_subjects > 0 ? round(($total_low_risk / $total_subjects) * 100) : 0;
                         ?>
-                        <div class="stat-card">
-                            <div class="stat-value"><?php echo $total_subjects; ?></div>
-                            <div class="stat-label">Total Subjects</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value" style="color: var(--success);"><?php echo $total_low_risk; ?></div>
-                            <div class="stat-label">Low Risk</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value" style="color: var(--warning);"><?php echo $total_medium_risk; ?></div>
-                            <div class="stat-label">Medium Risk</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value" style="color: var(--danger);"><?php echo $total_high_risk; ?></div>
-                            <div class="stat-label">High Risk</div>
-                        </div>
-                    </div>
-                    <div class="risk-breakdown">
-                        <div class="breakdown-item">
-                            <div class="risk-color" style="background: var(--success);"></div>
-                            <div class="risk-info">
-                                <span class="risk-label">Low Risk</span>
-                                <span class="risk-percentage"><?php echo $low_risk_percentage; ?>%</span>
-                            </div>
-                        </div>
-                        <div class="breakdown-item">
-                            <div class="risk-color" style="background: var(--warning);"></div>
-                            <div class="risk-info">
-                                <span class="risk-label">Medium Risk</span>
-                                <span class="risk-percentage"><?php echo $medium_risk_percentage; ?>%</span>
-                            </div>
-                        </div>
-                        <div class="breakdown-item">
-                            <div class="risk-color" style="background: var(--danger);"></div>
-                            <div class="risk-info">
-                                <span class="risk-label">High Risk</span>
-                                <span class="risk-percentage"><?php echo $high_risk_percentage; ?>%</span>
-                            </div>
-                        </div>
                     </div>
                 <?php else: ?>
                     <div class="empty-state">
