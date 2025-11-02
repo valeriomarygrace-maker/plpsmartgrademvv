@@ -1,5 +1,5 @@
 <?php
-// ml-helpers.php - UPDATED FOR SUPABASE
+// ml-helpers.php - UPDATED FOR SUPABASE WITH GWA
 
 // =============================================================================
 // NEW ML INTEGRATION CLASSES - ADD THESE AT THE TOP
@@ -108,7 +108,7 @@ class EnhancedInterventionSystem extends InterventionSystem {
             'recommendations' => [],
             'risk_level' => 'medium', // default
             'overall_grade' => 0,
-            'gpa' => 0
+            'gwa' => 0
         ];
         
         // Get ML predictions
@@ -118,15 +118,15 @@ class EnhancedInterventionSystem extends InterventionSystem {
             // Use ML risk level if available
             $riskLevel = $mlResult['risk_level'];
             $overallGrade = $mlResult['overall_grade'] ?? self::calculateOverallGrade($classStandings, $examScores);
-            $gpa = $mlResult['gpa'] ?? self::calculateGPA($overallGrade);
+            $gwa = $mlResult['gwa'] ?? self::calculateGWA($overallGrade);
             
             $baseInsights['ml_risk_level'] = $riskLevel;
             $baseInsights['risk_level'] = $riskLevel;
             $baseInsights['overall_grade'] = $overallGrade;
-            $baseInsights['gpa'] = $gpa;
+            $baseInsights['gwa'] = $gwa;
             $baseInsights['ml_confidence'] = $mlResult['confidence'];
             $baseInsights['ml_grade'] = $mlResult['overall_grade'] ?? null;
-            $baseInsights['ml_gpa'] = $mlResult['gpa'] ?? null;
+            $baseInsights['ml_gwa'] = $mlResult['gwa'] ?? null;
             
             // Add ML insights to behavioral insights
             if (!empty($mlResult['behavioral_insights'])) {
@@ -158,11 +158,11 @@ class EnhancedInterventionSystem extends InterventionSystem {
             // Fallback to original PHP logic
             $calculatedGrade = self::calculateOverallGrade($classStandings, $examScores);
             $riskLevel = self::calculateRiskLevel($calculatedGrade);
-            $gpa = self::calculateGPA($calculatedGrade);
+            $gwa = self::calculateGWA($calculatedGrade);
             
             $baseInsights['risk_level'] = $riskLevel;
             $baseInsights['overall_grade'] = $calculatedGrade;
-            $baseInsights['gpa'] = $gpa;
+            $baseInsights['gwa'] = $gwa;
             $baseInsights['interventions'] = parent::getInterventions($studentId, $subjectId, $riskLevel);
             $baseInsights['recommendations'] = parent::getRecommendations($studentId, $subjectId, $calculatedGrade);
             $baseInsights['source'] = 'php_fallback';
@@ -188,22 +188,28 @@ class EnhancedInterventionSystem extends InterventionSystem {
     }
     
     /**
-     * Calculate risk level based on grade
+     * Calculate GWA from grade (Philippine system)
      */
-    private static function calculateRiskLevel($grade) {
-        if ($grade >= 85) return 'low';
-        if ($grade >= 75) return 'medium';
-        return 'high';
+    private static function calculateGWA($grade) {
+        if ($grade >= 90) return 1.00;
+        elseif ($grade >= 85) return 1.25;
+        elseif ($grade >= 80) return 1.50;
+        elseif ($grade >= 75) return 1.75;
+        elseif ($grade >= 70) return 2.00;
+        elseif ($grade >= 65) return 2.25;
+        elseif ($grade >= 60) return 2.50;
+        elseif ($grade >= 55) return 2.75;
+        elseif ($grade >= 50) return 3.00;
+        else return 5.00;
     }
     
     /**
-     * Calculate GPA from grade
+     * Calculate risk level based on GWA
      */
-    private static function calculateGPA($grade) {
-        if ($grade >= 89) return 1.00;
-        if ($grade >= 82) return 2.00;
-        if ($grade >= 79) return 2.75;
-        return 3.00;
+    private static function calculateRiskLevel($gwa) {
+        if ($gwa <= 1.75) return 'low';
+        if ($gwa <= 2.50) return 'medium';
+        return 'high';
     }
 }
 
@@ -445,7 +451,6 @@ class GradeCalculator {
     }
 }
 
-// Database table creation script for new features - NOT NEEDED FOR SUPABASE
 class DatabaseSetup {
     public static function createBehaviorLogsTable() {
         return true;

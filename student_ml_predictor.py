@@ -9,7 +9,7 @@ from flask import Flask, request, jsonify
 import json
 
 # =============================================================================
-# 1. STUDENT GRADE PREDICTOR
+# 1. STUDENT GRADE PREDICTOR WITH GWA
 # =============================================================================
 class StudentGradePredictor:
     def __init__(self):
@@ -29,9 +29,10 @@ class StudentGradePredictor:
             consistency = np.random.normal(70, 12)
             
             overall_grade = (class_standing * 0.6) + (exam_score * 0.4)
+            gwa = self.calculate_gwa(overall_grade)
             
-            if overall_grade >= 85: risk = 'low'
-            elif overall_grade >= 75: risk = 'medium'
+            if gwa <= 1.75: risk = 'low'
+            elif gwa <= 2.50: risk = 'medium'
             else: risk = 'high'
             
             data.append({
@@ -43,6 +44,19 @@ class StudentGradePredictor:
             })
         
         return pd.DataFrame(data)
+    
+    def calculate_gwa(self, grade):
+        """Convert grade to GWA (Philippine system)"""
+        if grade >= 90: return 1.00
+        elif grade >= 85: return 1.25
+        elif grade >= 80: return 1.50
+        elif grade >= 75: return 1.75
+        elif grade >= 70: return 2.00
+        elif grade >= 65: return 2.25
+        elif grade >= 60: return 2.50
+        elif grade >= 55: return 2.75
+        elif grade >= 50: return 3.00
+        else: return 5.00
     
     def train_models(self):
         """Train ML models"""
@@ -189,16 +203,16 @@ class StudentPerformanceSystem:
             student_data.get('subject', 'General')
         )
         
-        # Calculate final grade and GPA
+        # Calculate final grade and GWA
         overall_grade = self.calculate_final_grade(metrics)
-        gpa = self.calculate_gpa(overall_grade)
+        gwa = self.predictor.calculate_gwa(overall_grade)
         
         return {
             'success': True,
             'risk_level': prediction['risk_level'],
             'confidence': prediction['confidence'],
             'overall_grade': overall_grade,
-            'gpa': gpa,
+            'gwa': gwa,
             'behavioral_insights': insights,
             'recommendations': recommendations,
             'calculated_metrics': metrics
@@ -227,13 +241,6 @@ class StudentPerformanceSystem:
         """Calculate final grade (60% class standing + 40% exams)"""
         final_grade = (metrics['class_standing_avg'] * 0.6) + (metrics['exam_score_avg'] * 0.4)
         return round(min(100, max(0, final_grade)), 1)
-    
-    def calculate_gpa(self, grade):
-        """Convert grade to GPA"""
-        if grade >= 89: return 1.00
-        elif grade >= 82: return 2.00
-        elif grade >= 79: return 2.75
-        else: return 3.00
 
 # =============================================================================
 # 4. FLASK API SERVER
@@ -272,6 +279,7 @@ def health():
 
 @app.route('/example', methods=['GET'])
 def example():
+    """Example of how to use the API"""
     example_data = {
         'class_standings': [65, 70, 60, 75, 68],
         'exam_scores': [58, 62],

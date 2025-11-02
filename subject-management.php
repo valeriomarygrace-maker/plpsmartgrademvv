@@ -233,27 +233,39 @@ if (!$hasScores) {
         $overallGrade = 100;
     }
 
-    // Calculate GPA
-    if ($overallGrade >= 89) {
-        $gpa = 1.00;
-    } elseif ($overallGrade >= 82) {
-        $gpa = 2.00;
-    } elseif ($overallGrade >= 79) {
-        $gpa = 2.75;
+    // Calculate GWA instead of GPA
+    if ($overallGrade >= 90) {
+        $gwa = 1.00;
+    } elseif ($overallGrade >= 85) {
+        $gwa = 1.25;
+    } elseif ($overallGrade >= 80) {
+        $gwa = 1.50;
+    } elseif ($overallGrade >= 75) {
+        $gwa = 1.75;
+    } elseif ($overallGrade >= 70) {
+        $gwa = 2.00;
+    } elseif ($overallGrade >= 65) {
+        $gwa = 2.25;
+    } elseif ($overallGrade >= 60) {
+        $gwa = 2.50;
+    } elseif ($overallGrade >= 55) {
+        $gwa = 2.75;
+    } elseif ($overallGrade >= 50) {
+        $gwa = 3.00;
     } else {
-        $gpa = 3.00;
+        $gwa = 5.00; // Failed
     }
 
-    // Calculate risk level
-    if ($gpa == 1.00) {
+    // Calculate risk level based on GWA
+    if ($gwa <= 1.75) {
         $riskLevel = 'low';
         $riskDescription = 'Low Risk';
         $interventionNeeded = false;
-    } elseif ($gpa == 2.00 || $gpa == 2.75) {
+    } elseif ($gwa <= 2.50) {
         $riskLevel = 'medium';
         $riskDescription = 'Medium Risk';
         $interventionNeeded = false;
-    } elseif ($gpa == 3.00) {
+    } else {
         $riskLevel = 'high';
         $riskDescription = 'High Risk';
         $interventionNeeded = true;
@@ -1552,22 +1564,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
                 
                 <div class="performance-card">
-                    <div class="performance-label">GPA</div>
+                    <div class="performance-label">GWA</div>
                     <?php if ($hasScores): ?>
-                        <div class="performance-value"><?php echo number_format($gpa, 2); ?></div>
+                        <div class="performance-value"><?php echo number_format($gwa, 2); ?></div>
                         <div class="performance-label">
                             <?php 
-                            if ($gpa == 1.00) echo 'Excellent';
-                            elseif ($gpa <= 1.75) echo 'Very Good';
-                            elseif ($gpa <= 2.50) echo 'Good';
-                            elseif ($gpa <= 2.75) echo 'Satisfactory';
-                            elseif ($gpa == 3.00) echo 'Passing';
-                            else echo 'Failing';
+                            if ($gwa <= 1.00) echo 'Excellent';
+                            elseif ($gwa <= 1.25) echo 'Very Good';
+                            elseif ($gwa <= 1.50) echo 'Good';
+                            elseif ($gwa <= 1.75) echo 'Satisfactory';
+                            elseif ($gwa <= 2.00) echo 'Passing';
+                            elseif ($gwa <= 2.25) echo 'Conditional';
+                            elseif ($gwa <= 2.50) echo 'Needs Improvement';
+                            elseif ($gwa <= 2.75) echo 'Poor';
+                            elseif ($gwa <= 3.00) echo 'Very Poor';
+                            else echo 'Failed';
                             ?>
                         </div>
                     <?php else: ?>
                         <div class="performance-value" style="color: var(--text-light);">--</div>
-                        <div class="performance-label">No GPA calculated</div>
+                        <div class="performance-label">No GWA calculated</div>
                     <?php endif; ?>
                 </div>
                 
@@ -1743,8 +1759,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <?php if (!empty($midtermExam)): ?>
                         <?php 
                         $midterm = reset($midtermExam);
-                        // Ensure we don't have duplicate entries
-                        if (is_array($midterm) && isset($midterm['score_name']) && $midterm['score_name'] !== 'midterm_exam_exam'):
+                        if (is_array($midterm) && isset($midterm['score_value']) && isset($midterm['max_score'])):
                         ?>
                             <p style="color: var(--text-medium); margin-top: 0.5rem; font-size: 0.9rem;">
                                 Score: <?php echo $midterm['score_value']; ?>/<?php echo $midterm['max_score']; ?>
@@ -1752,9 +1767,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <p style="color: var(--text-light); font-size: 0.75rem; margin-top: 0.3rem;">
                                 Weighted: <?php echo number_format($midtermScore, 1); ?>%
                             </p>
+                            <?php if ($midterm['max_score'] > 0): ?>
+                                <p style="color: var(--text-light); font-size: 0.7rem; margin-top: 0.2rem;">
+                                    Percentage: <?php echo number_format(($midterm['score_value'] / $midterm['max_score']) * 100, 1); ?>%
+                                </p>
+                            <?php endif; ?>
                         <?php else: ?>
                             <p style="color: var(--text-light); margin-top: 0.5rem; font-size: 0.9rem;">
-                                Click to add score
+                                Invalid score data
                             </p>
                         <?php endif; ?>
                     <?php else: ?>
@@ -1771,8 +1791,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <?php if (!empty($finalExam)): ?>
                         <?php 
                         $final = reset($finalExam);
-                        // Ensure we don't have duplicate entries
-                        if (is_array($final) && isset($final['score_name']) && $final['score_name'] !== 'final_exam_exam'):
+                        // Check if it's a valid exam entry
+                        if (is_array($final) && isset($final['score_value']) && isset($final['max_score'])):
                         ?>
                             <p style="color: var(--text-medium); margin-top: 0.5rem; font-size: 0.9rem;">
                                 Score: <?php echo $final['score_value']; ?>/<?php echo $final['max_score']; ?>
@@ -1780,9 +1800,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <p style="color: var(--text-light); font-size: 0.75rem; margin-top: 0.3rem;">
                                 Weighted: <?php echo number_format($finalScore, 1); ?>%
                             </p>
+                            <?php if ($final['max_score'] > 0): ?>
+                                <p style="color: var(--text-light); font-size: 0.7rem; margin-top: 0.2rem;">
+                                    Percentage: <?php echo number_format(($final['score_value'] / $final['max_score']) * 100, 1); ?>%
+                                </p>
+                            <?php endif; ?>
                         <?php else: ?>
                             <p style="color: var(--text-light); margin-top: 0.5rem; font-size: 0.9rem;">
-                                Click to add score
+                                Invalid score data
                             </p>
                         <?php endif; ?>
                     <?php else: ?>
