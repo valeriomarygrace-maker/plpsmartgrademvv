@@ -267,10 +267,41 @@ $interventions = [];
 $recommendations = [];
 
 if ($hasScores) {
-    // Remove $pdo parameter from these calls
-    $behavioralInsights = InterventionSystem::getBehavioralInsights($student['id'], $subject_id);
-    $interventions = InterventionSystem::getInterventions($student['id'], $subject_id, $riskLevel);
-    $recommendations = InterventionSystem::getRecommendations($student['id'], $subject_id, $overallGrade);
+    // Prepare data for ML
+    $classStandings = array_column($classStandings, 'score_value');
+    $examScores = [];
+    if (!empty($midtermExam)) $examScores[] = reset($midtermExam)['score_value'];
+    if (!empty($finalExam)) $examScores[] = reset($finalExam)['score_value'];
+    
+    $attendanceRecords = []; // Convert your attendance data to 1/0
+    
+    // Get enhanced ML insights
+    $mlInsights = InterventionSystem::getEnhancedMLInsights(
+        $student['id'], 
+        $subject_id, 
+        $classStandings, 
+        $examScores, 
+        $attendanceRecords,
+        $subject['subject_name']
+    );
+    
+    // Use ML insights if available, otherwise use PHP fallback
+    if ($mlInsights['source'] === 'ml_enhanced') {
+        $riskLevel = $mlInsights['risk_level'];
+        $behavioralInsights = array_merge(
+            InterventionSystem::getBehavioralInsights($student['id'], $subject_id),
+            $mlInsights['ml_insights']
+        );
+        $recommendations = array_merge(
+            InterventionSystem::getRecommendations($student['id'], $subject_id, $overallGrade),
+            $mlInsights['ml_recommendations']
+        );
+    } else {
+        // Use original PHP-only approach
+        $behavioralInsights = InterventionSystem::getBehavioralInsights($student['id'], $subject_id);
+        $interventions = InterventionSystem::getInterventions($student['id'], $subject_id, $riskLevel);
+        $recommendations = InterventionSystem::getRecommendations($student['id'], $subject_id, $overallGrade);
+    }
 }
 
 // Handle form submissions - UPDATED FOR SUPABASE

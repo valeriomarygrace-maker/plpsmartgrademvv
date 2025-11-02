@@ -1,6 +1,216 @@
 <?php
 // ml-helpers.php
 
+// =============================================================================
+// NEW ML INTEGRATION CLASSES - ADD THESE AT THE TOP
+// =============================================================================
+
+/**
+ * ML Service Integration for Enhanced Predictions
+ */
+class MLService {
+    private static $api_url = 'http://localhost:5000/predict';
+    private static $timeout = 5;
+    private static $enabled = true;
+    
+    /**
+     * Get ML-enhanced predictions for student
+     */
+    public static function getMLPredictions($classStandings, $examScores, $attendanceRecords, $subjectName) {
+        // Check if ML service is enabled
+        if (!self::$enabled) {
+            return ['success' => false, 'source' => 'disabled'];
+        }
+        
+        try {
+            $studentData = [
+                'class_standings' => $classStandings,
+                'exam_scores' => $examScores,
+                'attendance' => $attendanceRecords,
+                'subject' => $subjectName
+            ];
+            
+            $post_data = json_encode($studentData);
+            
+            $ch = curl_init();
+            curl_setopt_array($ch, [
+                CURLOPT_URL => self::$api_url,
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => $post_data,
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => self::$timeout
+            ]);
+            
+            $response = curl_exec($ch);
+            $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            
+            if ($http_code === 200) {
+                $result = json_decode($response, true);
+                $result['source'] = 'ml_enhanced';
+                return $result;
+            }
+            
+        } catch (Exception $e) {
+            error_log("ML Service Error: " . $e->getMessage());
+        }
+        
+        return ['success' => false, 'source' => 'service_unavailable'];
+    }
+    
+    /**
+     * Enable/disable ML service
+     */
+    public static function setEnabled($enabled) {
+        self::$enabled = $enabled;
+    }
+    
+    /**
+     * Check if ML service is available
+     */
+    public static function isAvailable() {
+        if (!self::$enabled) {
+            return false;
+        }
+        
+        try {
+            $ch = curl_init();
+            curl_setopt_array($ch, [
+                CURLOPT_URL => str_replace('/predict', '/health', self::$api_url),
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 3
+            ]);
+            
+            $response = curl_exec($ch);
+            $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            
+            return $http_code === 200;
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+}
+
+/**
+ * Enhanced Intervention System with ML Support
+ */
+class EnhancedInterventionSystem extends InterventionSystem {
+    
+    /**
+     * Get enhanced insights with ML predictions
+     */
+    public static function getEnhancedInsights($studentId, $subjectId, $classStandings, $examScores, $attendanceRecords, $subjectName, $pdo) {
+        $baseInsights = [
+            'behavioral_insights' => parent::getBehavioralInsights($studentId, $subjectId, $pdo),
+            'interventions' => [],
+            'recommendations' => [],
+            'risk_level' => 'medium', // default
+            'overall_grade' => 0,
+            'gpa' => 0
+        ];
+        
+        // Get ML predictions
+        $mlResult = MLService::getMLPredictions($classStandings, $examScores, $attendanceRecords, $subjectName);
+        
+        if ($mlResult['success']) {
+            // Use ML risk level if available
+            $riskLevel = $mlResult['risk_level'];
+            $overallGrade = $mlResult['overall_grade'] ?? self::calculateOverallGrade($classStandings, $examScores);
+            $gpa = $mlResult['gpa'] ?? self::calculateGPA($overallGrade);
+            
+            $baseInsights['ml_risk_level'] = $riskLevel;
+            $baseInsights['risk_level'] = $riskLevel;
+            $baseInsights['overall_grade'] = $overallGrade;
+            $baseInsights['gpa'] = $gpa;
+            $baseInsights['ml_confidence'] = $mlResult['confidence'];
+            $baseInsights['ml_grade'] = $mlResult['overall_grade'] ?? null;
+            $baseInsights['ml_gpa'] = $mlResult['gpa'] ?? null;
+            
+            // Add ML insights to behavioral insights
+            if (!empty($mlResult['behavioral_insights'])) {
+                foreach ($mlResult['behavioral_insights'] as $mlInsight) {
+                    $baseInsights['behavioral_insights'][] = [
+                        'message' => $mlInsight,
+                        'priority' => 'medium',
+                        'source' => 'ml'
+                    ];
+                }
+            }
+            
+            // Get interventions based on ML risk level
+            $baseInsights['interventions'] = parent::getInterventions($studentId, $subjectId, $riskLevel, $pdo);
+            
+            // Combine ML recommendations with base recommendations
+            $baseRecommendations = parent::getRecommendations($studentId, $subjectId, $overallGrade, $pdo);
+            $mlRecommendations = $mlResult['recommendations'] ?? [];
+            
+            // Convert ML recommendations to same format
+            $mlRecsFormatted = array_map(function($rec) {
+                return ['message' => $rec, 'priority' => 'medium', 'source' => 'ml'];
+            }, array_slice($mlRecommendations, 0, 3)); // Limit to 3 ML recommendations
+            
+            $baseInsights['recommendations'] = array_merge($baseRecommendations, $mlRecsFormatted);
+            $baseInsights['source'] = 'ml_enhanced';
+            
+        } else {
+            // Fallback to original PHP logic
+            $calculatedGrade = self::calculateOverallGrade($classStandings, $examScores);
+            $riskLevel = self::calculateRiskLevel($calculatedGrade);
+            $gpa = self::calculateGPA($calculatedGrade);
+            
+            $baseInsights['risk_level'] = $riskLevel;
+            $baseInsights['overall_grade'] = $calculatedGrade;
+            $baseInsights['gpa'] = $gpa;
+            $baseInsights['interventions'] = parent::getInterventions($studentId, $subjectId, $riskLevel, $pdo);
+            $baseInsights['recommendations'] = parent::getRecommendations($studentId, $subjectId, $calculatedGrade, $pdo);
+            $baseInsights['source'] = 'php_fallback';
+            $baseInsights['fallback_reason'] = $mlResult['source'] ?? 'service_unavailable';
+        }
+        
+        return $baseInsights;
+    }
+    
+    /**
+     * Calculate overall grade (60% class standing + 40% exams)
+     */
+    private static function calculateOverallGrade($classStandings, $examScores) {
+        if (empty($classStandings) && empty($examScores)) {
+            return 0;
+        }
+        
+        $classAvg = !empty($classStandings) ? array_sum($classStandings) / count($classStandings) : 70;
+        $examAvg = !empty($examScores) ? array_sum($examScores) / count($examScores) : 70;
+        
+        $overallGrade = ($classAvg * 0.6) + ($examAvg * 0.4);
+        return round(max(0, min(100, $overallGrade)), 1);
+    }
+    
+    /**
+     * Calculate risk level based on grade
+     */
+    private static function calculateRiskLevel($grade) {
+        if ($grade >= 85) return 'low';
+        if ($grade >= 75) return 'medium';
+        return 'high';
+    }
+    
+    /**
+     * Calculate GPA from grade
+     */
+    private static function calculateGPA($grade) {
+        if ($grade >= 89) return 1.00;
+        if ($grade >= 82) return 2.00;
+        if ($grade >= 79) return 2.75;
+        return 3.00;
+    }
+}
+
+// =============================================================================
+// YOUR EXISTING CODE - KEEP EVERYTHING BELOW EXACTLY AS IS
+// =============================================================================
+
 class InterventionSystem {
     
     /**
