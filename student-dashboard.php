@@ -489,9 +489,17 @@ function calculateGWA($grade) {
         }
 
         .card {
+            background: white;
             padding: 1.5rem;
             border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            border-left: 4px solid var(--plp-green);
             transition: var(--transition);
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--box-shadow-lg);
         }
 
         .card-header {
@@ -527,6 +535,10 @@ function calculateGWA($grade) {
             padding: 1rem;
             border-radius: var(--border-radius);
             transition: var(--transition);
+        }
+
+        .metric-card:hover {
+            background: var(--plp-green-lighter);
         }
 
         .metric-value {
@@ -914,7 +926,6 @@ function calculateGWA($grade) {
 
         <!-- Academic Statistics -->
         <div class="dashboard-grid">
-            <div class="card">
                 <div class="metrics-grid">
                     <div class="metric-card">
                         <div class="metric-value"><?php echo $performance_metrics['total_subjects']; ?></div>
