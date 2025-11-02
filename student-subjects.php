@@ -390,10 +390,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
 
 $semester_mapping = [
     '1st Semester' => 'First Semester',
-    '2nd Semester' => 'Second Semester',
-    'Summer' => 'Summer'
+    '2nd Semester' => 'Second Semester'
 ];
 $current_semester_display = $semester_mapping[$student['semester']] ?? 'First Semester';
+// Check for restored subject success message
+if (isset($_GET['restored']) && $_GET['restored'] == '1') {
+    $subject_name = isset($_GET['subject']) ? htmlspecialchars($_GET['subject']) : 'subject';
+    $success_message = "Subject {$subject_name} has been successfully restored and is now back in your active subjects!";
+}
 ?>
 
 <!DOCTYPE html>

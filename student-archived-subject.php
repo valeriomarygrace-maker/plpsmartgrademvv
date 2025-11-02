@@ -134,7 +134,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_subject'])) {
         // Finally delete the archived subject
         supabaseDelete('archived_subjects', ['id' => $archived_subject_id]);
         
-        $success_message = 'Subject restored successfully with all records!';
+        // Get subject info for success message
+        $subject_info = supabaseFetch('subjects', ['id' => $archived_subject['subject_id']]);
+        $subject_code = $subject_info && count($subject_info) > 0 ? $subject_info[0]['subject_code'] : 'Subject';
+        
+        // Redirect to active subjects page with success message
+        header("Location: student-subjects.php?restored=1&subject=" . urlencode($subject_code));
+        exit;
         
     } catch (Exception $e) {
         $error_message = 'Error restoring subject: ' . $e->getMessage();
