@@ -208,7 +208,7 @@ try {
                     } else {
                         $performance = [
                             'overall_grade' => 0,
-                            'gpa' => 0,
+                            'gwa' => 0,
                             'class_standing' => 0,
                             'exams_score' => 0,
                             'risk_level' => 'no-data',
@@ -227,7 +227,7 @@ try {
                     'credits' => $subject_info['credits'],
                     'semester' => $subject_info['semester'],
                     'overall_grade' => $performance['overall_grade'] ?? 0,
-                    'gpa' => $performance['gpa'] ?? 0,
+                    'gwa' => $performance['gwa'] ?? 0,
                     'class_standing' => $performance['class_standing'] ?? 0,
                     'exams_score' => $performance['exams_score'] ?? 0,
                     'risk_level' => $performance['risk_level'] ?? 'no-data',
@@ -252,7 +252,7 @@ try {
 }
 
 /**
- * Calculate performance for archived subject from scores (Supabase version)
+ * Calculate performance for archived subject from scores (Supabase version) - UPDATED FOR GWA
  */
 function calculateArchivedSubjectPerformance($archived_subject_id) {
     try {
@@ -321,7 +321,7 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
         if (!$hasScores) {
             return [
                 'overall_grade' => 0,
-                'gpa' => 0,
+                'gwa' => 0,
                 'class_standing' => 0,
                 'exams_score' => 0,
                 'risk_level' => 'no-data',
@@ -336,37 +336,30 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
             $overallGrade = 100;
         }
         
-        // Calculate GPA and risk level - using the same logic as subject-management.php
-        $gpa = 0;
+        // Calculate GWA (General Weighted Average) - Philippine system
+        $gwa = calculateGWA($overallGrade);
+        
+        // Calculate risk level based on GWA
         $riskLevel = 'no-data';
         $riskDescription = 'No Data Inputted';
-        
-        // GPA calculation (same as subject-management.php)
-        if ($overallGrade >= 89) {
-            $gpa = 1.00; // Low Risk
-        } elseif ($overallGrade >= 82) {
-            $gpa = 2.00; // Medium Risk  
-        } elseif ($overallGrade >= 79) {
-            $gpa = 2.75; // Medium Risk
-        } else {
-            $gpa = 3.00; // High Risk
-        }
 
-        // Calculate risk level based on GPA
-        if ($gpa == 1.00) {
+        if ($gwa <= 1.75) {
             $riskLevel = 'low';
             $riskDescription = 'Low Risk';
-        } elseif ($gpa == 2.00 || $gpa == 2.75) {
+        } elseif ($gwa <= 2.50) {
             $riskLevel = 'medium';
             $riskDescription = 'Medium Risk';
-        } elseif ($gpa == 3.00) {
+        } elseif ($gwa <= 3.00) {
             $riskLevel = 'high';
             $riskDescription = 'High Risk';
+        } else {
+            $riskLevel = 'failed';
+            $riskDescription = 'Failed';
         }
         
         return [
             'overall_grade' => $overallGrade,
-            'gpa' => $gpa,
+            'gwa' => $gwa,
             'class_standing' => $totalClassStanding,
             'exams_score' => $midtermScore + $finalScore,
             'risk_level' => $riskLevel,
@@ -378,6 +371,22 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
         error_log("Error calculating archived subject performance: " . $e->getMessage());
         return null;
     }
+}
+
+/**
+ * Calculate GWA from grade (Philippine system)
+ */
+function calculateGWA($grade) {
+    if ($grade >= 90) return 1.00;
+    elseif ($grade >= 85) return 1.25;
+    elseif ($grade >= 80) return 1.50;
+    elseif ($grade >= 75) return 1.75;
+    elseif ($grade >= 70) return 2.00;
+    elseif ($grade >= 65) return 2.25;
+    elseif ($grade >= 60) return 2.50;
+    elseif ($grade >= 55) return 2.75;
+    elseif ($grade >= 50) return 3.00;
+    else return 5.00;
 }
 ?>
 
@@ -816,6 +825,11 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
             color: #c53030;
         }
 
+        .risk-badge.failed {
+            background: #7f1d1d;
+            color: #fecaca;
+        }
+
         .risk-badge.no-data {
             background: #e2e8f0;
             color: #718096;
@@ -1115,6 +1129,16 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
                                     </span>
                                 </div>
                                 <div class="info-item">
+                                    <i class="fas fa-graduation-cap"></i>
+                                    <span><strong>GWA:</strong> 
+                                        <?php if ($subject['has_scores']): ?>
+                                            <?php echo number_format($subject['gwa'], 2); ?>
+                                        <?php else: ?>
+                                            <span style="color: var(--text-light);">--</span>
+                                        <?php endif; ?>
+                                    </span>
+                                </div>
+                                <div class="info-item">
                                     <i class="fas fa-clock"></i>
                                     <span><strong>Archived:</strong> <?php echo date('M j, Y g:i A', strtotime($subject['archived_at'])); ?></span>
                                 </div>
@@ -1136,7 +1160,7 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
                                     '<?php echo htmlspecialchars($subject['semester']); ?>',
                                     '<?php echo date('F j, Y g:i A', strtotime($subject['archived_at'])); ?>',
                                     <?php echo $subject['overall_grade'] ?? 0; ?>,
-                                    <?php echo $subject['gpa'] ?? 0; ?>,
+                                    <?php echo $subject['gwa'] ?? 0; ?>,
                                     <?php echo $subject['class_standing'] ?? 0; ?>,
                                     <?php echo $subject['exams_score'] ?? 0; ?>,
                                     '<?php echo $subject['risk_level'] ?? 'no-data'; ?>',
@@ -1176,8 +1200,8 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
                         </div>
                         
                         <div class="detail-item">
-                            <div class="detail-label">GPA</div>
-                            <div class="detail-value" id="view_gpa" style="font-size: 1.4rem; font-weight: 700; color: var(--plp-green); margin: 0.5rem 0;">--</div>
+                            <div class="detail-label">GWA</div>
+                            <div class="detail-value" id="view_gwa" style="font-size: 1.4rem; font-weight: 700; color: var(--plp-green); margin: 0.5rem 0;">--</div>
                             <div class="detail-label" id="view_risk_description" style="font-size: 0.85rem; color: var(--text-medium); margin-top: 0.5rem;">No Data Inputted</div>
                         </div>
                         
@@ -1243,7 +1267,7 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
     <script>
         function openViewModal(
             subjectCode, subjectName, credits, professor, schedule, semester, archivedDate,
-            overallGrade = 0, gpa = 0, classStanding = 0, examsScore = 0, riskLevel = 'no-data', 
+            overallGrade = 0, gwa = 0, classStanding = 0, examsScore = 0, riskLevel = 'no-data', 
             riskDescription = 'No Data Inputted', hasScores = false
         ) {
             // Set basic subject details
@@ -1257,12 +1281,12 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
             
             // Set performance data
             const overallGradeNum = parseFloat(overallGrade) || 0;
-            const gpaNum = parseFloat(gpa) || 0;
+            const gwaNum = parseFloat(gwa) || 0;
             const classStandingNum = parseFloat(classStanding) || 0;
             const examsScoreNum = parseFloat(examsScore) || 0;
             
             document.getElementById('view_overall_grade').textContent = hasScores ? overallGradeNum.toFixed(1) + '%' : '--';
-            document.getElementById('view_gpa').textContent = hasScores ? gpaNum.toFixed(2) : '--';
+            document.getElementById('view_gwa').textContent = hasScores ? gwaNum.toFixed(2) : '--';
             document.getElementById('view_class_standing').textContent = hasScores ? classStandingNum.toFixed(1) + '%' : '--';
             document.getElementById('view_exams_score').textContent = hasScores ? examsScoreNum.toFixed(1) + '%' : '--';
             document.getElementById('view_risk_description').textContent = riskDescription;

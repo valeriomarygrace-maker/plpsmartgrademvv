@@ -65,16 +65,19 @@ try {
                         
                         $has_scores = false;
                         $overall_grade = 0;
+                        $gwa = 0;
                         
                         if ($performance) {
                             $has_scores = true;
                             $overall_grade = $performance['overall_grade'] ?? 0;
+                            $gwa = $performance['gwa'] ?? calculateGWA($overall_grade);
                         } else {
                             // Calculate performance from scores if no performance data exists
                             $calculated_performance = calculateArchivedSubjectPerformance($archived_subject['id']);
                             if ($calculated_performance && $calculated_performance['has_scores']) {
                                 $has_scores = true;
                                 $overall_grade = $calculated_performance['overall_grade'];
+                                $gwa = $calculated_performance['gwa'];
                             }
                         }
                         
@@ -88,6 +91,7 @@ try {
                             'schedule' => $archived_subject['schedule'],
                             'archived_at' => $archived_subject['archived_at'],
                             'overall_grade' => $overall_grade,
+                            'gwa' => $gwa,
                             'has_scores' => $has_scores
                         ];
                     }
@@ -106,7 +110,7 @@ try {
 }
 
 /**
- * Calculate performance for archived subject from scores
+ * Calculate performance for archived subject from scores - UPDATED FOR GWA
  */
 function calculateArchivedSubjectPerformance($archived_subject_id) {
     try {
@@ -150,8 +154,9 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
         }
         
         // Get exam scores
-        $exam_scores = supabaseFetch('archived_subject_scores', ['score_type' => 'midterm_exam']);
-        $exam_scores = array_merge($exam_scores, supabaseFetch('archived_subject_scores', ['score_type' => 'final_exam']));
+        $midterm_exams = supabaseFetch('archived_subject_scores', ['score_type' => 'midterm_exam']);
+        $final_exams = supabaseFetch('archived_subject_scores', ['score_type' => 'final_exam']);
+        $exam_scores = array_merge($midterm_exams ?: [], $final_exams ?: []);
         
         foreach ($exam_scores as $exam) {
             if ($exam['max_score'] > 0) {
@@ -167,6 +172,7 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
         if (!$hasScores && $midtermScore == 0 && $finalScore == 0) {
             return [
                 'overall_grade' => 0,
+                'gwa' => 0,
                 'has_scores' => false
             ];
         }
@@ -177,8 +183,12 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
             $overallGrade = 100;
         }
         
+        // Calculate GWA
+        $gwa = calculateGWA($overallGrade);
+        
         return [
             'overall_grade' => $overallGrade,
+            'gwa' => $gwa,
             'has_scores' => true
         ];
         
@@ -186,6 +196,22 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
         error_log("Error calculating archived subject performance: " . $e->getMessage());
         return null;
     }
+}
+
+/**
+ * Calculate GWA from grade (Philippine system)
+ */
+function calculateGWA($grade) {
+    if ($grade >= 90) return 1.00;
+    elseif ($grade >= 85) return 1.25;
+    elseif ($grade >= 80) return 1.50;
+    elseif ($grade >= 75) return 1.75;
+    elseif ($grade >= 70) return 2.00;
+    elseif ($grade >= 65) return 2.25;
+    elseif ($grade >= 60) return 2.50;
+    elseif ($grade >= 55) return 2.75;
+    elseif ($grade >= 50) return 3.00;
+    else return 5.00;
 }
 ?>
 <!DOCTYPE html>
@@ -495,7 +521,47 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
             color: var(--danger);
         }
 
+        .grade-failed {
+            color: #7f1d1d;
+            background: #fecaca;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+        }
+
         .grade-no-data {
+            color: var(--text-light);
+            font-style: italic;
+        }
+
+        .gwa {
+            text-align: center;
+            font-weight: 700;
+        }
+
+        .gwa-excellent {
+            color: var(--success);
+        }
+
+        .gwa-good {
+            color: var(--info);
+        }
+
+        .gwa-average {
+            color: var(--warning);
+        }
+
+        .gwa-poor {
+            color: var(--danger);
+        }
+
+        .gwa-failed {
+            color: #7f1d1d;
+            background: #fecaca;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+        }
+
+        .gwa-no-data {
             color: var(--text-light);
             font-style: italic;
         }
@@ -561,7 +627,7 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
             }
             
             .grades-table {
-                min-width: 600px;
+                min-width: 800px;
             }
         }
     </style>
@@ -654,7 +720,7 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
                                 <th>Professor</th>
                                 <th>Schedule</th>
                                 <th>Credits</th>
-                                <th>Final Grade</th>
+                                <th>GWA</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -669,19 +735,20 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
                                     <td><?php echo htmlspecialchars($subject['professor_name']); ?></td>
                                     <td><?php echo htmlspecialchars($subject['schedule']); ?></td>
                                     <td class="credits"><?php echo htmlspecialchars($subject['credits']); ?></td>
-                                    <td class="grade 
+                                    <td class="gwa 
                                         <?php if ($subject['has_scores']): ?>
                                             <?php 
-                                            if ($subject['overall_grade'] >= 90) echo 'grade-excellent';
-                                            elseif ($subject['overall_grade'] >= 80) echo 'grade-good';
-                                            elseif ($subject['overall_grade'] >= 75) echo 'grade-average';
-                                            else echo 'grade-poor';
+                                            if ($subject['gwa'] <= 1.25) echo 'gwa-excellent';
+                                            elseif ($subject['gwa'] <= 1.75) echo 'gwa-good';
+                                            elseif ($subject['gwa'] <= 2.50) echo 'gwa-average';
+                                            elseif ($subject['gwa'] <= 3.00) echo 'gwa-poor';
+                                            else echo 'gwa-failed';
                                             ?>
                                         <?php else: ?>
-                                            grade-no-data
+                                            gwa-no-data
                                         <?php endif; ?>
                                     ">
-                                        <?php echo $subject['has_scores'] ? number_format($subject['overall_grade'], 1) . '%' : 'No Data'; ?>
+                                        <?php echo $subject['has_scores'] ? number_format($subject['gwa'], 2) : '--'; ?>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
