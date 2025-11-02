@@ -485,17 +485,28 @@ function calculateGWA($grade) {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 1.5rem;
+            margin-bottom: 2rem;
         }
 
         .card {
-            transition: var(--transition);
+            background: white;
             padding: 1.5rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            border-left: 4px solid var(--plp-green);
+            transition: var(--transition);
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--box-shadow-lg);
         }
 
         .card-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            margin-bottom: 1rem;
             padding-bottom: 0.75rem;
             border-bottom: 1px solid var(--plp-green-lighter);
         }
@@ -516,12 +527,15 @@ function calculateGWA($grade) {
         }
 
         .metric-card {
-            background: white;
-            border-left: 4px solid var(--plp-green);
             text-align: center;
             padding: 1rem;
+            background: var(--plp-green-pale);
             border-radius: var(--border-radius);
             transition: var(--transition);
+        }
+
+        .metric-card:hover {
+            background: var(--plp-green-lighter);
         }
 
         .metric-value {
@@ -910,6 +924,12 @@ function calculateGWA($grade) {
         <!-- Academic Statistics -->
         <div class="dashboard-grid">
             <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fas fa-chart-bar"></i>
+                        Academic Statistics
+                    </div>
+                </div>
                 <div class="metrics-grid">
                     <div class="metric-card">
                         <div class="metric-value"><?php echo $performance_metrics['total_subjects']; ?></div>
