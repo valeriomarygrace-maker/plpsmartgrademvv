@@ -776,6 +776,44 @@ function calculateGWA($grade) {
                 grid-template-columns: repeat(2, 1fr);
             }
         }
+        /* Risk Breakdown Styles */
+        .risk-breakdown {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--plp-green-lighter);
+        }
+
+        .breakdown-item {
+            display: flex;
+            align-items: center;
+            padding: 0.5rem 0;
+            gap: 0.75rem;
+        }
+
+        .risk-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .risk-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-grow: 1;
+        }
+
+        .risk-label {
+            font-weight: 500;
+            color: var(--text-dark);
+            font-size: 0.85rem;
+        }
+
+        .risk-percentage {
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
     </style>
 </head>
 <body>
@@ -973,12 +1011,12 @@ function calculateGWA($grade) {
                 <?php endif; ?>
             </div>
 
-            <!-- Semester Risk Graph -->
+            <!-- Semester Risk Pie Chart -->
             <div class="card">
                 <div class="card-header">
                     <div class="card-title">
-                        <i class="fas fa-chart-line"></i>
-                        Semester Risk Trend
+                        <i class="fas fa-chart-pie"></i>
+                        Semester Risk Distribution
                     </div>
                 </div>
                 <?php if (!empty($semester_risk_data)): ?>
@@ -988,56 +1026,76 @@ function calculateGWA($grade) {
                     <div class="semester-stats">
                         <?php 
                         $total_high_risk = 0;
+                        $total_medium_risk = 0;
+                        $total_low_risk = 0;
                         $total_subjects = 0;
+                        
                         foreach ($semester_risk_data as $semester) {
-                            $total_high_risk += $semester['high_risk_count'];
-                            $total_subjects += $semester['total_subjects'];
+                            foreach ($semester['subjects'] as $subject) {
+                                $total_subjects++;
+                                switch ($subject['risk_level']) {
+                                    case 'high':
+                                        $total_high_risk++;
+                                        break;
+                                    case 'medium':
+                                        $total_medium_risk++;
+                                        break;
+                                    case 'low':
+                                        $total_low_risk++;
+                                        break;
+                                }
+                            }
                         }
-                        $overall_high_risk_percentage = $total_subjects > 0 ? round(($total_high_risk / $total_subjects) * 100) : 0;
+                        
+                        $high_risk_percentage = $total_subjects > 0 ? round(($total_high_risk / $total_subjects) * 100) : 0;
+                        $medium_risk_percentage = $total_subjects > 0 ? round(($total_medium_risk / $total_subjects) * 100) : 0;
+                        $low_risk_percentage = $total_subjects > 0 ? round(($total_low_risk / $total_subjects) * 100) : 0;
                         ?>
-                        <div class="stat-card">
-                            <div class="stat-value"><?php echo count($semester_risk_data); ?></div>
-                            <div class="stat-label">Semesters</div>
-                        </div>
                         <div class="stat-card">
                             <div class="stat-value"><?php echo $total_subjects; ?></div>
                             <div class="stat-label">Total Subjects</div>
                         </div>
                         <div class="stat-card">
-                            <div class="stat-value"><?php echo $total_high_risk; ?></div>
-                            <div class="stat-label">High Risk</div>
+                            <div class="stat-value" style="color: var(--success);"><?php echo $total_low_risk; ?></div>
+                            <div class="stat-label">Low Risk</div>
                         </div>
                         <div class="stat-card">
-                            <div class="stat-value"><?php echo $overall_high_risk_percentage; ?>%</div>
-                            <div class="stat-label">Overall Risk Rate</div>
+                            <div class="stat-value" style="color: var(--warning);"><?php echo $total_medium_risk; ?></div>
+                            <div class="stat-label">Medium Risk</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" style="color: var(--danger);"><?php echo $total_high_risk; ?></div>
+                            <div class="stat-label">High Risk</div>
                         </div>
                     </div>
-                    <div class="semester-list">
-                        <?php foreach ($semester_risk_data as $semester): ?>
-                            <div class="semester-item">
-                                <div class="semester-name"><?php echo htmlspecialchars($semester['semester']); ?></div>
-                                <div class="semester-risk">
-                                    <div class="risk-percentage 
-                                        <?php 
-                                        if ($semester['high_risk_percentage'] >= 50) echo 'high';
-                                        elseif ($semester['high_risk_percentage'] >= 25) echo 'medium';
-                                        else echo 'low';
-                                        ?>
-                                    ">
-                                        <?php echo $semester['high_risk_percentage']; ?>% High Risk
-                                    </div>
-                                    <div class="subject-count">
-                                        <?php echo $semester['high_risk_count']; ?>/<?php echo $semester['total_subjects']; ?> subjects
-                                    </div>
-                                </div>
+                    <div class="risk-breakdown">
+                        <div class="breakdown-item">
+                            <div class="risk-color" style="background: var(--success);"></div>
+                            <div class="risk-info">
+                                <span class="risk-label">Low Risk</span>
+                                <span class="risk-percentage"><?php echo $low_risk_percentage; ?>%</span>
                             </div>
-                        <?php endforeach; ?>
+                        </div>
+                        <div class="breakdown-item">
+                            <div class="risk-color" style="background: var(--warning);"></div>
+                            <div class="risk-info">
+                                <span class="risk-label">Medium Risk</span>
+                                <span class="risk-percentage"><?php echo $medium_risk_percentage; ?>%</span>
+                            </div>
+                        </div>
+                        <div class="breakdown-item">
+                            <div class="risk-color" style="background: var(--danger);"></div>
+                            <div class="risk-info">
+                                <span class="risk-label">High Risk</span>
+                                <span class="risk-percentage"><?php echo $high_risk_percentage; ?>%</span>
+                            </div>
+                        </div>
                     </div>
                 <?php else: ?>
                     <div class="empty-state">
-                        <i class="fas fa-chart-line"></i>
+                        <i class="fas fa-chart-pie"></i>
                         <p>No semester data available</p>
-                        <small>Complete and archive subjects to see semester risk trends</small>
+                        <small>Complete and archive subjects to see risk distribution</small>
                         <br>
                         <a href="student-semester-grades.php" style="color: var(--plp-green); text-decoration: none; font-size: 0.9rem; margin-top: 0.5rem; display: inline-block;">
                             View History Records
@@ -1072,120 +1130,87 @@ function calculateGWA($grade) {
             });
         });
 
-        // Semester Risk Chart
+        // Semester Risk Pie Chart
         <?php if (!empty($semester_risk_data)): ?>
         document.addEventListener('DOMContentLoaded', function() {
             const ctx = document.getElementById('semesterRiskChart').getContext('2d');
-            const semesterData = <?php echo json_encode($semester_risk_data); ?>;
             
-            const labels = semesterData.map(semester => semester.semester);
-            const highRiskData = semesterData.map(semester => semester.high_risk_percentage);
+            // Calculate total risk distribution across all semesters
+            let totalHighRisk = 0;
+            let totalMediumRisk = 0;
+            let totalLowRisk = 0;
+            let totalNoData = 0;
             
-            // Calculate trend line
-            const trendLine = calculateTrendLine(highRiskData);
+            <?php foreach ($semester_risk_data as $semester): ?>
+                <?php foreach ($semester['subjects'] as $subject): ?>
+                    switch('<?php echo $subject['risk_level']; ?>') {
+                        case 'high':
+                            totalHighRisk++;
+                            break;
+                        case 'medium':
+                            totalMediumRisk++;
+                            break;
+                        case 'low':
+                            totalLowRisk++;
+                            break;
+                        default:
+                            totalNoData++;
+                            break;
+                    }
+                <?php endforeach; ?>
+            <?php endforeach; ?>
+            
+            const totalSubjects = totalHighRisk + totalMediumRisk + totalLowRisk + totalNoData;
             
             const chart = new Chart(ctx, {
-                type: 'line',
+                type: 'pie',
                 data: {
-                    labels: labels,
-                    datasets: [
-                        {
-                            label: 'High Risk Percentage',
-                            data: highRiskData,
-                            borderColor: '#dc3545',
-                            backgroundColor: 'rgba(220, 53, 69, 0.1)',
-                            borderWidth: 3,
-                            fill: true,
-                            tension: 0.4,
-                            pointBackgroundColor: '#dc3545',
-                            pointBorderColor: '#ffffff',
-                            pointBorderWidth: 2,
-                            pointRadius: 6,
-                            pointHoverRadius: 8
-                        },
-                        {
-                            label: 'Trend',
-                            data: trendLine,
-                            borderColor: '#6c757d',
-                            borderWidth: 2,
-                            borderDash: [5, 5],
-                            fill: false,
-                            pointRadius: 0,
-                            tension: 0.4
-                        }
-                    ]
+                    labels: ['High Risk', 'Medium Risk', 'Low Risk', 'No Data'],
+                    datasets: [{
+                        data: [totalHighRisk, totalMediumRisk, totalLowRisk, totalNoData],
+                        backgroundColor: [
+                            '#dc3545', // High Risk - Red
+                            '#ffc107', // Medium Risk - Yellow
+                            '#28a745', // Low Risk - Green
+                            '#6c757d'  // No Data - Gray
+                        ],
+                        borderColor: '#ffffff',
+                        borderWidth: 3,
+                        hoverOffset: 15
+                    }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
                         legend: {
-                            position: 'top',
+                            position: 'bottom',
                             labels: {
                                 usePointStyle: true,
-                                padding: 20
+                                padding: 20,
+                                font: {
+                                    size: 11
+                                }
                             }
                         },
                         tooltip: {
-                            mode: 'index',
-                            intersect: false,
                             callbacks: {
                                 label: function(context) {
-                                    let label = context.dataset.label || '';
-                                    if (label) {
-                                        label += ': ';
-                                    }
-                                    if (context.parsed.y !== null) {
-                                        label += context.parsed.y + '%';
-                                    }
-                                    return label;
+                                    const label = context.label || '';
+                                    const value = context.raw || 0;
+                                    const percentage = totalSubjects > 0 ? ((value / totalSubjects) * 100).toFixed(1) : 0;
+                                    return `${label}: ${value} subjects (${percentage}%)`;
                                 }
                             }
                         }
                     },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            max: 100,
-                            ticks: {
-                                callback: function(value) {
-                                    return value + '%';
-                                }
-                            },
-                            grid: {
-                                color: 'rgba(0, 99, 65, 0.1)'
-                            }
-                        },
-                        x: {
-                            grid: {
-                                color: 'rgba(0, 99, 65, 0.1)'
-                            }
-                        }
-                    },
-                    interaction: {
-                        mode: 'nearest',
-                        axis: 'x',
-                        intersect: false
+                    cutout: '50%', // Makes it a donut chart
+                    animation: {
+                        animateScale: true,
+                        animateRotate: true
                     }
                 }
             });
-            
-            function calculateTrendLine(data) {
-                const n = data.length;
-                let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
-                
-                for (let i = 0; i < n; i++) {
-                    sumX += i;
-                    sumY += data[i];
-                    sumXY += i * data[i];
-                    sumXX += i * i;
-                }
-                
-                const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
-                const intercept = (sumY - slope * sumX) / n;
-                
-                return data.map((_, i) => intercept + slope * i);
-            }
         });
         <?php endif; ?>
     </script>
