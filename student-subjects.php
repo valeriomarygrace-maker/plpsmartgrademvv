@@ -393,6 +393,7 @@ $semester_mapping = [
     '2nd Semester' => 'Second Semester'
 ];
 $current_semester_display = $semester_mapping[$student['semester']] ?? 'First Semester';
+
 // Check for restored subject success message
 if (isset($_GET['restored']) && $_GET['restored'] == '1') {
     $subject_name = isset($_GET['subject']) ? htmlspecialchars($_GET['subject']) : 'subject';

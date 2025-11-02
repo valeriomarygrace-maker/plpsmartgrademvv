@@ -40,9 +40,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_subject'])) {
             throw new Exception("Archived subject not found.");
         }
         
-        // Check if subject already exists in active subjects
-        $existing_subjects = supabaseFetch('student_subjects', ['student_id' => $student['id'], 'subject_id' => $archived_subject['subject_id']]);
-        if ($existing_subjects && count($existing_subjects) > 0) {
+        // FIXED: Check if subject already exists in active subjects (only non-deleted ones)
+        $existing_subjects = supabaseFetch('student_subjects', [
+            'student_id' => $student['id'], 
+            'subject_id' => $archived_subject['subject_id']
+        ]);
+
+        // Filter out deleted/archived subjects
+        $active_existing_subjects = array_filter($existing_subjects ?: [], function($subject) {
+            return empty($subject['deleted_at']) && empty($subject['archived_at']);
+        });
+
+        if ($active_existing_subjects && count($active_existing_subjects) > 0) {
             throw new Exception("This subject is already in your active subjects.");
         }
         
@@ -146,7 +155,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_subject'])) {
         $error_message = 'Error restoring subject: ' . $e->getMessage();
     }
 }
-
 // Fetch archived subjects with calculated performance data
 try {
     // First get all archived subjects for this student
