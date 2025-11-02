@@ -488,9 +488,8 @@ function calculateGWA($grade) {
         }
 
         .card {
+            margin-bottom: 0.25rem;
             padding: 1.5rem;
-            border-radius: var(--border-radius);
-            box-shadow: var(--box-shadow);
             border-left: 4px solid var(--plp-green);
             transition: var(--transition);
         }
@@ -504,6 +503,7 @@ function calculateGWA($grade) {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 1rem;
+            border-left: 4px solid var(--plp-green);
         }
 
         .metric-card {
