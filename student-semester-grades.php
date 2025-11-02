@@ -523,7 +523,6 @@ function calculateGWA($grade) {
 
         .grade-failed {
             color: #7f1d1d;
-            background: #fecaca;
             padding: 0.25rem 0.5rem;
             border-radius: 4px;
         }
@@ -556,7 +555,6 @@ function calculateGWA($grade) {
 
         .gwa-failed {
             color: #7f1d1d;
-            background: #fecaca;
             padding: 0.25rem 0.5rem;
             border-radius: 4px;
         }

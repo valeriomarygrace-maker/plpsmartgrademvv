@@ -1116,29 +1116,6 @@ function calculateGWA($grade) {
                                     <span><strong>Semester:</strong> <?php echo htmlspecialchars($subject['semester']); ?></span>
                                 </div>
                                 <div class="info-item">
-                                    <i class="fas fa-chart-line"></i>
-                                    <span><strong>Final Grade:</strong> 
-                                        <?php if ($subject['has_scores']): ?>
-                                            <?php echo number_format($subject['overall_grade'], 1); ?>%
-                                            <span class="risk-badge <?php echo $subject['risk_level']; ?>">
-                                                <?php echo ucfirst($subject['risk_level']); ?>
-                                            </span>
-                                        <?php else: ?>
-                                            <span style="color: var(--text-light);">No Data</span>
-                                        <?php endif; ?>
-                                    </span>
-                                </div>
-                                <div class="info-item">
-                                    <i class="fas fa-graduation-cap"></i>
-                                    <span><strong>GWA:</strong> 
-                                        <?php if ($subject['has_scores']): ?>
-                                            <?php echo number_format($subject['gwa'], 2); ?>
-                                        <?php else: ?>
-                                            <span style="color: var(--text-light);">--</span>
-                                        <?php endif; ?>
-                                    </span>
-                                </div>
-                                <div class="info-item">
                                     <i class="fas fa-clock"></i>
                                     <span><strong>Archived:</strong> <?php echo date('M j, Y g:i A', strtotime($subject['archived_at'])); ?></span>
                                 </div>
