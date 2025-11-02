@@ -128,7 +128,6 @@ require_once 'ml-helpers.php';
 // Log behavioral data when scores are added/updated
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['add_standing']) || isset($_POST['update_score']) || isset($_POST['add_exam']) || isset($_POST['add_attendance'])) {
-        // Log the activity - remove $pdo parameter
         InterventionSystem::logBehavior(
             $student['id'], 
             'grade_update', 
@@ -275,8 +274,8 @@ if ($hasScores) {
     
     $attendanceRecords = []; // Convert your attendance data to 1/0
     
-    // Get enhanced ML insights
-    $mlInsights = InterventionSystem::getEnhancedMLInsights(
+    // Get enhanced ML insights - REMOVED PDO PARAMETER
+    $mlInsights = EnhancedInterventionSystem::getEnhancedInsights(
         $student['id'], 
         $subject_id, 
         $classStandings, 
@@ -290,14 +289,14 @@ if ($hasScores) {
         $riskLevel = $mlInsights['risk_level'];
         $behavioralInsights = array_merge(
             InterventionSystem::getBehavioralInsights($student['id'], $subject_id),
-            $mlInsights['ml_insights']
+            $mlInsights['behavioral_insights']
         );
         $recommendations = array_merge(
             InterventionSystem::getRecommendations($student['id'], $subject_id, $overallGrade),
-            $mlInsights['ml_recommendations']
+            $mlInsights['recommendations']
         );
     } else {
-        // Use original PHP-only approach
+        // Use original PHP-only approach - REMOVED PDO PARAMETERS
         $behavioralInsights = InterventionSystem::getBehavioralInsights($student['id'], $subject_id);
         $interventions = InterventionSystem::getInterventions($student['id'], $subject_id, $riskLevel);
         $recommendations = InterventionSystem::getRecommendations($student['id'], $subject_id, $overallGrade);
