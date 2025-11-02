@@ -497,11 +497,6 @@ function calculateGWA($grade) {
             transition: var(--transition);
         }
 
-        .card:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--box-shadow-lg);
-        }
-
         .card-header {
             display: flex;
             justify-content: space-between;
@@ -936,12 +931,9 @@ function calculateGWA($grade) {
                         <div class="metric-label">Professors</div>
                     </div>
                 </div>
-            </div>
-        </div>
 
         <!-- Main Content Grid -->
         <div class="dashboard-grid">
-            <!-- Active Subjects -->
             <div class="card">
                 <div class="card-header">
                     <div class="card-title">
