@@ -189,6 +189,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_subject'])) {
         error_log("Restore error: " . $e->getMessage());
     }
 }
+
 // Fetch archived subjects with calculated performance data
 try {
     // Get all archived subjects for this student
@@ -406,7 +407,6 @@ function calculateGWA($grade) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* Your existing CSS styles remain exactly the same */
         :root {
             --plp-green: #006341;
             --plp-green-light: #008856;
@@ -444,7 +444,7 @@ function calculateGWA($grade) {
             min-height: 100vh;
             color: var(--text-dark);
             line-height: 1.6;
-            overflow: hidden;
+            overflow-x: hidden;
         }
 
         .sidebar {
@@ -455,15 +455,20 @@ function calculateGWA($grade) {
             display: flex;
             flex-direction: column;
             height: 100vh;
-            position: sticky;
+            position: fixed;
             top: 0;
+            left: 0;
             border-right: 1px solid rgba(0, 99, 65, 0.1);
             overflow-y: auto;
+            z-index: 1000;
+            transform: translateX(0);
+            transition: transform 0.3s ease;
         }
 
         .sidebar-header {
             text-align: center;
             border-bottom: 1px solid rgba(0, 99, 65, 0.1);
+            padding-bottom: 1rem;
         }
 
         .logo-container {
@@ -498,6 +503,7 @@ function calculateGWA($grade) {
             font-size: 1.3rem;
             font-weight: 700;
             letter-spacing: 0.5px;
+            margin: 0.5rem 0;
         }
 
         .student-email {
@@ -508,6 +514,7 @@ function calculateGWA($grade) {
             padding: 0.5rem;
             border-radius: 6px;
             font-weight: 500;
+            background: var(--plp-green-pale);
         }
 
         .nav-menu {
@@ -525,7 +532,7 @@ function calculateGWA($grade) {
             display: flex;
             align-items: center;
             gap: 0.75rem;
-            padding: 0.50rem;
+            padding: 0.75rem;
             color: var(--text-medium);
             text-decoration: none;
             border-radius: var(--border-radius);
@@ -547,10 +554,11 @@ function calculateGWA($grade) {
 
         .sidebar-footer {
             border-top: 3px solid rgba(0, 99, 65, 0.1);
+            padding-top: 1rem;
         }
 
         .logout-btn {
-            margin-top:1rem;
+            margin-top: 1rem;
             background: transparent;
             color: var(--text-medium);
             padding: 0.75rem 1rem;
@@ -574,36 +582,40 @@ function calculateGWA($grade) {
 
         .main-content {
             flex: 1;
-            padding: 1rem 2.5rem; 
+            padding: 1rem 2.5rem;
             background: var(--plp-green-pale);
-            max-width: 100%;
-            margin: 0 auto;
+            max-width: calc(100% - 320px);
+            margin-left: 320px;
             width: 100%;
             overflow-y: auto;
-            height: 100vh;
+            min-height: 100vh;
+            transition: margin-left 0.3s ease;
         }
 
         .header {
             background: white;
-            padding: 0.6rem 1.25rem;
+            padding: 1rem 1.5rem;
             border-radius: var(--border-radius);
             box-shadow: var(--box-shadow);
-            margin-bottom: 1.5rem; 
+            margin-bottom: 1.5rem;
             background: var(--plp-green-gradient);
             color: white;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
         }
 
         .welcome {
             font-size: 1.5rem;
             font-weight: 700;
             letter-spacing: 0.5px;
+            line-height: 1.2;
         }
 
         .subject-count {
-            background: var(--plp-green-gradient);
+            background: rgba(255, 255, 255, 0.2);
             color: white;
             padding: 0.5rem 1rem;
             border-radius: 20px;
@@ -612,7 +624,8 @@ function calculateGWA($grade) {
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            box-shadow: 0 2px 8px rgba(0, 99, 65, 0.2);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
         }
 
         .card {
@@ -667,7 +680,7 @@ function calculateGWA($grade) {
             top: 1rem;
             right: 1rem;
             font-size: 0.7rem;
-            padding: 0.2rem 0.6rem;
+            padding: 0.3rem 0.8rem;
             border-radius: 10px;
             font-weight: 600;
             background: var(--plp-green);
@@ -679,6 +692,7 @@ function calculateGWA($grade) {
             justify-content: space-between;
             align-items: flex-start;
             margin-bottom: 1rem;
+            gap: 1rem;
         }
 
         .subject-code {
@@ -699,6 +713,7 @@ function calculateGWA($grade) {
             font-size: 0.85rem;
             color: var(--plp-green);
             font-weight: 1000;
+            white-space: nowrap;
         }
 
         .subject-info {
@@ -730,6 +745,7 @@ function calculateGWA($grade) {
             margin-top: 1rem;
             padding-top: 1rem;
             border-top: 1px solid var(--plp-green-lighter);
+            flex-wrap: wrap;
         }
 
         .btn-restore {
@@ -745,6 +761,9 @@ function calculateGWA($grade) {
             align-items: center;
             gap: 0.4rem;
             font-weight: 500;
+            flex: 1;
+            min-width: 120px;
+            justify-content: center;
         }
 
         .btn-restore:hover {
@@ -765,6 +784,9 @@ function calculateGWA($grade) {
             align-items: center;
             gap: 0.4rem;
             font-weight: 500;
+            flex: 1;
+            min-width: 120px;
+            justify-content: center;
         }
 
         .btn-view:hover {
@@ -852,11 +874,12 @@ function calculateGWA($grade) {
             height: 100%;
             background: rgba(0, 0, 0, 0.5);
             backdrop-filter: blur(4px);
-            z-index: 1000;
+            z-index: 2000;
             align-items: center;
             justify-content: center;
             opacity: 0;
             transition: opacity 0.3s ease;
+            padding: 1rem;
         }
 
         .modal.show {
@@ -866,14 +889,14 @@ function calculateGWA($grade) {
 
         .modal-content {
             background: white;
-            padding: 2.5rem;
+            padding: 2rem;
             border-radius: var(--border-radius-lg);
             box-shadow: var(--box-shadow-lg);
             max-width: 700px;
-            width: 90%;
+            width: 100%;
             transform: translateY(20px);
             transition: transform 0.3s ease;
-            max-height: 85vh;
+            max-height: 90vh;
             overflow: hidden;
             display: flex;
             flex-direction: column;
@@ -885,7 +908,7 @@ function calculateGWA($grade) {
 
         .modal-title {
             color: var(--plp-green);
-            font-size: 1.50rem;
+            font-size: 1.5rem;
             font-weight: 700;
             margin-bottom: 1.5rem;
             display: flex;
@@ -902,6 +925,7 @@ function calculateGWA($grade) {
             margin-top: 1.5rem;
             padding-top: 1rem;
             border-top: 1px solid var(--plp-green-lighter);
+            flex-wrap: wrap;
         }
 
         .modal-btn {
@@ -916,6 +940,9 @@ function calculateGWA($grade) {
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
+            flex: 1;
+            min-width: 120px;
+            justify-content: center;
         }
 
         .modal-btn-cancel {
@@ -959,49 +986,333 @@ function calculateGWA($grade) {
             font-weight: 500;
         }
 
-        /* Responsive styles */
+        /* Mobile Menu Toggle */
+        .mobile-menu-toggle {
+            display: none;
+            position: fixed;
+            top: 1rem;
+            left: 1rem;
+            background: var(--plp-green);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 0.75rem;
+            z-index: 3000;
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: var(--transition);
+        }
+
+        .mobile-menu-toggle:hover {
+            background: var(--plp-green-light);
+            transform: scale(1.05);
+        }
+
+        /* Enhanced Responsive Styles */
+        @media (max-width: 1200px) {
+            .main-content {
+                padding: 1rem 2rem;
+            }
+            
+            .subjects-grid {
+                grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+                gap: 1.25rem;
+            }
+        }
+
+        @media (max-width: 1024px) {
+            .sidebar {
+                width: 280px;
+            }
+            
+            .main-content {
+                margin-left: 280px;
+                max-width: calc(100% - 280px);
+            }
+            
+            .card {
+                padding: 1.5rem;
+            }
+        }
+
         @media (max-width: 768px) {
             body {
                 flex-direction: column;
             }
             
+            .mobile-menu-toggle {
+                display: block;
+            }
+            
             .sidebar {
-                width: 100%;
-                height: auto;
-                position: relative;
+                width: 280px;
+                transform: translateX(-100%);
+                z-index: 2000;
+            }
+            
+            .sidebar.active {
+                transform: translateX(0);
             }
             
             .main-content {
-                padding: 1.5rem;
-                height: auto;
+                margin-left: 0;
+                max-width: 100%;
+                padding: 1rem;
+                margin-top: 60px;
             }
             
             .header {
                 flex-direction: column;
                 gap: 1rem;
                 text-align: center;
+                padding: 1rem;
+            }
+            
+            .welcome {
+                font-size: 1.3rem;
+            }
+            
+            .subject-count {
+                font-size: 0.8rem;
             }
             
             .subjects-grid {
                 grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+            
+            .subject-card {
+                padding: 1.25rem;
+            }
+            
+            .subject-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.5rem;
             }
             
             .subject-actions {
                 flex-direction: column;
+                gap: 0.5rem;
+            }
+            
+            .btn-restore,
+            .btn-view {
+                flex: none;
+                width: 100%;
             }
             
             .details-grid {
                 grid-template-columns: 1fr;
+                gap: 0.5rem;
             }
             
             .modal-content {
                 padding: 1.5rem;
-                margin: 1rem;
+                margin: 0.5rem;
+            }
+            
+            .modal-title {
+                font-size: 1.3rem;
+            }
+            
+            .modal-actions {
+                flex-direction: column;
+            }
+            
+            .modal-btn {
+                width: 100%;
+            }
+            
+            .card {
+                padding: 1.25rem;
+                margin-bottom: 1.5rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .main-content {
+                padding: 0.75rem;
+            }
+            
+            .header {
+                padding: 0.75rem;
+                margin-bottom: 1rem;
+            }
+            
+            .welcome {
+                font-size: 1.2rem;
+            }
+            
+            .subject-count {
+                font-size: 0.75rem;
+                padding: 0.4rem 0.8rem;
+            }
+            
+            .card {
+                padding: 1rem;
+                border-radius: var(--border-radius);
+            }
+            
+            .subject-card {
+                padding: 1rem;
+            }
+            
+            .subject-name {
+                font-size: 1rem;
+            }
+            
+            .info-item {
+                font-size: 0.8rem;
+            }
+            
+            .modal-content {
+                padding: 1rem;
+            }
+            
+            .modal-title {
+                font-size: 1.2rem;
+                margin-bottom: 1rem;
+            }
+            
+            .detail-item {
+                padding: 0.75rem;
+            }
+            
+            .detail-value {
+                font-size: 0.9rem;
+            }
+            
+            .alert-success,
+            .alert-error {
+                padding: 0.75rem;
+                font-size: 0.9rem;
+            }
+            
+            .empty-state {
+                padding: 2rem 1rem;
+            }
+            
+            .empty-state i {
+                font-size: 2.5rem;
+            }
+        }
+
+        @media (max-width: 360px) {
+            .main-content {
+                padding: 0.5rem;
+            }
+            
+            .header {
+                padding: 0.5rem;
+            }
+            
+            .welcome {
+                font-size: 1.1rem;
+            }
+            
+            .card {
+                padding: 0.75rem;
+            }
+            
+            .subject-card {
+                padding: 0.75rem;
+            }
+            
+            .btn-restore,
+            .btn-view {
+                font-size: 0.8rem;
+                padding: 0.4rem 0.8rem;
+            }
+            
+            .modal-content {
+                padding: 0.75rem;
+            }
+        }
+
+        /* Print Styles */
+        @media print {
+            .sidebar,
+            .mobile-menu-toggle,
+            .subject-actions,
+            .modal {
+                display: none !important;
+            }
+            
+            .main-content {
+                margin-left: 0;
+                max-width: 100%;
+                padding: 0;
+            }
+            
+            .card {
+                box-shadow: none;
+                border: 1px solid #ddd;
+            }
+            
+            .subject-card {
+                break-inside: avoid;
+                margin-bottom: 1rem;
+            }
+        }
+
+        /* High contrast mode support */
+        @media (prefers-contrast: high) {
+            :root {
+                --plp-green: #004d33;
+                --plp-green-light: #006341;
+                --plp-green-lighter: #e0f2e9;
+                --text-dark: #000000;
+                --text-medium: #333333;
+                --text-light: #666666;
+            }
+            
+            .subject-card {
+                border: 2px solid var(--plp-green);
+            }
+        }
+
+        /* Reduced motion support */
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                transition: none !important;
+                animation: none !important;
+            }
+            
+            .subject-card:hover {
+                transform: none;
+            }
+            
+            .modal-content {
+                transform: none;
+            }
+        }
+
+        /* Dark mode support */
+        @media (prefers-color-scheme: dark) {
+            .card,
+            .subject-card,
+            .modal-content {
+                background: #2d3748;
+                color: #e2e8f0;
+            }
+            
+            .detail-item {
+                background: #4a5568;
+            }
+            
+            .detail-value {
+                color: #e2e8f0;
             }
         }
     </style>
 </head>
 <body>
+    <!-- Mobile Menu Toggle Button -->
+    <button class="mobile-menu-toggle" id="mobileMenuToggle">
+        <i class="fas fa-bars"></i>
+    </button>
+
     <div class="sidebar">
         <div class="sidebar-header">
             <div class="logo-container">
@@ -1042,6 +1353,12 @@ function calculateGWA($grade) {
                 <a href="student-semester-grades.php" class="nav-link">
                     <i class="fas fa-history"></i>
                     History Records
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="student-reminder.php" class="nav-link">
+                    <i class="fas fa-bell"></i>
+                    Reminder
                 </a>
             </li>
         </ul>
@@ -1243,6 +1560,46 @@ function calculateGWA($grade) {
     </div>
     
     <script>
+        // Mobile menu functionality
+        const mobileMenuToggle = document.getElementById('mobileMenuToggle');
+        const sidebar = document.querySelector('.sidebar');
+        const mainContent = document.querySelector('.main-content');
+
+        mobileMenuToggle.addEventListener('click', () => {
+            sidebar.classList.toggle('active');
+            document.body.style.overflow = sidebar.classList.contains('active') ? 'hidden' : '';
+        });
+
+        // Close sidebar when clicking on a link (mobile)
+        const navLinks = document.querySelectorAll('.nav-link');
+        navLinks.forEach(link => {
+            link.addEventListener('click', () => {
+                if (window.innerWidth <= 768) {
+                    sidebar.classList.remove('active');
+                    document.body.style.overflow = '';
+                }
+            });
+        });
+
+        // Close sidebar when clicking outside (mobile)
+        document.addEventListener('click', (e) => {
+            if (window.innerWidth <= 768 && 
+                sidebar.classList.contains('active') && 
+                !sidebar.contains(e.target) && 
+                !mobileMenuToggle.contains(e.target)) {
+                sidebar.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            if (window.innerWidth > 768) {
+                sidebar.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+        });
+
         function openViewModal(
             subjectCode, subjectName, credits, professor, schedule, semester, archivedDate,
             overallGrade = 0, gwa = 0, classStanding = 0, examsScore = 0, riskLevel = 'no-data', 
