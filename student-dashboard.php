@@ -79,6 +79,9 @@ try {
     error_log("Error in student-dashboard.php: " . $e->getMessage());
 }
 
+/**
+ * Calculate overall performance metrics
+ */
 function calculatePerformanceMetrics($student_id) {
     $metrics = [
         'total_subjects' => 0,
@@ -140,6 +143,9 @@ function calculatePerformanceMetrics($student_id) {
     return $metrics;
 }
 
+/**
+ * Get unique professors count for the student
+ */
 function getUniqueProfessors($student_id) {
     $professors = [];
     
@@ -171,7 +177,9 @@ function getUniqueProfessors($student_id) {
     return array_keys($professors);
 }
 
-
+/**
+ * Get semester risk data for the graph
+ */
 function getSemesterRiskData($student_id) {
     $semester_data = [];
     
@@ -254,7 +262,9 @@ function getSemesterRiskData($student_id) {
     return $semester_data;
 }
 
-
+/**
+ * Calculate GWA from grade (Philippine system)
+ */
 function calculateGWA($grade) {
     if ($grade >= 90) return 1.00;
     elseif ($grade >= 85) return 1.25;
@@ -917,33 +927,23 @@ function calculateGWA($grade) {
             </div>
         </div>
 
-        <!-- Risk Distribution -->
+        <!-- Academic Statistics -->
         <div class="dashboard-grid">
             <div class="card">
                 <div class="card-header">
                     <div class="card-title">
-                        <i class="fas fa-shield-alt"></i>
-                        Risk Distribution
+                        <i class="fas fa-chart-bar"></i>
+                        Academic Statistics
                     </div>
                 </div>
                 <div class="metrics-grid">
                     <div class="metric-card">
-                        <div class="metric-value" style="color: var(--success);"><?php echo $performance_metrics['low_risk_count']; ?></div>
-                        <div class="metric-label">Low Risk</div>
+                        <div class="metric-value"><?php echo $performance_metrics['total_subjects']; ?></div>
+                        <div class="metric-label">Total Subjects</div>
                     </div>
                     <div class="metric-card">
-                        <div class="metric-value" style="color: var(--warning);"><?php echo $performance_metrics['medium_risk_count']; ?></div>
-                        <div class="metric-label">Medium Risk</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-value" style="color: var(--danger);"><?php echo $performance_metrics['high_risk_count']; ?></div>
-                        <div class="metric-label">High Risk</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-value" style="color: var(--text-light);">
-                            <?php echo $performance_metrics['total_subjects'] - $performance_metrics['subjects_with_scores']; ?>
-                        </div>
-                        <div class="metric-label">No Data</div>
+                        <div class="metric-value"><?php echo count(getUniqueProfessors($student['id'])); ?></div>
+                        <div class="metric-label">Professors</div>
                     </div>
                 </div>
             </div>
@@ -1035,34 +1035,58 @@ function calculateGWA($grade) {
                 <?php endif; ?>
             </div>
 
-            <!-- Academic Statistics -->
-            <div class="dashboard-grid">
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">
-                            <i class="fas fa-chart-bar"></i>
-                            Academic Statistics
-                        </div>
-                    </div>
-                    <div class="metrics-grid">
-                        <div class="metric-card">
-                            <div class="metric-value"><?php echo $performance_metrics['total_subjects']; ?></div>
-                            <div class="metric-label">Total Subjects</div>
-                        </div>
-                        <div class="metric-card">
-                            <div class="metric-value"><?php echo $performance_metrics['subjects_with_scores']; ?></div>
-                            <div class="metric-label">With Grades</div>
-                        </div>
-                        <div class="metric-card">
-                            <div class="metric-value"><?php echo count(getUniqueProfessors($student['id'])); ?></div>
-                            <div class="metric-label">Professors</div>
-                        </div>
-                        <div class="metric-card">
-                            <div class="metric-value"><?php echo $performance_metrics['average_gwa']; ?></div>
-                            <div class="metric-label">Average GWA</div>
-                        </div>
+            <!-- Semester Risk Pie Chart -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fas fa-chart-pie"></i>
+                        Semester Risk Distribution
                     </div>
                 </div>
+                <?php if (!empty($semester_risk_data)): ?>
+                    <div class="graph-container">
+                        <canvas id="semesterRiskChart"></canvas>
+                    </div>
+                    <div class="semester-stats">
+                        <?php 
+                        $total_high_risk = 0;
+                        $total_medium_risk = 0;
+                        $total_low_risk = 0;
+                        $total_subjects = 0;
+                        
+                        foreach ($semester_risk_data as $semester) {
+                            foreach ($semester['subjects'] as $subject) {
+                                $total_subjects++;
+                                switch ($subject['risk_level']) {
+                                    case 'high':
+                                        $total_high_risk++;
+                                        break;
+                                    case 'medium':
+                                        $total_medium_risk++;
+                                        break;
+                                    case 'low':
+                                        $total_low_risk++;
+                                        break;
+                                }
+                            }
+                        }
+                        
+                        $high_risk_percentage = $total_subjects > 0 ? round(($total_high_risk / $total_subjects) * 100) : 0;
+                        $medium_risk_percentage = $total_subjects > 0 ? round(($total_medium_risk / $total_subjects) * 100) : 0;
+                        $low_risk_percentage = $total_subjects > 0 ? round(($total_low_risk / $total_subjects) * 100) : 0;
+                        ?>
+                    </div>
+                <?php else: ?>
+                    <div class="empty-state">
+                        <i class="fas fa-chart-pie"></i>
+                        <p>No semester data available</p>
+                        <small>Complete and archive subjects to see risk distribution</small>
+                        <br>
+                        <a href="student-semester-grades.php" style="color: var(--plp-green); text-decoration: none; font-size: 0.9rem; margin-top: 0.5rem; display: inline-block;">
+                            View History Records
+                        </a>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
