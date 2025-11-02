@@ -488,16 +488,25 @@ function calculateGWA($grade) {
         }
 
         .card {
-            padding: 1.5rem;
-            border-radius: var(--border-radius);
-            box-shadow: var(--box-shadow);
-            border-left: 4px solid var(--plp-green);
             transition: var(--transition);
+            padding: 1.5rem;
         }
 
-        .card:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--box-shadow-lg);
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--plp-green-lighter);
+        }
+
+        .card-title {
+            color: var(--plp-green);
+            font-size: 1.1rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
 
         .metrics-grid {
@@ -507,15 +516,12 @@ function calculateGWA($grade) {
         }
 
         .metric-card {
+            background: white;
+            border-left: 4px solid var(--plp-green);
             text-align: center;
             padding: 1rem;
-            background: white;
             border-radius: var(--border-radius);
             transition: var(--transition);
-        }
-
-        .metric-card:hover {
-            background: var(--plp-green-lighter);
         }
 
         .metric-value {
