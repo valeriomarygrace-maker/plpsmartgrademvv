@@ -79,9 +79,6 @@ try {
     error_log("Error in student-dashboard.php: " . $e->getMessage());
 }
 
-/**
- * Calculate overall performance metrics
- */
 function calculatePerformanceMetrics($student_id) {
     $metrics = [
         'total_subjects' => 0,
@@ -143,9 +140,38 @@ function calculatePerformanceMetrics($student_id) {
     return $metrics;
 }
 
-/**
- * Get semester risk data for the graph
- */
+function getUniqueProfessors($student_id) {
+    $professors = [];
+    
+    try {
+        // Get active subjects
+        $active_subjects = supabaseFetch('student_subjects', ['student_id' => $student_id, 'deleted_at' => null]);
+        if ($active_subjects && is_array($active_subjects)) {
+            foreach ($active_subjects as $subject) {
+                if (!empty($subject['professor_name'])) {
+                    $professors[$subject['professor_name']] = true;
+                }
+            }
+        }
+        
+        // Get archived subjects
+        $archived_subjects = supabaseFetch('archived_subjects', ['student_id' => $student_id]);
+        if ($archived_subjects && is_array($archived_subjects)) {
+            foreach ($archived_subjects as $subject) {
+                if (!empty($subject['professor_name'])) {
+                    $professors[$subject['professor_name']] = true;
+                }
+            }
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error getting professors count: " . $e->getMessage());
+    }
+    
+    return array_keys($professors);
+}
+
+
 function getSemesterRiskData($student_id) {
     $semester_data = [];
     
@@ -228,9 +254,7 @@ function getSemesterRiskData($student_id) {
     return $semester_data;
 }
 
-/**
- * Calculate GWA from grade (Philippine system)
- */
+
 function calculateGWA($grade) {
     if ($grade >= 90) return 1.00;
     elseif ($grade >= 85) return 1.25;
@@ -1011,58 +1035,34 @@ function calculateGWA($grade) {
                 <?php endif; ?>
             </div>
 
-            <!-- Semester Risk Pie Chart -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title">
-                        <i class="fas fa-chart-pie"></i>
-                        Semester Risk Distribution
+            <!-- Academic Statistics -->
+            <div class="dashboard-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <i class="fas fa-chart-bar"></i>
+                            Academic Statistics
+                        </div>
+                    </div>
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <div class="metric-value"><?php echo $performance_metrics['total_subjects']; ?></div>
+                            <div class="metric-label">Total Subjects</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value"><?php echo $performance_metrics['subjects_with_scores']; ?></div>
+                            <div class="metric-label">With Grades</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value"><?php echo count(getUniqueProfessors($student['id'])); ?></div>
+                            <div class="metric-label">Professors</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value"><?php echo $performance_metrics['average_gwa']; ?></div>
+                            <div class="metric-label">Average GWA</div>
+                        </div>
                     </div>
                 </div>
-                <?php if (!empty($semester_risk_data)): ?>
-                    <div class="graph-container">
-                        <canvas id="semesterRiskChart"></canvas>
-                    </div>
-                    <div class="semester-stats">
-                        <?php 
-                        $total_high_risk = 0;
-                        $total_medium_risk = 0;
-                        $total_low_risk = 0;
-                        $total_subjects = 0;
-                        
-                        foreach ($semester_risk_data as $semester) {
-                            foreach ($semester['subjects'] as $subject) {
-                                $total_subjects++;
-                                switch ($subject['risk_level']) {
-                                    case 'high':
-                                        $total_high_risk++;
-                                        break;
-                                    case 'medium':
-                                        $total_medium_risk++;
-                                        break;
-                                    case 'low':
-                                        $total_low_risk++;
-                                        break;
-                                }
-                            }
-                        }
-                        
-                        $high_risk_percentage = $total_subjects > 0 ? round(($total_high_risk / $total_subjects) * 100) : 0;
-                        $medium_risk_percentage = $total_subjects > 0 ? round(($total_medium_risk / $total_subjects) * 100) : 0;
-                        $low_risk_percentage = $total_subjects > 0 ? round(($total_low_risk / $total_subjects) * 100) : 0;
-                        ?>
-                    </div>
-                <?php else: ?>
-                    <div class="empty-state">
-                        <i class="fas fa-chart-pie"></i>
-                        <p>No semester data available</p>
-                        <small>Complete and archive subjects to see risk distribution</small>
-                        <br>
-                        <a href="student-semester-grades.php" style="color: var(--plp-green); text-decoration: none; font-size: 0.9rem; margin-top: 0.5rem; display: inline-block;">
-                            View History Records
-                        </a>
-                    </div>
-                <?php endif; ?>
             </div>
         </div>
     </div>
