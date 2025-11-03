@@ -55,7 +55,7 @@ try {
     $error_message = 'Database error: ' . $e->getMessage();
 }
 
-// UNAHIN ANG PAG-FETCH NG CATEGORIES PARA MA-DEFINE ANG $remainingAllocation
+// UNAHIN ANG PAG-FETCH NG DATA BAGO ANG FORM PROCESSING
 $categories = [];
 $classStandings = [];
 $midtermExam = [];
@@ -69,7 +69,7 @@ try {
     $categories = [];
 }
 
-// DEFINE ANG $remainingAllocation DITO
+// I-CALCULATE ANG REMAINING ALLOCATION
 $totalClassStandingPercentage = 0;
 foreach ($categories as $category) {
     $totalClassStandingPercentage += floatval($category['category_percentage']);
@@ -77,9 +77,44 @@ foreach ($categories as $category) {
 $remainingAllocation = 60 - $totalClassStandingPercentage;
 $canAddCategory = ($remainingAllocation > 0);
 
-// NGAYON PWEDE NA ANG FORM HANDLING GAMIT ANG $remainingAllocation
+// FETCH ALL SCORES
+try {
+    $allScores = supabaseFetch('student_subject_scores', ['student_subject_id' => $subject_id]);
+    if (!$allScores) $allScores = [];
+    
+    foreach ($allScores as &$score) {
+        if ($score['category_id']) {
+            $category_data = supabaseFetch('student_class_standing_categories', ['id' => $score['category_id']]);
+            if ($category_data && count($category_data) > 0) {
+                $score['category_name'] = $category_data[0]['category_name'];
+            } else {
+                $score['category_name'] = '';
+            }
+        } else {
+            $score['category_name'] = '';
+        }
+    }
+    
+} catch (Exception $e) {
+    $allScores = [];
+}
+
+// FILTER SCORES
+$classStandings = array_filter($allScores, function($score) {
+    return $score['score_type'] === 'class_standing';
+});
+
+$midtermExam = array_filter($allScores, function($score) {
+    return $score['score_type'] === 'midterm_exam';
+});
+
+$finalExam = array_filter($allScores, function($score) {
+    return $score['score_type'] === 'final_exam';
+});
+
+// FORM PROCESSING - GAMIT ANG EXACT CODES FROM BOTH VERSIONS
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Handle MAJOR EXAM form submission
+    // MAJOR EXAM CODE - GINAGAMIT ANG EXACT VALUES
     if (isset($_POST['add_exam'])) {
         $exam_type = $_POST['exam_type'];
         $score_value = floatval($_POST['score_value']);
@@ -93,13 +128,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $exam_name = $exam_type === 'midterm_exam' ? 'Midterm Exam' : 'Final Exam';
             
             try {
-                // DELETE any existing exam score for this subject and exam type
+                // DELETE ANY EXISTING EXAM SCORE
                 supabaseDelete('student_subject_scores', [
                     'student_subject_id' => $subject_id,
                     'score_type' => $exam_type
                 ]);
                 
-                // INSERT new exam score with EXACT values
+                // INSERT NEW EXAM SCORE WITH EXACT VALUES
                 $insert_data = [
                     'student_subject_id' => $subject_id,
                     'score_type' => $exam_type,
@@ -124,7 +159,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     
-    // Handle CLASS STANDING CATEGORY form submission
+    // CLASS STANDING CATEGORY CODE
     elseif (isset($_POST['add_category'])) {
         $category_name = trim($_POST['category_name']);
         $category_percentage = floatval($_POST['category_percentage']);
@@ -157,7 +192,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     
-    // Handle CLASS STANDING SCORE form submission
+    // CLASS STANDING SCORE CODE
     elseif (isset($_POST['add_standing'])) {
         $category_id = intval($_POST['category_id']);
         $score_name = trim($_POST['score_name']);
@@ -197,7 +232,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     
-    // Handle ATTENDANCE form submission
+    // ATTENDANCE CODE
     elseif (isset($_POST['add_attendance'])) {
         $category_id = intval($_POST['category_id']);
         $attendance_date = $_POST['attendance_date'];
@@ -245,7 +280,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     
-    // Handle SCORE UPDATE form submission
+    // OTHER FORM HANDLERS (update, delete, etc.)
     elseif (isset($_POST['update_score'])) {
         $score_id = intval($_POST['score_id']);
         $score_value = floatval($_POST['score_value']);
@@ -277,7 +312,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     
-    // Handle SCORE DELETE form submission
     elseif (isset($_POST['delete_score'])) {
         $score_id = intval($_POST['score_id']);
         
@@ -296,7 +330,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     
-    // Handle CATEGORY DELETE form submission
     elseif (isset($_POST['delete_category'])) {
         $category_id = intval($_POST['category_id']);
         
@@ -317,44 +350,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// FETCH ALL SCORES FOR DISPLAY
-try {
-    $allScores = supabaseFetch('student_subject_scores', ['student_subject_id' => $subject_id]);
-    if (!$allScores) $allScores = [];
-    
-    foreach ($allScores as &$score) {
-        if ($score['category_id']) {
-            $category_data = supabaseFetch('student_class_standing_categories', ['id' => $score['category_id']]);
-            if ($category_data && count($category_data) > 0) {
-                $score['category_name'] = $category_data[0]['category_name'];
-            } else {
-                $score['category_name'] = '';
-            }
-        } else {
-            $score['category_name'] = '';
-        }
-    }
-    
-} catch (Exception $e) {
-    $allScores = [];
-}
-
-// Filter scores - MAJOR EXAMS are separate from class standing
-$classStandings = array_filter($allScores, function($score) {
-    return $score['score_type'] === 'class_standing';
-});
-
-$midtermExam = array_filter($allScores, function($score) {
-    return $score['score_type'] === 'midterm_exam';
-});
-
-$finalExam = array_filter($allScores, function($score) {
-    return $score['score_type'] === 'final_exam';
-});
-
+// CALCULATIONS - PINAGSAMA ANG MGA CALCULATION FROM BOTH CODES
 $hasScores = !empty($classStandings) || !empty($midtermExam) || !empty($finalExam);
 
-// Initialize calculation variables
 $totalClassStanding = 0;
 $midtermScore = 0;
 $finalScore = 0;
@@ -374,7 +372,7 @@ if (!$hasScores) {
     $midtermScore = 0;
     $finalScore = 0;
 } else {
-    // Try ML-enhanced insights first
+    // TRY ML-ENHANCED INSIGHTS FIRST
     $classStandingsForML = array_column($classStandings, 'score_value');
     $examScoresForML = [];
     if (!empty($midtermExam)) $examScoresForML[] = reset($midtermExam)['score_value'];
@@ -399,7 +397,7 @@ if (!$hasScores) {
         $interventions = $mlInsights['interventions'];
         $recommendations = $mlInsights['recommendations'];
     } else {
-        // Calculate class standing (from categories)
+        // CLASS STANDING CALCULATION (FROM FIRST CODE)
         $categoryTotals = [];
         foreach ($categories as $category) {
             $categoryTotals[$category['id']] = [
@@ -445,7 +443,7 @@ if (!$hasScores) {
             $totalClassStanding = 60;
         }
 
-        // Calculate MAJOR EXAM scores - USE EXACT INPUT VALUES
+        // MAJOR EXAM CALCULATION (FROM SECOND CODE) - GUMAGAMIT NG EXACT VALUES
         $midtermScore = 0;
         $finalScore = 0;
 
@@ -476,7 +474,7 @@ if (!$hasScores) {
             $overallGrade = 100;
         }
 
-        // Calculate GWA
+        // GWA CALCULATION
         if ($overallGrade >= 90) {
             $gwa = 1.00;
         } elseif ($overallGrade >= 85) {
@@ -499,7 +497,7 @@ if (!$hasScores) {
             $gwa = 5.00;
         }
 
-        // Calculate risk level
+        // RISK LEVEL CALCULATION
         if ($gwa <= 1.75) {
             $riskLevel = 'low';
             $riskDescription = 'Low Risk';
@@ -520,7 +518,6 @@ if (!$hasScores) {
     }
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
