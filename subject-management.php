@@ -55,9 +55,9 @@ try {
     $error_message = 'Database error: ' . $e->getMessage();
 }
 
-// SIMPLIFIED FORM PROCESSING - WALANG COMPLEX CALCULATIONS DITO
+// SIMPLE FORM PROCESSING - AGAD-AGAD NA REDIRECT
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // MAJOR EXAM - DIRECT INPUT, DIRECT DISPLAY
+    // MAJOR EXAM - SIMPLE LANG
     if (isset($_POST['add_exam'])) {
         $exam_type = $_POST['exam_type'];
         $score_value = floatval($_POST['score_value']);
@@ -77,7 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'score_type' => $exam_type
                 ]);
                 
-                // INSERT NEW EXAM SCORE WITH EXACT VALUES
+                // INSERT NEW EXAM SCORE
                 $insert_data = [
                     'student_subject_id' => $subject_id,
                     'score_type' => $exam_type,
@@ -90,9 +90,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $result = supabaseInsert('student_subject_scores', $insert_data);
                 
                 if ($result) {
-                    $success_message = $exam_name . ' score added successfully!';
-                    // AGAD-AGAD NA REDIRECT
-                    header("Location: subject-management.php?subject_id=$subject_id");
+                    // AGAD-AGAD NA REDIRECT - WALANG PROCESSING
+                    header("Location: subject-management.php?subject_id=$subject_id&success=" . urlencode($exam_name . ' score added successfully!'));
                     exit;
                 } else {
                     $error_message = 'Failed to add exam score.';
@@ -103,7 +102,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     
-    // CLASS STANDING SCORE - DIRECT INPUT, DIRECT DISPLAY
+    // CLASS STANDING SCORE - SIMPLE LANG
     elseif (isset($_POST['add_standing'])) {
         $category_id = intval($_POST['category_id']);
         $score_name = trim($_POST['score_name']);
@@ -131,9 +130,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $result = supabaseInsert('student_subject_scores', $insert_data);
                 
                 if ($result) {
-                    $success_message = 'Score added successfully!';
-                    // AGAD-AGAD NA REDIRECT
-                    header("Location: subject-management.php?subject_id=$subject_id");
+                    // AGAD-AGAD NA REDIRECT - WALANG PROCESSING
+                    header("Location: subject-management.php?subject_id=$subject_id&success=" . urlencode('Score added successfully!'));
                     exit;
                 } else {
                     $error_message = 'Failed to add score.';
@@ -144,7 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     
-    // ATTENDANCE - DIRECT INPUT, DIRECT DISPLAY
+    // ATTENDANCE - SIMPLE LANG
     elseif (isset($_POST['add_attendance'])) {
         $category_id = intval($_POST['category_id']);
         $attendance_date = $_POST['attendance_date'];
@@ -179,9 +177,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $result = supabaseInsert('student_subject_scores', $insert_data);
                     
                     if ($result) {
-                        $success_message = 'Attendance recorded successfully!';
-                        // AGAD-AGAD NA REDIRECT
-                        header("Location: subject-management.php?subject_id=$subject_id");
+                        // AGAD-AGAD NA REDIRECT - WALANG PROCESSING
+                        header("Location: subject-management.php?subject_id=$subject_id&success=" . urlencode('Attendance recorded successfully!'));
                         exit;
                     } else {
                         $error_message = 'Failed to record attendance.';
@@ -224,9 +221,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $result = supabaseInsert('student_class_standing_categories', $insert_data);
                 
                 if ($result) {
-                    $success_message = 'Category added successfully!';
-                    // AGAD-AGAD NA REDIRECT
-                    header("Location: subject-management.php?subject_id=$subject_id");
+                    // AGAD-AGAD NA REDIRECT - WALANG PROCESSING
+                    header("Location: subject-management.php?subject_id=$subject_id&success=" . urlencode('Category added successfully!'));
                     exit;
                 } else {
                     $error_message = 'Failed to add category.';
@@ -237,7 +233,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     
-    // UPDATE SCORE - DIRECT UPDATE
+    // UPDATE SCORE - SIMPLE LANG
     elseif (isset($_POST['update_score'])) {
         $score_id = intval($_POST['score_id']);
         $score_value = floatval($_POST['score_value']);
@@ -254,9 +250,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $result = supabaseUpdate('student_subject_scores', $update_data, ['id' => $score_id]);
                     
                     if ($result) {
-                        $success_message = 'Score updated successfully!';
-                        // AGAD-AGAD NA REDIRECT
-                        header("Location: subject-management.php?subject_id=$subject_id");
+                        // AGAD-AGAD NA REDIRECT - WALANG PROCESSING
+                        header("Location: subject-management.php?subject_id=$subject_id&success=" . urlencode('Score updated successfully!'));
                         exit;
                     } else {
                         $error_message = 'Failed to update score.';
@@ -270,7 +265,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     
-    // DELETE SCORE - DIRECT DELETE
+    // DELETE SCORE - SIMPLE LANG
     elseif (isset($_POST['delete_score'])) {
         $score_id = intval($_POST['score_id']);
         
@@ -278,9 +273,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $result = supabaseDelete('student_subject_scores', ['id' => $score_id]);
             
             if ($result) {
-                $success_message = 'Score deleted successfully!';
-                // AGAD-AGAD NA REDIRECT
-                header("Location: subject-management.php?subject_id=$subject_id");
+                // AGAD-AGAD NA REDIRECT - WALANG PROCESSING
+                header("Location: subject-management.php?subject_id=$subject_id&success=" . urlencode('Score deleted successfully!'));
                 exit;
             } else {
                 $error_message = 'Failed to delete score.';
@@ -290,7 +284,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     
-    // DELETE CATEGORY - DIRECT DELETE
+    // DELETE CATEGORY - SIMPLE LANG
     elseif (isset($_POST['delete_category'])) {
         $category_id = intval($_POST['category_id']);
         
@@ -299,9 +293,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $result = supabaseDelete('student_class_standing_categories', ['id' => $category_id]);
             
             if ($result) {
-                $success_message = 'Category deleted successfully!';
-                // AGAD-AGAD NA REDIRECT
-                header("Location: subject-management.php?subject_id=$subject_id");
+                // AGAD-AGAD NA REDIRECT - WALANG PROCESSING
+                header("Location: subject-management.php?subject_id=$subject_id&success=" . urlencode('Category deleted successfully!'));
                 exit;
             } else {
                 $error_message = 'Failed to delete category.';
@@ -312,7 +305,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// FETCH DATA FOR DISPLAY - SIMPLE LANG, WALANG COMPLEX LOGIC
+// GET SUCCESS MESSAGE FROM URL
+if (isset($_GET['success'])) {
+    $success_message = $_GET['success'];
+}
+
+// SIMPLE DATA FETCHING FOR DISPLAY
 $categories = [];
 $classStandings = [];
 $midtermExam = [];
@@ -357,7 +355,7 @@ try {
     $allScores = [];
 }
 
-// SEPARATE THE SCORES - VERY CLEAR DISTINCTION
+// SEPARATE THE SCORES
 $classStandings = array_filter($allScores, function($score) {
     return $score['score_type'] === 'class_standing';
 });
@@ -373,7 +371,7 @@ $finalExam = array_filter($allScores, function($score) {
 // SIMPLE CALCULATIONS FOR DISPLAY ONLY
 $hasScores = !empty($classStandings) || !empty($midtermExam) || !empty($finalExam);
 
-// DISPLAY VARIABLES - SIMPLE AND CLEAR
+// DISPLAY VARIABLES
 $totalClassStanding = 0;
 $midtermScore = 0;
 $finalScore = 0;
@@ -396,8 +394,16 @@ if ($hasScores) {
         if ($standing['category_id'] && isset($categoryTotals[$standing['category_id']])) {
             $categoryId = $standing['category_id'];
             
-            if (isset($categories[array_search($categoryId, array_column($categories, 'id'))]['category_name']) && 
-                strtolower($categories[array_search($categoryId, array_column($categories, 'id'))]['category_name']) === 'attendance') {
+            // Find category name
+            $categoryName = '';
+            foreach ($categories as $cat) {
+                if ($cat['id'] == $categoryId) {
+                    $categoryName = strtolower($cat['category_name']);
+                    break;
+                }
+            }
+            
+            if ($categoryName === 'attendance') {
                 $scoreValue = ($standing['score_name'] === 'Present') ? 1 : 0;
                 $categoryTotals[$categoryId]['total_score'] += $scoreValue;
                 $categoryTotals[$categoryId]['max_possible'] += 1;
