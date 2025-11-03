@@ -208,7 +208,7 @@ if (!$hasScores) {
         $totalClassStanding = 60;
     }
 
-    // Calculate Exam Scores (MAX 40% TOTAL) 
+    // Calculate Exam Scores (MAX 40% TOTAL) - ONLY from exam scores
     $midtermScore = 0;
     $finalScore = 0;
 
@@ -217,10 +217,7 @@ if (!$hasScores) {
         $midterm = reset($midtermExam);
         if ($midterm['max_score'] > 0) {
             $midtermPercentage = ($midterm['score_value'] / $midterm['max_score']) * 100;
-            $midtermScore = ($midtermPercentage * 20) / 100; // This gives the weighted score out of 20%
-            
-            // Debug information (you can remove this later)
-            error_log("Score: {$midterm['score_value']}, Max: {$midterm['max_score']}, Percentage: $midtermPercentage%, Weighted: $midtermScore%");
+            $midtermScore = ($midtermPercentage * 20) / 100; // 20% of overall grade
         }
     }
 
@@ -229,9 +226,7 @@ if (!$hasScores) {
         $final = reset($finalExam);
         if ($final['max_score'] > 0) {
             $finalPercentage = ($final['score_value'] / $final['max_score']) * 100;
-            $finalScore = ($finalPercentage * 20) / 100; // This gives the weighted score out of 20%
-            
-            error_log("Score: {$final['score_value']}, Max: {$final['max_score']}, Percentage: $finalPercentage%, Weighted: $finalScore%");
+            $finalScore = ($finalPercentage * 20) / 100; // 20% of overall grade
         }
     }
 
@@ -1583,7 +1578,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             elseif ($gwa <= 1.50) echo 'Good';
                             elseif ($gwa <= 1.75) echo 'Satisfactory';
                             elseif ($gwa <= 2.00) echo 'Passing';
-                            elseif ($gwa <= 2.25) echo 'Conditional';
+                            elseif ($gwa <= 2.25) echo 'Needs Improvement';
                             elseif ($gwa <= 2.50) echo 'Needs Improvement';
                             elseif ($gwa <= 2.75) echo 'Poor';
                             elseif ($gwa <= 3.00) echo 'Very Poor';
@@ -1611,10 +1606,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <div class="performance-label">Exams</div>
                     <?php if ($hasScores): ?>
                         <div class="performance-value"><?php echo number_format($midtermScore + $finalScore, 1); ?>%</div>
-                        <div class="performance-label">
-                            Midterm: <?php echo number_format($midtermScore, 1); ?>% | 
-                            Final: <?php echo number_format($finalScore, 1); ?>%
-                        </div>
+                        <div class="performance-label">of 40%</div>
                     <?php else: ?>
                         <div class="performance-value" style="color: var(--text-light);">--</div>
                         <div class="performance-label">No exam scores</div>
@@ -1770,14 +1762,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <?php if (!empty($midtermExam)): ?>
                         <?php 
                         $midterm = reset($midtermExam);
+                        // Ensure we have valid score data
                         if (isset($midterm['score_value']) && isset($midterm['max_score']) && $midterm['max_score'] > 0):
-                            $midtermPercentage = ($midterm['score_value'] / $midterm['max_score']) * 100;
                         ?>
                             <p style="color: var(--text-medium); margin-top: 0.5rem; font-size: 0.9rem;">
                                 Score: <?php echo floatval($midterm['score_value']); ?>/<?php echo floatval($midterm['max_score']); ?>
-                            </p>
-                            <p style="color: var(--text-medium); font-size: 0.8rem; margin-top: 0.3rem;">
-                                Percentage: <?php echo number_format($midtermPercentage, 1); ?>%
                             </p>
                             <p style="color: var(--text-light); font-size: 0.75rem; margin-top: 0.3rem;">
                                 Weighted: <?php echo number_format($midtermScore, 1); ?>%
@@ -1801,14 +1790,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <?php if (!empty($finalExam)): ?>
                         <?php 
                         $final = reset($finalExam);
+                        // Ensure we have valid score data
                         if (isset($final['score_value']) && isset($final['max_score']) && $final['max_score'] > 0):
-                            $finalPercentage = ($final['score_value'] / $final['max_score']) * 100;
                         ?>
                             <p style="color: var(--text-medium); margin-top: 0.5rem; font-size: 0.9rem;">
                                 Score: <?php echo floatval($final['score_value']); ?>/<?php echo floatval($final['max_score']); ?>
-                            </p>
-                            <p style="color: var(--text-medium); font-size: 0.8rem; margin-top: 0.3rem;">
-                                Percentage: <?php echo number_format($finalPercentage, 1); ?>%
                             </p>
                             <p style="color: var(--text-light); font-size: 0.75rem; margin-top: 0.3rem;">
                                 Weighted: <?php echo number_format($finalScore, 1); ?>%
