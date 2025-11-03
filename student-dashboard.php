@@ -1060,7 +1060,7 @@ function calculateGWA($grade) {
                 </div>
                 <?php if (!empty($active_subjects)): ?>
                     <ul class="subject-list">
-                        <?php foreach (array_slice($active_subjects, 0, 5) as $subject): ?>
+                        <?php foreach (array_slice($active_subjects, 0, 3) as $subject): ?>
                             <li class="subject-item">
                                 <div class="subject-info">
                                     <div class="subject-code"><?php echo htmlspecialchars($subject['subject_code']); ?></div>
@@ -1085,7 +1085,6 @@ function calculateGWA($grade) {
                                             </span>
                                         </div>
                                     <?php else: ?>
-                                        <div class="grade-value grade-no-data">No Data</div>
                                     <?php endif; ?>
                                 </div>
                             </li>

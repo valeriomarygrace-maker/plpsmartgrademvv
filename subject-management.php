@@ -55,9 +55,58 @@ try {
     $error_message = 'Database error: ' . $e->getMessage();
 }
 
-// Handle form submissions FIRST before fetching data
+// First, fetch categories to calculate remainingAllocation
+$categories = [];
+try {
+    $categories = supabaseFetch('student_class_standing_categories', ['student_subject_id' => $subject_id]);
+    if (!$categories) $categories = [];
+} catch (Exception $e) {
+    $categories = [];
+}
+
+// Calculate remaining allocation BEFORE form handling
+$totalClassStandingPercentage = 0;
+foreach ($categories as $category) {
+    $totalClassStandingPercentage += floatval($category['category_percentage']);
+}
+$remainingAllocation = 60 - $totalClassStandingPercentage;
+$canAddCategory = ($remainingAllocation > 0);
+
+// NOW handle form submissions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['add_exam'])) {
+    if (isset($_POST['add_category'])) {
+        $category_name = trim($_POST['category_name']);
+        $category_percentage = floatval($_POST['category_percentage']);
+        
+        if (empty($category_name) || $category_percentage <= 0) {
+            $error_message = 'Please fill all fields with valid values.';
+        } elseif ($category_percentage > $remainingAllocation) {
+            $error_message = 'Cannot add category. Remaining allocation is only ' . $remainingAllocation . '%.';
+        } else {
+            try {
+                $insert_data = [
+                    'student_subject_id' => $subject_id,
+                    'category_name' => $category_name,
+                    'category_percentage' => $category_percentage,
+                    'created_at' => date('Y-m-d H:i:s')
+                ];
+                
+                $result = supabaseInsert('student_class_standing_categories', $insert_data);
+                
+                if ($result) {
+                    $success_message = 'Category added successfully!';
+                    header("Location: subject-management.php?subject_id=$subject_id");
+                    exit;
+                } else {
+                    $error_message = 'Failed to add category.';
+                }
+            } catch (Exception $e) {
+                $error_message = 'Database error: ' . $e->getMessage();
+            }
+        }
+    }
+    
+    elseif (isset($_POST['add_exam'])) {
         $exam_type = $_POST['exam_type'];
         $score_value = floatval($_POST['score_value']);
         $max_score = floatval($_POST['max_score']);
@@ -91,44 +140,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 if ($result) {
                     $success_message = $exam_name . ' score added successfully!';
-                    // Force immediate refresh to show updated data
                     header("Location: subject-management.php?subject_id=$subject_id");
                     exit;
                 } else {
                     $error_message = 'Failed to add exam score.';
-                }
-            } catch (Exception $e) {
-                $error_message = 'Database error: ' . $e->getMessage();
-            }
-        }
-    }
-    
-    // Other form handlers...
-    elseif (isset($_POST['add_category'])) {
-        $category_name = trim($_POST['category_name']);
-        $category_percentage = floatval($_POST['category_percentage']);
-        
-        if (empty($category_name) || $category_percentage <= 0) {
-            $error_message = 'Please fill all fields with valid values.';
-        } elseif ($category_percentage > $remainingAllocation) {
-            $error_message = 'Cannot add category. Remaining allocation is only ' . $remainingAllocation . '%.';
-        } else {
-            try {
-                $insert_data = [
-                    'student_subject_id' => $subject_id,
-                    'category_name' => $category_name,
-                    'category_percentage' => $category_percentage,
-                    'created_at' => date('Y-m-d H:i:s')
-                ];
-                
-                $result = supabaseInsert('student_class_standing_categories', $insert_data);
-                
-                if ($result) {
-                    $success_message = 'Category added successfully!';
-                    header("Location: subject-management.php?subject_id=$subject_id");
-                    exit;
-                } else {
-                    $error_message = 'Failed to add category.';
                 }
             } catch (Exception $e) {
                 $error_message = 'Database error: ' . $e->getMessage();
@@ -175,29 +190,127 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     
-    // Add other form handlers here...
+    elseif (isset($_POST['add_attendance'])) {
+        $category_id = intval($_POST['category_id']);
+        $attendance_date = $_POST['attendance_date'];
+        $attendance_status = $_POST['attendance_status'];
+        
+        if (empty($attendance_date)) {
+            $error_message = 'Please select a date.';
+        } else {
+            try {
+                $existing_attendance = supabaseFetch('student_subject_scores', [
+                    'student_subject_id' => $subject_id,
+                    'category_id' => $category_id,
+                    'score_date' => $attendance_date
+                ]);
+                
+                if ($existing_attendance && count($existing_attendance) > 0) {
+                    $error_message = 'Attendance already recorded for this date.';
+                } else {
+                    $score_value = ($attendance_status === 'present') ? 1 : 0;
+                    
+                    $insert_data = [
+                        'student_subject_id' => $subject_id,
+                        'category_id' => $category_id,
+                        'score_type' => 'class_standing',
+                        'score_name' => ucfirst($attendance_status),
+                        'score_value' => $score_value,
+                        'max_score' => 1,
+                        'score_date' => $attendance_date,
+                        'created_at' => date('Y-m-d H:i:s')
+                    ];
+                    
+                    $result = supabaseInsert('student_subject_scores', $insert_data);
+                    
+                    if ($result) {
+                        $success_message = 'Attendance recorded successfully!';
+                        header("Location: subject-management.php?subject_id=$subject_id");
+                        exit;
+                    } else {
+                        $error_message = 'Failed to record attendance.';
+                    }
+                }
+            } catch (Exception $e) {
+                $error_message = 'Database error: ' . $e->getMessage();
+            }
+        }
+    }
+    
+    elseif (isset($_POST['update_score'])) {
+        $score_id = intval($_POST['score_id']);
+        $score_value = floatval($_POST['score_value']);
+        
+        try {
+            $score_data = supabaseFetch('student_subject_scores', ['id' => $score_id]);
+            
+            if ($score_data && count($score_data) > 0) {
+                $score = $score_data[0];
+                if ($score_value > $score['max_score']) {
+                    $error_message = 'Score value cannot exceed maximum score of ' . $score['max_score'];
+                } else {
+                    $update_data = ['score_value' => $score_value];
+                    $result = supabaseUpdate('student_subject_scores', $update_data, ['id' => $score_id]);
+                    
+                    if ($result) {
+                        $success_message = 'Score updated successfully!';
+                        header("Location: subject-management.php?subject_id=$subject_id");
+                        exit;
+                    } else {
+                        $error_message = 'Failed to update score.';
+                    }
+                }
+            } else {
+                $error_message = 'Score not found.';
+            }
+        } catch (Exception $e) {
+            $error_message = 'Database error: ' . $e->getMessage();
+        }
+    }
+    
+    elseif (isset($_POST['delete_score'])) {
+        $score_id = intval($_POST['score_id']);
+        
+        try {
+            $result = supabaseDelete('student_subject_scores', ['id' => $score_id]);
+            
+            if ($result) {
+                $success_message = 'Score deleted successfully!';
+                header("Location: subject-management.php?subject_id=$subject_id");
+                exit;
+            } else {
+                $error_message = 'Failed to delete score.';
+            }
+        } catch (Exception $e) {
+            $error_message = 'Database error: ' . $e->getMessage();
+        }
+    }
+    
+    elseif (isset($_POST['delete_category'])) {
+        $category_id = intval($_POST['category_id']);
+        
+        try {
+            supabaseDelete('student_subject_scores', ['category_id' => $category_id]);
+            $result = supabaseDelete('student_class_standing_categories', ['id' => $category_id]);
+            
+            if ($result) {
+                $success_message = 'Category deleted successfully!';
+                header("Location: subject-management.php?subject_id=$subject_id");
+                exit;
+            } else {
+                $error_message = 'Failed to delete category.';
+            }
+        } catch (Exception $e) {
+            $error_message = 'Database error: ' . $e->getMessage();
+        }
+    }
 }
 
-// NOW fetch the data after handling form submissions
-$categories = [];
+// Now fetch the rest of the data for display
 $classStandings = [];
 $midtermExam = [];
 $finalExam = [];
 $allScores = [];
-
-try {
-    $categories = supabaseFetch('student_class_standing_categories', ['student_subject_id' => $subject_id]);
-    if (!$categories) $categories = [];
-} catch (Exception $e) {
-    $categories = [];
-}
-
-$totalClassStandingPercentage = 0;
-foreach ($categories as $category) {
-    $totalClassStandingPercentage += floatval($category['category_percentage']);
-}
-$remainingAllocation = 60 - $totalClassStandingPercentage;
-$canAddCategory = ($remainingAllocation > 0);
 
 try {
     $allScores = supabaseFetch('student_subject_scores', ['student_subject_id' => $subject_id]);
@@ -220,7 +333,7 @@ try {
     $allScores = [];
 }
 
-// Filter scores by score_type - FIXED: Use strict comparison
+// Filter scores by score_type
 $classStandings = array_filter($allScores, function($score) {
     return $score['score_type'] === 'class_standing';
 });
