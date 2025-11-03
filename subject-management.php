@@ -122,10 +122,8 @@ $finalExam = array_filter($allScores, function($score) {
     return $score['score_type'] === 'final_exam';
 });
 
-// Include ML helpers
 require_once 'ml-helpers.php';
 
-// Log behavioral data when scores are added/updated
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['add_standing']) || isset($_POST['update_score']) || isset($_POST['add_exam']) || isset($_POST['add_attendance'])) {
         InterventionSystem::logBehavior(
@@ -152,15 +150,16 @@ $riskLevel = 'no-data';
 $riskDescription = 'No Data Inputted';
 $interventionNeeded = false;
 
-// If no scores are inputted, set everything to 0 and show "No Data"
+// In your subject-management.php file, replace the grade calculation section with this:
+
 if (!$hasScores) {
     $overallGrade = 0;
-    $gpa = 0;
+    $gwa = 0;
     $totalClassStanding = 0;
     $midtermScore = 0;
     $finalScore = 0;
 } else {
-    // Calculate category totals and overall class standing (MAX 60%)
+    // Calculate Class Standing (MAX 60%) - ONLY from class_standing scores
     $categoryTotals = [];
     foreach ($categories as $category) {
         $categoryTotals[$category['id']] = [
@@ -174,14 +173,13 @@ if (!$hasScores) {
         ];
     }
 
-    // Process class standings
+    // Process ONLY class_standing scores for class standing calculation
     if (is_array($classStandings)) {
         foreach ($classStandings as $standing) {
             if ($standing['category_id'] && isset($categoryTotals[$standing['category_id']])) {
                 $categoryId = $standing['category_id'];
                 $categoryTotals[$categoryId]['scores'][] = $standing;
                 
-                // For attendance, treat "Present" as 1 point and "Absent" as 0
                 if (strtolower($categoryTotals[$categoryId]['name']) === 'attendance') {
                     $scoreValue = ($standing['score_name'] === 'Present') ? 1 : 0;
                     $categoryTotals[$categoryId]['total_score'] += $scoreValue;
@@ -195,6 +193,7 @@ if (!$hasScores) {
     }
 
     // Calculate weighted scores for each category (MAX 60% TOTAL)
+    $totalClassStanding = 0;
     foreach ($categoryTotals as $categoryId => $category) {
         if ($category['max_possible'] > 0) {
             $percentageScore = ($category['total_score'] / $category['max_possible']) * 100;
@@ -209,31 +208,42 @@ if (!$hasScores) {
         $totalClassStanding = 60;
     }
 
-    // Calculate exam scores
+    // Calculate Exam Scores (MAX 40% TOTAL) - ONLY from exam scores
+    $midtermScore = 0;
+    $finalScore = 0;
+
+    // Midterm Exam (20% of total grade)
     if (!empty($midtermExam)) {
         $midterm = reset($midtermExam);
         if ($midterm['max_score'] > 0) {
             $midtermPercentage = ($midterm['score_value'] / $midterm['max_score']) * 100;
-            $midtermScore = ($midtermPercentage * 20) / 100;
+            $midtermScore = ($midtermPercentage * 20) / 100; // 20% of overall grade
         }
     }
 
+    // Final Exam (20% of total grade)
     if (!empty($finalExam)) {
         $final = reset($finalExam);
         if ($final['max_score'] > 0) {
             $finalPercentage = ($final['score_value'] / $final['max_score']) * 100;
-            $finalScore = ($finalPercentage * 20) / 100;
+            $finalScore = ($finalPercentage * 20) / 100; // 20% of overall grade
         }
     }
 
-    // Calculate overall grade
-    $overallGrade = $totalClassStanding + $midtermScore + $finalScore;
+    // Total Exam Score (should not exceed 40%)
+    $totalExamScore = $midtermScore + $finalScore;
+    if ($totalExamScore > 40) {
+        $totalExamScore = 40;
+    }
+
+    // Calculate overall grade (Class Standing + Exams)
+    $overallGrade = $totalClassStanding + $totalExamScore;
 
     if ($overallGrade > 100) {
         $overallGrade = 100;
     }
 
-    // Calculate GWA instead of GPA
+    // Calculate GWA 
     if ($overallGrade >= 90) {
         $gwa = 1.00;
     } elseif ($overallGrade >= 85) {
@@ -253,7 +263,7 @@ if (!$hasScores) {
     } elseif ($overallGrade >= 50) {
         $gwa = 3.00;
     } else {
-        $gwa = 5.00; // Failed
+        $gwa = 5.00; 
     }
 
     // Calculate risk level based on GWA
@@ -315,7 +325,7 @@ if ($hasScores) {
     }
 }
 
-// Handle form submissions - UPDATED FOR SUPABASE
+// Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['add_category'])) {
         $category_name = trim($_POST['category_name']);
@@ -1596,7 +1606,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <div class="performance-label">Exams</div>
                     <?php if ($hasScores): ?>
                         <div class="performance-value"><?php echo number_format($midtermScore + $finalScore, 1); ?>%</div>
-                        <div class="performance-label">of 40%</div>
+                        <div class="performance-label">
+                            Midterm: <?php echo number_format($midtermScore, 1); ?>% | 
+                            Final: <?php echo number_format($finalScore, 1); ?>%
+                        </div>
                     <?php else: ?>
                         <div class="performance-value" style="color: var(--text-light);">--</div>
                         <div class="performance-label">No exam scores</div>
