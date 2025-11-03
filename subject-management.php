@@ -55,66 +55,9 @@ try {
     $error_message = 'Database error: ' . $e->getMessage();
 }
 
-// UNAHIN ANG PAG-FETCH NG DATA BAGO ANG FORM PROCESSING
-$categories = [];
-$classStandings = [];
-$midtermExam = [];
-$finalExam = [];
-$allScores = [];
-
-try {
-    $categories = supabaseFetch('student_class_standing_categories', ['student_subject_id' => $subject_id]);
-    if (!$categories) $categories = [];
-} catch (Exception $e) {
-    $categories = [];
-}
-
-// I-CALCULATE ANG REMAINING ALLOCATION
-$totalClassStandingPercentage = 0;
-foreach ($categories as $category) {
-    $totalClassStandingPercentage += floatval($category['category_percentage']);
-}
-$remainingAllocation = 60 - $totalClassStandingPercentage;
-$canAddCategory = ($remainingAllocation > 0);
-
-// FETCH ALL SCORES
-try {
-    $allScores = supabaseFetch('student_subject_scores', ['student_subject_id' => $subject_id]);
-    if (!$allScores) $allScores = [];
-    
-    foreach ($allScores as &$score) {
-        if ($score['category_id']) {
-            $category_data = supabaseFetch('student_class_standing_categories', ['id' => $score['category_id']]);
-            if ($category_data && count($category_data) > 0) {
-                $score['category_name'] = $category_data[0]['category_name'];
-            } else {
-                $score['category_name'] = '';
-            }
-        } else {
-            $score['category_name'] = '';
-        }
-    }
-    
-} catch (Exception $e) {
-    $allScores = [];
-}
-
-// FILTER SCORES
-$classStandings = array_filter($allScores, function($score) {
-    return $score['score_type'] === 'class_standing';
-});
-
-$midtermExam = array_filter($allScores, function($score) {
-    return $score['score_type'] === 'midterm_exam';
-});
-
-$finalExam = array_filter($allScores, function($score) {
-    return $score['score_type'] === 'final_exam';
-});
-
-// FORM PROCESSING - GAMIT ANG EXACT CODES FROM BOTH VERSIONS
+// SIMPLIFIED FORM PROCESSING - WALANG COMPLEX CALCULATIONS DITO
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // MAJOR EXAM CODE - GINAGAMIT ANG EXACT VALUES
+    // MAJOR EXAM - DIRECT INPUT, DIRECT DISPLAY
     if (isset($_POST['add_exam'])) {
         $exam_type = $_POST['exam_type'];
         $score_value = floatval($_POST['score_value']);
@@ -148,6 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 if ($result) {
                     $success_message = $exam_name . ' score added successfully!';
+                    // AGAD-AGAD NA REDIRECT
                     header("Location: subject-management.php?subject_id=$subject_id");
                     exit;
                 } else {
@@ -159,40 +103,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     
-    // CLASS STANDING CATEGORY CODE
-    elseif (isset($_POST['add_category'])) {
-        $category_name = trim($_POST['category_name']);
-        $category_percentage = floatval($_POST['category_percentage']);
-        
-        if (empty($category_name) || $category_percentage <= 0) {
-            $error_message = 'Please fill all fields with valid values.';
-        } elseif ($category_percentage > $remainingAllocation) {
-            $error_message = 'Cannot add category. Remaining allocation is only ' . $remainingAllocation . '%.';
-        } else {
-            try {
-                $insert_data = [
-                    'student_subject_id' => $subject_id,
-                    'category_name' => $category_name,
-                    'category_percentage' => $category_percentage,
-                    'created_at' => date('Y-m-d H:i:s')
-                ];
-                
-                $result = supabaseInsert('student_class_standing_categories', $insert_data);
-                
-                if ($result) {
-                    $success_message = 'Category added successfully!';
-                    header("Location: subject-management.php?subject_id=$subject_id");
-                    exit;
-                } else {
-                    $error_message = 'Failed to add category.';
-                }
-            } catch (Exception $e) {
-                $error_message = 'Database error: ' . $e->getMessage();
-            }
-        }
-    }
-    
-    // CLASS STANDING SCORE CODE
+    // CLASS STANDING SCORE - DIRECT INPUT, DIRECT DISPLAY
     elseif (isset($_POST['add_standing'])) {
         $category_id = intval($_POST['category_id']);
         $score_name = trim($_POST['score_name']);
@@ -221,6 +132,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 if ($result) {
                     $success_message = 'Score added successfully!';
+                    // AGAD-AGAD NA REDIRECT
                     header("Location: subject-management.php?subject_id=$subject_id");
                     exit;
                 } else {
@@ -232,7 +144,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     
-    // ATTENDANCE CODE
+    // ATTENDANCE - DIRECT INPUT, DIRECT DISPLAY
     elseif (isset($_POST['add_attendance'])) {
         $category_id = intval($_POST['category_id']);
         $attendance_date = $_POST['attendance_date'];
@@ -268,6 +180,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     
                     if ($result) {
                         $success_message = 'Attendance recorded successfully!';
+                        // AGAD-AGAD NA REDIRECT
                         header("Location: subject-management.php?subject_id=$subject_id");
                         exit;
                     } else {
@@ -280,7 +193,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     
-    // OTHER FORM HANDLERS (update, delete, etc.)
+    // CATEGORY ADD - SIMPLE LANG
+    elseif (isset($_POST['add_category'])) {
+        $category_name = trim($_POST['category_name']);
+        $category_percentage = floatval($_POST['category_percentage']);
+        
+        // FETCH CURRENT CATEGORIES PARA MAKUHA ANG REMAINING ALLOCATION
+        $current_categories = supabaseFetch('student_class_standing_categories', ['student_subject_id' => $subject_id]);
+        $totalPercentage = 0;
+        if ($current_categories) {
+            foreach ($current_categories as $cat) {
+                $totalPercentage += floatval($cat['category_percentage']);
+            }
+        }
+        $remainingAllocation = 60 - $totalPercentage;
+        
+        if (empty($category_name) || $category_percentage <= 0) {
+            $error_message = 'Please fill all fields with valid values.';
+        } elseif ($category_percentage > $remainingAllocation) {
+            $error_message = 'Cannot add category. Remaining allocation is only ' . $remainingAllocation . '%.';
+        } else {
+            try {
+                $insert_data = [
+                    'student_subject_id' => $subject_id,
+                    'category_name' => $category_name,
+                    'category_percentage' => $category_percentage,
+                    'created_at' => date('Y-m-d H:i:s')
+                ];
+                
+                $result = supabaseInsert('student_class_standing_categories', $insert_data);
+                
+                if ($result) {
+                    $success_message = 'Category added successfully!';
+                    // AGAD-AGAD NA REDIRECT
+                    header("Location: subject-management.php?subject_id=$subject_id");
+                    exit;
+                } else {
+                    $error_message = 'Failed to add category.';
+                }
+            } catch (Exception $e) {
+                $error_message = 'Database error: ' . $e->getMessage();
+            }
+        }
+    }
+    
+    // UPDATE SCORE - DIRECT UPDATE
     elseif (isset($_POST['update_score'])) {
         $score_id = intval($_POST['score_id']);
         $score_value = floatval($_POST['score_value']);
@@ -298,6 +255,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     
                     if ($result) {
                         $success_message = 'Score updated successfully!';
+                        // AGAD-AGAD NA REDIRECT
                         header("Location: subject-management.php?subject_id=$subject_id");
                         exit;
                     } else {
@@ -312,6 +270,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     
+    // DELETE SCORE - DIRECT DELETE
     elseif (isset($_POST['delete_score'])) {
         $score_id = intval($_POST['score_id']);
         
@@ -320,6 +279,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             if ($result) {
                 $success_message = 'Score deleted successfully!';
+                // AGAD-AGAD NA REDIRECT
                 header("Location: subject-management.php?subject_id=$subject_id");
                 exit;
             } else {
@@ -330,6 +290,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     
+    // DELETE CATEGORY - DIRECT DELETE
     elseif (isset($_POST['delete_category'])) {
         $category_id = intval($_POST['category_id']);
         
@@ -339,6 +300,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             if ($result) {
                 $success_message = 'Category deleted successfully!';
+                // AGAD-AGAD NA REDIRECT
                 header("Location: subject-management.php?subject_id=$subject_id");
                 exit;
             } else {
@@ -350,9 +312,68 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// CALCULATIONS - PINAGSAMA ANG MGA CALCULATION FROM BOTH CODES
+// FETCH DATA FOR DISPLAY - SIMPLE LANG, WALANG COMPLEX LOGIC
+$categories = [];
+$classStandings = [];
+$midtermExam = [];
+$finalExam = [];
+$allScores = [];
+
+try {
+    $categories = supabaseFetch('student_class_standing_categories', ['student_subject_id' => $subject_id]);
+    if (!$categories) $categories = [];
+} catch (Exception $e) {
+    $categories = [];
+}
+
+// CALCULATE REMAINING ALLOCATION FOR DISPLAY
+$totalClassStandingPercentage = 0;
+foreach ($categories as $category) {
+    $totalClassStandingPercentage += floatval($category['category_percentage']);
+}
+$remainingAllocation = 60 - $totalClassStandingPercentage;
+$canAddCategory = ($remainingAllocation > 0);
+
+// FETCH ALL SCORES
+try {
+    $allScores = supabaseFetch('student_subject_scores', ['student_subject_id' => $subject_id]);
+    if (!$allScores) $allScores = [];
+    
+    // ADD CATEGORY NAMES TO SCORES
+    foreach ($allScores as &$score) {
+        if ($score['category_id']) {
+            $category_data = supabaseFetch('student_class_standing_categories', ['id' => $score['category_id']]);
+            if ($category_data && count($category_data) > 0) {
+                $score['category_name'] = $category_data[0]['category_name'];
+            } else {
+                $score['category_name'] = '';
+            }
+        } else {
+            $score['category_name'] = '';
+        }
+    }
+    
+} catch (Exception $e) {
+    $allScores = [];
+}
+
+// SEPARATE THE SCORES - VERY CLEAR DISTINCTION
+$classStandings = array_filter($allScores, function($score) {
+    return $score['score_type'] === 'class_standing';
+});
+
+$midtermExam = array_filter($allScores, function($score) {
+    return $score['score_type'] === 'midterm_exam';
+});
+
+$finalExam = array_filter($allScores, function($score) {
+    return $score['score_type'] === 'final_exam';
+});
+
+// SIMPLE CALCULATIONS FOR DISPLAY ONLY
 $hasScores = !empty($classStandings) || !empty($midtermExam) || !empty($finalExam);
 
+// DISPLAY VARIABLES - SIMPLE AND CLEAR
 $totalClassStanding = 0;
 $midtermScore = 0;
 $finalScore = 0;
@@ -360,161 +381,89 @@ $overallGrade = 0;
 $gwa = 0;
 $riskLevel = 'no-data';
 $riskDescription = 'No Data Inputted';
-$interventionNeeded = false;
-$behavioralInsights = [];
-$interventions = [];
-$recommendations = [];
 
-if (!$hasScores) {
-    $overallGrade = 0;
-    $gwa = 0;
+if ($hasScores) {
+    // CLASS STANDING CALCULATION - SIMPLE
+    $categoryTotals = [];
+    foreach ($categories as $category) {
+        $categoryTotals[$category['id']] = [
+            'total_score' => 0,
+            'max_possible' => 0
+        ];
+    }
+
+    foreach ($classStandings as $standing) {
+        if ($standing['category_id'] && isset($categoryTotals[$standing['category_id']])) {
+            $categoryId = $standing['category_id'];
+            
+            if (isset($categories[array_search($categoryId, array_column($categories, 'id'))]['category_name']) && 
+                strtolower($categories[array_search($categoryId, array_column($categories, 'id'))]['category_name']) === 'attendance') {
+                $scoreValue = ($standing['score_name'] === 'Present') ? 1 : 0;
+                $categoryTotals[$categoryId]['total_score'] += $scoreValue;
+                $categoryTotals[$categoryId]['max_possible'] += 1;
+            } else {
+                $categoryTotals[$categoryId]['total_score'] += $standing['score_value'];
+                $categoryTotals[$categoryId]['max_possible'] += $standing['max_score'];
+            }
+        }
+    }
+
     $totalClassStanding = 0;
-    $midtermScore = 0;
-    $finalScore = 0;
-} else {
-    // TRY ML-ENHANCED INSIGHTS FIRST
-    $classStandingsForML = array_column($classStandings, 'score_value');
-    $examScoresForML = [];
-    if (!empty($midtermExam)) $examScoresForML[] = reset($midtermExam)['score_value'];
-    if (!empty($finalExam)) $examScoresForML[] = reset($finalExam)['score_value'];
-    
-    $attendanceRecordsForML = [];
-    
-    $mlInsights = EnhancedInterventionSystem::getEnhancedInsights(
-        $student['id'], 
-        $subject_id, 
-        $classStandingsForML,
-        $examScoresForML,
-        $attendanceRecordsForML,
-        $subject['subject_name']
-    );
-    
-    if ($mlInsights['source'] === 'ml_enhanced') {
-        $riskLevel = $mlInsights['risk_level'];
-        $overallGrade = $mlInsights['overall_grade'];
-        $gwa = $mlInsights['gwa'];
-        $behavioralInsights = $mlInsights['behavioral_insights'];
-        $interventions = $mlInsights['interventions'];
-        $recommendations = $mlInsights['recommendations'];
+    foreach ($categories as $category) {
+        if (isset($categoryTotals[$category['id']]) && $categoryTotals[$category['id']]['max_possible'] > 0) {
+            $percentageScore = ($categoryTotals[$category['id']]['total_score'] / $categoryTotals[$category['id']]['max_possible']) * 100;
+            $weightedScore = ($percentageScore * floatval($category['category_percentage'])) / 100;
+            $totalClassStanding += $weightedScore;
+        }
+    }
+
+    if ($totalClassStanding > 60) $totalClassStanding = 60;
+
+    // MAJOR EXAM CALCULATION - SIMPLE
+    if (!empty($midtermExam)) {
+        $midterm = reset($midtermExam);
+        if ($midterm['max_score'] > 0) {
+            $midtermPercentage = ($midterm['score_value'] / $midterm['max_score']) * 100;
+            $midtermScore = ($midtermPercentage * 20) / 100;
+        }
+    }
+
+    if (!empty($finalExam)) {
+        $final = reset($finalExam);
+        if ($final['max_score'] > 0) {
+            $finalPercentage = ($final['score_value'] / $final['max_score']) * 100;
+            $finalScore = ($finalPercentage * 20) / 100;
+        }
+    }
+
+    $totalExamScore = $midtermScore + $finalScore;
+    if ($totalExamScore > 40) $totalExamScore = 40;
+
+    $overallGrade = $totalClassStanding + $totalExamScore;
+    if ($overallGrade > 100) $overallGrade = 100;
+
+    // SIMPLE GWA CALCULATION
+    if ($overallGrade >= 90) $gwa = 1.00;
+    elseif ($overallGrade >= 85) $gwa = 1.25;
+    elseif ($overallGrade >= 80) $gwa = 1.50;
+    elseif ($overallGrade >= 75) $gwa = 1.75;
+    elseif ($overallGrade >= 70) $gwa = 2.00;
+    elseif ($overallGrade >= 65) $gwa = 2.25;
+    elseif ($overallGrade >= 60) $gwa = 2.50;
+    elseif ($overallGrade >= 55) $gwa = 2.75;
+    elseif ($overallGrade >= 50) $gwa = 3.00;
+    else $gwa = 5.00;
+
+    // SIMPLE RISK LEVEL
+    if ($gwa <= 1.75) {
+        $riskLevel = 'low';
+        $riskDescription = 'Low Risk';
+    } elseif ($gwa <= 2.50) {
+        $riskLevel = 'medium';
+        $riskDescription = 'Medium Risk';
     } else {
-        // CLASS STANDING CALCULATION (FROM FIRST CODE)
-        $categoryTotals = [];
-        foreach ($categories as $category) {
-            $categoryTotals[$category['id']] = [
-                'name' => $category['category_name'],
-                'percentage' => $category['category_percentage'],
-                'scores' => [],
-                'total_score' => 0,
-                'max_possible' => 0,
-                'percentage_score' => 0,
-                'weighted_score' => 0
-            ];
-        }
-
-        if (is_array($classStandings)) {
-            foreach ($classStandings as $standing) {
-                if ($standing['category_id'] && isset($categoryTotals[$standing['category_id']])) {
-                    $categoryId = $standing['category_id'];
-                    $categoryTotals[$categoryId]['scores'][] = $standing;
-                    
-                    if (strtolower($categoryTotals[$categoryId]['name']) === 'attendance') {
-                        $scoreValue = ($standing['score_name'] === 'Present') ? 1 : 0;
-                        $categoryTotals[$categoryId]['total_score'] += $scoreValue;
-                        $categoryTotals[$categoryId]['max_possible'] += 1;
-                    } else {
-                        $categoryTotals[$categoryId]['total_score'] += $standing['score_value'];
-                        $categoryTotals[$categoryId]['max_possible'] += $standing['max_score'];
-                    }
-                }
-            }
-        }
-
-        $totalClassStanding = 0;
-        foreach ($categoryTotals as $categoryId => $category) {
-            if ($category['max_possible'] > 0) {
-                $percentageScore = ($category['total_score'] / $category['max_possible']) * 100;
-                $categoryTotals[$categoryId]['percentage_score'] = $percentageScore;
-                $categoryTotals[$categoryId]['weighted_score'] = ($percentageScore * $category['percentage']) / 100;
-                $totalClassStanding += $categoryTotals[$categoryId]['weighted_score'];
-            }
-        }
-
-        if ($totalClassStanding > 60) {
-            $totalClassStanding = 60;
-        }
-
-        // MAJOR EXAM CALCULATION (FROM SECOND CODE) - GUMAGAMIT NG EXACT VALUES
-        $midtermScore = 0;
-        $finalScore = 0;
-
-        if (!empty($midtermExam)) {
-            $midterm = reset($midtermExam);
-            if ($midterm['max_score'] > 0) {
-                $midtermPercentage = ($midterm['score_value'] / $midterm['max_score']) * 100;
-                $midtermScore = ($midtermPercentage * 20) / 100;
-            }
-        }
-
-        if (!empty($finalExam)) {
-            $final = reset($finalExam);
-            if ($final['max_score'] > 0) {
-                $finalPercentage = ($final['score_value'] / $final['max_score']) * 100;
-                $finalScore = ($finalPercentage * 20) / 100;
-            }
-        }
-
-        $totalExamScore = $midtermScore + $finalScore;
-        if ($totalExamScore > 40) {
-            $totalExamScore = 40;
-        }
-
-        $overallGrade = $totalClassStanding + $totalExamScore;
-
-        if ($overallGrade > 100) {
-            $overallGrade = 100;
-        }
-
-        // GWA CALCULATION
-        if ($overallGrade >= 90) {
-            $gwa = 1.00;
-        } elseif ($overallGrade >= 85) {
-            $gwa = 1.25;
-        } elseif ($overallGrade >= 80) {
-            $gwa = 1.50;
-        } elseif ($overallGrade >= 75) {
-            $gwa = 1.75;
-        } elseif ($overallGrade >= 70) {
-            $gwa = 2.00;
-        } elseif ($overallGrade >= 65) {
-            $gwa = 2.25;
-        } elseif ($overallGrade >= 60) {
-            $gwa = 2.50;
-        } elseif ($overallGrade >= 55) {
-            $gwa = 2.75;
-        } elseif ($overallGrade >= 50) {
-            $gwa = 3.00;
-        } else {
-            $gwa = 5.00;
-        }
-
-        // RISK LEVEL CALCULATION
-        if ($gwa <= 1.75) {
-            $riskLevel = 'low';
-            $riskDescription = 'Low Risk';
-            $interventionNeeded = false;
-        } elseif ($gwa <= 2.50) {
-            $riskLevel = 'medium';
-            $riskDescription = 'Medium Risk';
-            $interventionNeeded = false;
-        } else {
-            $riskLevel = 'high';
-            $riskDescription = 'High Risk';
-            $interventionNeeded = true;
-        }
-
-        $behavioralInsights = InterventionSystem::getBehavioralInsights($student['id'], $subject_id, $overallGrade, $riskLevel);
-        $interventions = InterventionSystem::getInterventions($student['id'], $subject_id, $riskLevel);
-        $recommendations = InterventionSystem::getRecommendations($student['id'], $subject_id, $overallGrade, $riskLevel);
+        $riskLevel = 'high';
+        $riskDescription = 'High Risk';
     }
 }
 ?>
