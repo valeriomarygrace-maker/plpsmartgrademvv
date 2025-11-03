@@ -122,8 +122,6 @@ $finalExam = array_filter($allScores, function($score) {
     return $score['score_type'] === 'final_exam';
 });
 
-require_once 'ml-helpers.php';
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['add_standing']) || isset($_POST['update_score']) || isset($_POST['add_exam']) || isset($_POST['add_attendance'])) {
         InterventionSystem::logBehavior(
@@ -145,12 +143,13 @@ $totalClassStanding = 0;
 $midtermScore = 0;
 $finalScore = 0;
 $overallGrade = 0;
-$gpa = 0;
+$gwa = 0;
 $riskLevel = 'no-data';
 $riskDescription = 'No Data Inputted';
 $interventionNeeded = false;
-
-// In your subject-management.php file, replace the grade calculation section with this:
+$behavioralInsights = [];
+$interventions = [];
+$recommendations = [];
 
 if (!$hasScores) {
     $overallGrade = 0;
@@ -159,136 +158,7 @@ if (!$hasScores) {
     $midtermScore = 0;
     $finalScore = 0;
 } else {
-    // Calculate Class Standing (MAX 60%) - ONLY from class_standing scores
-    $categoryTotals = [];
-    foreach ($categories as $category) {
-        $categoryTotals[$category['id']] = [
-            'name' => $category['category_name'],
-            'percentage' => $category['category_percentage'],
-            'scores' => [],
-            'total_score' => 0,
-            'max_possible' => 0,
-            'percentage_score' => 0,
-            'weighted_score' => 0
-        ];
-    }
-
-    // Process ONLY class_standing scores for class standing calculation
-    if (is_array($classStandings)) {
-        foreach ($classStandings as $standing) {
-            if ($standing['category_id'] && isset($categoryTotals[$standing['category_id']])) {
-                $categoryId = $standing['category_id'];
-                $categoryTotals[$categoryId]['scores'][] = $standing;
-                
-                if (strtolower($categoryTotals[$categoryId]['name']) === 'attendance') {
-                    $scoreValue = ($standing['score_name'] === 'Present') ? 1 : 0;
-                    $categoryTotals[$categoryId]['total_score'] += $scoreValue;
-                    $categoryTotals[$categoryId]['max_possible'] += 1;
-                } else {
-                    $categoryTotals[$categoryId]['total_score'] += $standing['score_value'];
-                    $categoryTotals[$categoryId]['max_possible'] += $standing['max_score'];
-                }
-            }
-        }
-    }
-
-    // Calculate weighted scores for each category (MAX 60% TOTAL)
-    $totalClassStanding = 0;
-    foreach ($categoryTotals as $categoryId => $category) {
-        if ($category['max_possible'] > 0) {
-            $percentageScore = ($category['total_score'] / $category['max_possible']) * 100;
-            $categoryTotals[$categoryId]['percentage_score'] = $percentageScore;
-            $categoryTotals[$categoryId]['weighted_score'] = ($percentageScore * $category['percentage']) / 100;
-            $totalClassStanding += $categoryTotals[$categoryId]['weighted_score'];
-        }
-    }
-
-    // Ensure Class Standing doesn't exceed 60%
-    if ($totalClassStanding > 60) {
-        $totalClassStanding = 60;
-    }
-
-    // Calculate Exam Scores (MAX 40% TOTAL) - ONLY from exam scores
-    $midtermScore = 0;
-    $finalScore = 0;
-
-    // Midterm Exam (20% of total grade)
-    if (!empty($midtermExam)) {
-        $midterm = reset($midtermExam);
-        if ($midterm['max_score'] > 0) {
-            $midtermPercentage = ($midterm['score_value'] / $midterm['max_score']) * 100;
-            $midtermScore = ($midtermPercentage * 20) / 100; // 20% of overall grade
-        }
-    }
-
-    // Final Exam (20% of total grade)
-    if (!empty($finalExam)) {
-        $final = reset($finalExam);
-        if ($final['max_score'] > 0) {
-            $finalPercentage = ($final['score_value'] / $final['max_score']) * 100;
-            $finalScore = ($finalPercentage * 20) / 100; // 20% of overall grade
-        }
-    }
-
-    // Total Exam Score (should not exceed 40%)
-    $totalExamScore = $midtermScore + $finalScore;
-    if ($totalExamScore > 40) {
-        $totalExamScore = 40;
-    }
-
-    // Calculate overall grade (Class Standing + Exams)
-    $overallGrade = $totalClassStanding + $totalExamScore;
-
-    if ($overallGrade > 100) {
-        $overallGrade = 100;
-    }
-
-    // Calculate GWA 
-    if ($overallGrade >= 90) {
-        $gwa = 1.00;
-    } elseif ($overallGrade >= 85) {
-        $gwa = 1.25;
-    } elseif ($overallGrade >= 80) {
-        $gwa = 1.50;
-    } elseif ($overallGrade >= 75) {
-        $gwa = 1.75;
-    } elseif ($overallGrade >= 70) {
-        $gwa = 2.00;
-    } elseif ($overallGrade >= 65) {
-        $gwa = 2.25;
-    } elseif ($overallGrade >= 60) {
-        $gwa = 2.50;
-    } elseif ($overallGrade >= 55) {
-        $gwa = 2.75;
-    } elseif ($overallGrade >= 50) {
-        $gwa = 3.00;
-    } else {
-        $gwa = 5.00; 
-    }
-
-    // Calculate risk level based on GWA
-    if ($gwa <= 1.75) {
-        $riskLevel = 'low';
-        $riskDescription = 'Low Risk';
-        $interventionNeeded = false;
-    } elseif ($gwa <= 2.50) {
-        $riskLevel = 'medium';
-        $riskDescription = 'Medium Risk';
-        $interventionNeeded = false;
-    } else {
-        $riskLevel = 'high';
-        $riskDescription = 'High Risk';
-        $interventionNeeded = true;
-    }
-}
-
-// Get behavioral insights and recommendations
-$behavioralInsights = [];
-$interventions = [];
-$recommendations = [];
-
-if ($hasScores) {
-    // Prepare data for ML - USE DIFFERENT VARIABLE NAMES
+    // Prepare data for ML-enhanced insights
     $classStandingsForML = array_column($classStandings, 'score_value');
     $examScoresForML = [];
     if (!empty($midtermExam)) $examScoresForML[] = reset($midtermExam)['score_value'];
@@ -300,25 +170,145 @@ if ($hasScores) {
     $mlInsights = EnhancedInterventionSystem::getEnhancedInsights(
         $student['id'], 
         $subject_id, 
-        $classStandingsForML,  // Use the new variable
-        $examScoresForML,      // Use the new variable
-        $attendanceRecordsForML, // Use the new variable
+        $classStandingsForML,
+        $examScoresForML,
+        $attendanceRecordsForML,
         $subject['subject_name']
     );
     
-    // Use ML insights if available, otherwise use PHP fallback
+    // Use ML insights if available
     if ($mlInsights['source'] === 'ml_enhanced') {
         $riskLevel = $mlInsights['risk_level'];
-        $behavioralInsights = array_merge(
-            InterventionSystem::getBehavioralInsights($student['id'], $subject_id),
-            $mlInsights['behavioral_insights']
-        );
-        $recommendations = array_merge(
-            InterventionSystem::getRecommendations($student['id'], $subject_id, $overallGrade),
-            $mlInsights['recommendations']
-        );
+        $overallGrade = $mlInsights['overall_grade'];
+        $gwa = $mlInsights['gwa'];
+        $behavioralInsights = $mlInsights['behavioral_insights'];
+        $interventions = $mlInsights['interventions'];
+        $recommendations = $mlInsights['recommendations'];
     } else {
-        // Use original PHP-only approach
+        // Fallback to PHP calculation
+        // Calculate Class Standing (MAX 60%) - ONLY from class_standing scores
+        $categoryTotals = [];
+        foreach ($categories as $category) {
+            $categoryTotals[$category['id']] = [
+                'name' => $category['category_name'],
+                'percentage' => $category['category_percentage'],
+                'scores' => [],
+                'total_score' => 0,
+                'max_possible' => 0,
+                'percentage_score' => 0,
+                'weighted_score' => 0
+            ];
+        }
+
+        // Process ONLY class_standing scores for class standing calculation
+        if (is_array($classStandings)) {
+            foreach ($classStandings as $standing) {
+                if ($standing['category_id'] && isset($categoryTotals[$standing['category_id']])) {
+                    $categoryId = $standing['category_id'];
+                    $categoryTotals[$categoryId]['scores'][] = $standing;
+                    
+                    if (strtolower($categoryTotals[$categoryId]['name']) === 'attendance') {
+                        $scoreValue = ($standing['score_name'] === 'Present') ? 1 : 0;
+                        $categoryTotals[$categoryId]['total_score'] += $scoreValue;
+                        $categoryTotals[$categoryId]['max_possible'] += 1;
+                    } else {
+                        $categoryTotals[$categoryId]['total_score'] += $standing['score_value'];
+                        $categoryTotals[$categoryId]['max_possible'] += $standing['max_score'];
+                    }
+                }
+            }
+        }
+
+        // Calculate weighted scores for each category (MAX 60% TOTAL)
+        $totalClassStanding = 0;
+        foreach ($categoryTotals as $categoryId => $category) {
+            if ($category['max_possible'] > 0) {
+                $percentageScore = ($category['total_score'] / $category['max_possible']) * 100;
+                $categoryTotals[$categoryId]['percentage_score'] = $percentageScore;
+                $categoryTotals[$categoryId]['weighted_score'] = ($percentageScore * $category['percentage']) / 100;
+                $totalClassStanding += $categoryTotals[$categoryId]['weighted_score'];
+            }
+        }
+
+        // Ensure Class Standing doesn't exceed 60%
+        if ($totalClassStanding > 60) {
+            $totalClassStanding = 60;
+        }
+
+        // Calculate Exam Scores (MAX 40% TOTAL) - ONLY from exam scores
+        $midtermScore = 0;
+        $finalScore = 0;
+
+        // Midterm Exam (20% of total grade)
+        if (!empty($midtermExam)) {
+            $midterm = reset($midtermExam);
+            if ($midterm['max_score'] > 0) {
+                $midtermPercentage = ($midterm['score_value'] / $midterm['max_score']) * 100;
+                $midtermScore = ($midtermPercentage * 20) / 100; // 20% of overall grade
+            }
+        }
+
+        // Final Exam (20% of total grade)
+        if (!empty($finalExam)) {
+            $final = reset($finalExam);
+            if ($final['max_score'] > 0) {
+                $finalPercentage = ($final['score_value'] / $final['max_score']) * 100;
+                $finalScore = ($finalPercentage * 20) / 100; // 20% of overall grade
+            }
+        }
+
+        // Total Exam Score (should not exceed 40%)
+        $totalExamScore = $midtermScore + $finalScore;
+        if ($totalExamScore > 40) {
+            $totalExamScore = 40;
+        }
+
+        // Calculate overall grade (Class Standing + Exams)
+        $overallGrade = $totalClassStanding + $totalExamScore;
+
+        if ($overallGrade > 100) {
+            $overallGrade = 100;
+        }
+
+        // Calculate GWA 
+        if ($overallGrade >= 90) {
+            $gwa = 1.00;
+        } elseif ($overallGrade >= 85) {
+            $gwa = 1.25;
+        } elseif ($overallGrade >= 80) {
+            $gwa = 1.50;
+        } elseif ($overallGrade >= 75) {
+            $gwa = 1.75;
+        } elseif ($overallGrade >= 70) {
+            $gwa = 2.00;
+        } elseif ($overallGrade >= 65) {
+            $gwa = 2.25;
+        } elseif ($overallGrade >= 60) {
+            $gwa = 2.50;
+        } elseif ($overallGrade >= 55) {
+            $gwa = 2.75;
+        } elseif ($overallGrade >= 50) {
+            $gwa = 3.00;
+        } else {
+            $gwa = 5.00; 
+        }
+
+        // Calculate risk level based on GWA
+        if ($gwa <= 1.75) {
+            $riskLevel = 'low';
+            $riskDescription = 'Low Risk';
+            $interventionNeeded = false;
+        } elseif ($gwa <= 2.50) {
+            $riskLevel = 'medium';
+            $riskDescription = 'Medium Risk';
+            $interventionNeeded = false;
+        } else {
+            $riskLevel = 'high';
+            $riskDescription = 'High Risk';
+            $interventionNeeded = true;
+        }
+
+        // Get behavioral insights and recommendations using fallback
         $behavioralInsights = InterventionSystem::getBehavioralInsights($student['id'], $subject_id);
         $interventions = InterventionSystem::getInterventions($student['id'], $subject_id, $riskLevel);
         $recommendations = InterventionSystem::getRecommendations($student['id'], $subject_id, $overallGrade);
@@ -1841,6 +1831,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                                 <?php echo ucfirst($insight['priority']); ?>
                                             </span>
                                         <?php endif; ?>
+                                        <?php if (isset($insight['source']) && $insight['source'] === 'ml'): ?>
+                                            <span class="insight-priority" style="background: #6366f1; color: white;">
+                                                AI
+                                            </span>
+                                        <?php endif; ?>
                                     </div>
                                 </li>
                             <?php endforeach; ?>
@@ -1891,6 +1886,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                         <?php if (isset($recommendation['priority'])): ?>
                                             <span class="insight-priority priority-<?php echo $recommendation['priority']; ?>">
                                                 <?php echo ucfirst($recommendation['priority']); ?>
+                                            </span>
+                                        <?php endif; ?>
+                                        <?php if (isset($recommendation['source']) && $recommendation['source'] === 'ml'): ?>
+                                            <span class="insight-priority" style="background: #6366f1; color: white;">
+                                                AI
                                             </span>
                                         <?php endif; ?>
                                     </div>

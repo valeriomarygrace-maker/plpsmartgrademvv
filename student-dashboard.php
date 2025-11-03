@@ -57,15 +57,8 @@ try {
             }
         }
         
-        // Get recent scores (last 5 scores across all subjects)
-        $all_scores = supabaseFetchAll('student_subject_scores');
-        if ($all_scores && is_array($all_scores)) {
-            // Sort by creation date descending and take first 5
-            usort($all_scores, function($a, $b) {
-                return strtotime($b['created_at']) - strtotime($a['created_at']);
-            });
-            $recent_scores = array_slice($all_scores, 0, 5);
-        }
+        // Get recent scores (last 5 scores for current student)
+        $recent_scores = getRecentScoresForStudent($student['id'], 5);
         
         // Calculate overall performance metrics
         $performance_metrics = calculatePerformanceMetrics($student['id']);
@@ -77,6 +70,64 @@ try {
 } catch (Exception $e) {
     $error_message = 'Database error: ' . $e->getMessage();
     error_log("Error in student-dashboard.php: " . $e->getMessage());
+}
+
+/**
+ * Get recent scores for a student
+ */
+function getRecentScoresForStudent($student_id, $limit = 5) {
+    $recent_scores = [];
+    
+    try {
+        // Get all the student's subjects
+        $student_subjects_data = supabaseFetch('student_subjects', [
+            'student_id' => $student_id, 
+            'deleted_at' => null
+        ]);
+        
+        if ($student_subjects_data && is_array($student_subjects_data)) {
+            $student_subject_ids = array_column($student_subjects_data, 'id');
+            
+            if (!empty($student_subject_ids)) {
+                // Get scores only for this student's subjects
+                $all_scores = [];
+                foreach ($student_subject_ids as $subject_id) {
+                    $scores = supabaseFetch('student_subject_scores', ['student_subject_id' => $subject_id]);
+                    if ($scores && is_array($scores)) {
+                        $all_scores = array_merge($all_scores, $scores);
+                    }
+                }
+                
+                if (!empty($all_scores)) {
+                    // Sort by creation date descending
+                    usort($all_scores, function($a, $b) {
+                        $dateA = isset($a['created_at']) ? strtotime($a['created_at']) : 0;
+                        $dateB = isset($b['created_at']) ? strtotime($b['created_at']) : 0;
+                        return $dateB - $dateA;
+                    });
+                    
+                    // Take the specified limit
+                    $recent_scores = array_slice($all_scores, 0, $limit);
+                    
+                    // Get subject names for display
+                    foreach ($recent_scores as &$score) {
+                        $subject_data = supabaseFetch('student_subjects', ['id' => $score['student_subject_id']]);
+                        if ($subject_data && count($subject_data) > 0) {
+                            $student_subject = $subject_data[0];
+                            $subject_info = supabaseFetch('subjects', ['id' => $student_subject['subject_id']]);
+                            if ($subject_info && count($subject_info) > 0) {
+                                $score['subject_code'] = $subject_info[0]['subject_code'];
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    } catch (Exception $e) {
+        error_log("Error getting recent scores: " . $e->getMessage());
+    }
+    
+    return $recent_scores;
 }
 
 /**
@@ -983,18 +1034,17 @@ function calculateGWA($grade) {
 
         <!-- Academic Statistics -->
         <div class="dashboard-grid">
-                <div class="metrics-grid">
-                    <div class="metric-card">
-                        <div class="metric-value"><?php echo $performance_metrics['total_subjects']; ?></div>
-                        <div class="metric-label">Total Subjects</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-value"><?php echo count(getUniqueProfessors($student['id'])); ?></div>
-                        <div class="metric-label">Professors</div>
-                    </div>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-value"><?php echo $performance_metrics['total_subjects']; ?></div>
+                    <div class="metric-label">Total Subjects</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value"><?php echo count(getUniqueProfessors($student['id'])); ?></div>
+                    <div class="metric-label">Professors</div>
                 </div>
             </div>
-        
+        </div>
 
         <!-- Main Content Grid -->
         <div class="dashboard-grid">
@@ -1064,7 +1114,15 @@ function calculateGWA($grade) {
                             <li class="score-item">
                                 <div class="score-info">
                                     <div class="score-name"><?php echo htmlspecialchars($score['score_name']); ?></div>
-                                    <div class="score-subject"><?php echo htmlspecialchars($score['score_type']); ?></div>
+                                    <div class="score-subject">
+                                        <?php 
+                                        if (isset($score['subject_code'])) {
+                                            echo htmlspecialchars($score['subject_code']);
+                                        } else {
+                                            echo 'Unknown Subject';
+                                        }
+                                        ?> • <?php echo htmlspecialchars($score['score_type']); ?>
+                                    </div>
                                 </div>
                                 <div class="score-value">
                                     <?php echo number_format($score['score_value'], 1); ?>/<?php echo number_format($score['max_score'], 1); ?>
@@ -1076,7 +1134,7 @@ function calculateGWA($grade) {
                     <div class="empty-state">
                         <i class="fas fa-clipboard-list"></i>
                         <p>No recent scores</p>
-                        <small>Add scores to see recent activity</small>
+                        <small>Add scores to your subjects to see recent activity</small>
                     </div>
                 <?php endif; ?>
             </div>
@@ -1137,7 +1195,7 @@ function calculateGWA($grade) {
         </div>
     </div>
 
-        <!--  Logout Modal -->
+    <!-- Logout Modal -->
     <div class="modal" id="logoutModal">
         <div class="modal-content" style="max-width: 450px; text-align: center;">
             <h3 style="color: var(--plp-green); font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem;">
@@ -1265,13 +1323,14 @@ function calculateGWA($grade) {
             });
         });
         <?php endif; ?>
+
         // Logout modal functionality
         const logoutBtn = document.querySelector('.logout-btn');
         const logoutModal = document.getElementById('logoutModal');
         const cancelLogout = document.getElementById('cancelLogout');
         const confirmLogout = document.getElementById('confirmLogout');
 
-// Show modal when clicking logout button
+        // Show modal when clicking logout button
         logoutBtn.addEventListener('click', (e) => {
             e.preventDefault();
             logoutModal.classList.add('show');
@@ -1287,14 +1346,11 @@ function calculateGWA($grade) {
             window.location.href = 'logout.php';
         });
 
-// Hide modal when clicking outside the modal content
-        const modals = [addSubjectModal, editSubjectModal, archiveSubjectModal, logoutModal];
-        modals.forEach(modal => {
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    modal.classList.remove('show');
-                }
-            });
+        // Hide modal when clicking outside the modal content
+        logoutModal.addEventListener('click', (e) => {
+            if (e.target === logoutModal) {
+                logoutModal.classList.remove('show');
+            }
         });
     </script>
 </body>
