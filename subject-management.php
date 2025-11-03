@@ -125,14 +125,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'score_type' => $exam_type
                 ]);
                 
-                // Insert new exam score
+                // Insert new exam score - WITHOUT score_date for exams
                 $insert_data = [
                     'student_subject_id' => $subject_id,
                     'score_type' => $exam_type,
                     'score_name' => $exam_name,
                     'score_value' => $score_value,
                     'max_score' => $max_score,
-                    'score_date' => date('Y-m-d'),
                     'created_at' => date('Y-m-d H:i:s')
                 ];
                 
@@ -437,7 +436,7 @@ if (!$hasScores) {
             $totalClassStanding = 60;
         }
 
-        // Calculate Exam Scores
+        // Calculate Exam Scores - FIXED: Use exact input values
         $midtermScore = 0;
         $finalScore = 0;
 
@@ -1707,20 +1706,16 @@ if (!$hasScores) {
                     <?php if (!empty($midtermExam)): ?>
                         <?php 
                         $midterm = reset($midtermExam);
-                        // Ensure we have valid score data
-                        if (isset($midterm['score_value']) && isset($midterm['max_score']) && $midterm['max_score'] > 0):
                         ?>
-                            <p style="color: var(--text-medium); margin-top: 0.5rem; font-size: 0.9rem;">
-                                Score: <?php echo floatval($midterm['score_value']); ?>/<?php echo floatval($midterm['max_score']); ?>
-                            </p>
-                            <p style="color: var(--text-light); font-size: 0.75rem; margin-top: 0.3rem;">
-                                Weighted: <?php echo number_format($midtermScore, 1); ?>%
-                            </p>
-                        <?php else: ?>
-                            <p style="color: var(--text-light); margin-top: 0.5rem; font-size: 0.9rem;">
-                                Invalid score data
-                            </p>
-                        <?php endif; ?>
+                        <p style="color: var(--text-medium); margin-top: 0.5rem; font-size: 0.9rem;">
+                            Score: <strong><?php echo floatval($midterm['score_value']); ?></strong>/<strong><?php echo floatval($midterm['max_score']); ?></strong>
+                        </p>
+                        <p style="color: var(--text-light); font-size: 0.75rem; margin-top: 0.3rem;">
+                            Percentage: <?php echo number_format(($midterm['score_value'] / $midterm['max_score']) * 100, 1); ?>%
+                        </p>
+                        <p style="color: var(--text-light); font-size: 0.75rem; margin-top: 0.1rem;">
+                            Weighted: <?php echo number_format($midtermScore, 1); ?>%
+                        </p>
                     <?php else: ?>
                         <p style="color: var(--text-light); margin-top: 0.5rem; font-size: 0.9rem;">
                             Click to add score
@@ -1735,20 +1730,16 @@ if (!$hasScores) {
                     <?php if (!empty($finalExam)): ?>
                         <?php 
                         $final = reset($finalExam);
-                        // Ensure we have valid score data
-                        if (isset($final['score_value']) && isset($final['max_score']) && $final['max_score'] > 0):
                         ?>
-                            <p style="color: var(--text-medium); margin-top: 0.5rem; font-size: 0.9rem;">
-                                Score: <?php echo floatval($final['score_value']); ?>/<?php echo floatval($final['max_score']); ?>
-                            </p>
-                            <p style="color: var(--text-light); font-size: 0.75rem; margin-top: 0.3rem;">
-                                Weighted: <?php echo number_format($finalScore, 1); ?>%
-                            </p>
-                        <?php else: ?>
-                            <p style="color: var(--text-light); margin-top: 0.5rem; font-size: 0.9rem;">
-                                Invalid score data
-                            </p>
-                        <?php endif; ?>
+                        <p style="color: var(--text-medium); margin-top: 0.5rem; font-size: 0.9rem;">
+                            Score: <strong><?php echo floatval($final['score_value']); ?></strong>/<strong><?php echo floatval($final['max_score']); ?></strong>
+                        </p>
+                        <p style="color: var(--text-light); font-size: 0.75rem; margin-top: 0.3rem;">
+                            Percentage: <?php echo number_format(($final['score_value'] / $final['max_score']) * 100, 1); ?>%
+                        </p>
+                        <p style="color: var(--text-light); font-size: 0.75rem; margin-top: 0.1rem;">
+                            Weighted: <?php echo number_format($finalScore, 1); ?>%
+                        </p>
                     <?php else: ?>
                         <p style="color: var(--text-light); margin-top: 0.5rem; font-size: 0.9rem;">
                             Click to add score

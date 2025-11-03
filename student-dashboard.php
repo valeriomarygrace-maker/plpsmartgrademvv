@@ -58,7 +58,7 @@ try {
         }
         
         // Get recent scores (last 5 scores for current student)
-        $recent_scores = getRecentScoresForStudent($student['id'], 5);
+        $recent_scores = getRecentScoresForStudent($student['id'], 3);
         
         // Calculate overall performance metrics
         $performance_metrics = calculatePerformanceMetrics($student['id']);
