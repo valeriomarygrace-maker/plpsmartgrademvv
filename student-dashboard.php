@@ -75,7 +75,7 @@ try {
 /**
  * Get recent scores for a student
  */
-function getRecentScoresForStudent($student_id, $limit = 5) {
+function getRecentScoresForStudent($student_id, $limit = 3) {
     $recent_scores = [];
     
     try {
