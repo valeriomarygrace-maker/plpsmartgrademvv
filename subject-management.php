@@ -55,14 +55,12 @@ try {
     $error_message = 'Database error: ' . $e->getMessage();
 }
 
-// Initialize arrays
 $categories = [];
 $classStandings = [];
 $midtermExam = [];
 $finalExam = [];
 $allScores = [];
 
-// Get class standing categories
 try {
     $categories = supabaseFetch('student_class_standing_categories', ['student_subject_id' => $subject_id]);
     if (!$categories) $categories = [];
@@ -70,7 +68,6 @@ try {
     $categories = [];
 }
 
-// Calculate total allocated percentage and remaining
 $totalClassStandingPercentage = 0;
 foreach ($categories as $category) {
     $totalClassStandingPercentage += floatval($category['category_percentage']);
@@ -78,12 +75,10 @@ foreach ($categories as $category) {
 $remainingAllocation = 60 - $totalClassStandingPercentage;
 $canAddCategory = ($remainingAllocation > 0);
 
-// Get student's scores for this subject
 try {
     $allScores = supabaseFetch('student_subject_scores', ['student_subject_id' => $subject_id]);
     if (!$allScores) $allScores = [];
     
-    // Add category names to scores
     foreach ($allScores as &$score) {
         if ($score['category_id']) {
             $category_data = supabaseFetch('student_class_standing_categories', ['id' => $score['category_id']]);
@@ -101,7 +96,6 @@ try {
     $allScores = [];
 }
 
-// Filter scores by score_type
 $classStandings = array_filter($allScores, function($score) {
     return $score['score_type'] === 'class_standing';
 });
@@ -114,9 +108,22 @@ $finalExam = array_filter($allScores, function($score) {
     return $score['score_type'] === 'final_exam';
 });
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_POST['add_standing']) || isset($_POST['update_score']) || isset($_POST['add_exam']) || isset($_POST['add_attendance'])) {
+        InterventionSystem::logBehavior(
+            $student['id'], 
+            'grade_update', 
+            [
+                'subject_id' => $subject_id,
+                'subject_name' => $subject['subject_name'],
+                'action' => isset($_POST['add_standing']) ? 'add_score' : 'update_score'
+            ]
+        );
+    }
+}
+
 $hasScores = !empty($classStandings) || !empty($midtermExam) || !empty($finalExam);
 
-// Initialize calculation variables
 $totalClassStanding = 0;
 $midtermScore = 0;
 $finalScore = 0;
@@ -124,20 +131,25 @@ $overallGrade = 0;
 $gwa = 0;
 $riskLevel = 'no-data';
 $riskDescription = 'No Data Inputted';
+$interventionNeeded = false;
 $behavioralInsights = [];
 $interventions = [];
 $recommendations = [];
 
-if ($hasScores) {
-    // Prepare data for ML-enhanced insights
+if (!$hasScores) {
+    $overallGrade = 0;
+    $gwa = 0;
+    $totalClassStanding = 0;
+    $midtermScore = 0;
+    $finalScore = 0;
+} else {
     $classStandingsForML = array_column($classStandings, 'score_value');
     $examScoresForML = [];
     if (!empty($midtermExam)) $examScoresForML[] = reset($midtermExam)['score_value'];
     if (!empty($finalExam)) $examScoresForML[] = reset($finalExam)['score_value'];
     
-    $attendanceRecordsForML = []; // Convert your attendance data to 1/0
+    $attendanceRecordsForML = [];
     
-    // Get enhanced ML insights
     $mlInsights = EnhancedInterventionSystem::getEnhancedInsights(
         $student['id'], 
         $subject_id, 
@@ -147,97 +159,131 @@ if ($hasScores) {
         $subject['subject_name']
     );
     
-    // Use the insights
-    $riskLevel = $mlInsights['risk_level'];
-    $overallGrade = $mlInsights['overall_grade'];
-    $gwa = $mlInsights['gwa'];
-    $behavioralInsights = $mlInsights['behavioral_insights'];
-    $interventions = $mlInsights['interventions'];
-    $recommendations = $mlInsights['recommendations'];
-    
-    // Calculate detailed scores for display
-    $categoryTotals = [];
-    foreach ($categories as $category) {
-        $categoryTotals[$category['id']] = [
-            'name' => $category['category_name'],
-            'percentage' => $category['category_percentage'],
-            'scores' => [],
-            'total_score' => 0,
-            'max_possible' => 0,
-            'percentage_score' => 0,
-            'weighted_score' => 0
-        ];
-    }
+    if ($mlInsights['source'] === 'ml_enhanced') {
+        $riskLevel = $mlInsights['risk_level'];
+        $overallGrade = $mlInsights['overall_grade'];
+        $gwa = $mlInsights['gwa'];
+        $behavioralInsights = $mlInsights['behavioral_insights'];
+        $interventions = $mlInsights['interventions'];
+        $recommendations = $mlInsights['recommendations'];
+    } else {
+        $categoryTotals = [];
+        foreach ($categories as $category) {
+            $categoryTotals[$category['id']] = [
+                'name' => $category['category_name'],
+                'percentage' => $category['category_percentage'],
+                'scores' => [],
+                'total_score' => 0,
+                'max_possible' => 0,
+                'percentage_score' => 0,
+                'weighted_score' => 0
+            ];
+        }
 
-    // Process class_standing scores for class standing calculation
-    foreach ($classStandings as $standing) {
-        if ($standing['category_id'] && isset($categoryTotals[$standing['category_id']])) {
-            $categoryId = $standing['category_id'];
-            $categoryTotals[$categoryId]['scores'][] = $standing;
-            
-            if (strtolower($categoryTotals[$categoryId]['name']) === 'attendance') {
-                $scoreValue = ($standing['score_name'] === 'Present') ? 1 : 0;
-                $categoryTotals[$categoryId]['total_score'] += $scoreValue;
-                $categoryTotals[$categoryId]['max_possible'] += 1;
-            } else {
-                $categoryTotals[$categoryId]['total_score'] += $standing['score_value'];
-                $categoryTotals[$categoryId]['max_possible'] += $standing['max_score'];
+        if (is_array($classStandings)) {
+            foreach ($classStandings as $standing) {
+                if ($standing['category_id'] && isset($categoryTotals[$standing['category_id']])) {
+                    $categoryId = $standing['category_id'];
+                    $categoryTotals[$categoryId]['scores'][] = $standing;
+                    
+                    if (strtolower($categoryTotals[$categoryId]['name']) === 'attendance') {
+                        $scoreValue = ($standing['score_name'] === 'Present') ? 1 : 0;
+                        $categoryTotals[$categoryId]['total_score'] += $scoreValue;
+                        $categoryTotals[$categoryId]['max_possible'] += 1;
+                    } else {
+                        $categoryTotals[$categoryId]['total_score'] += $standing['score_value'];
+                        $categoryTotals[$categoryId]['max_possible'] += $standing['max_score'];
+                    }
+                }
             }
         }
-    }
 
-    // Calculate weighted scores for each category
-    $totalClassStanding = 0;
-    foreach ($categoryTotals as $categoryId => $category) {
-        if ($category['max_possible'] > 0) {
-            $percentageScore = ($category['total_score'] / $category['max_possible']) * 100;
-            $categoryTotals[$categoryId]['percentage_score'] = $percentageScore;
-            $categoryTotals[$categoryId]['weighted_score'] = ($percentageScore * $category['percentage']) / 100;
-            $totalClassStanding += $categoryTotals[$categoryId]['weighted_score'];
+        $totalClassStanding = 0;
+        foreach ($categoryTotals as $categoryId => $category) {
+            if ($category['max_possible'] > 0) {
+                $percentageScore = ($category['total_score'] / $category['max_possible']) * 100;
+                $categoryTotals[$categoryId]['percentage_score'] = $percentageScore;
+                $categoryTotals[$categoryId]['weighted_score'] = ($percentageScore * $category['percentage']) / 100;
+                $totalClassStanding += $categoryTotals[$categoryId]['weighted_score'];
+            }
         }
-    }
 
-    // Ensure Class Standing doesn't exceed 60%
-    if ($totalClassStanding > 60) {
-        $totalClassStanding = 60;
-    }
-
-    // Calculate Exam Scores
-    $midtermScore = 0;
-    $finalScore = 0;
-
-    // Midterm Exam (20% of total grade)
-    if (!empty($midtermExam)) {
-        $midterm = reset($midtermExam);
-        if ($midterm['max_score'] > 0) {
-            $midtermPercentage = ($midterm['score_value'] / $midterm['max_score']) * 100;
-            $midtermScore = ($midtermPercentage * 20) / 100;
+        if ($totalClassStanding > 60) {
+            $totalClassStanding = 60;
         }
-    }
 
-    // Final Exam (20% of total grade)
-    if (!empty($finalExam)) {
-        $final = reset($finalExam);
-        if ($final['max_score'] > 0) {
-            $finalPercentage = ($final['score_value'] / $final['max_score']) * 100;
-            $finalScore = ($finalPercentage * 20) / 100;
+        $midtermScore = 0;
+        $finalScore = 0;
+
+        if (!empty($midtermExam)) {
+            $midterm = reset($midtermExam);
+            if ($midterm['max_score'] > 0) {
+                $midtermPercentage = (floatval($midterm['score_value']) / floatval($midterm['max_score'])) * 100;
+                $midtermScore = ($midtermPercentage * 20) / 100;
+            }
         }
-    }
 
-    // Total Exam Score (should not exceed 40%)
-    $totalExamScore = $midtermScore + $finalScore;
-    if ($totalExamScore > 40) {
-        $totalExamScore = 40;
-    }
+        if (!empty($finalExam)) {
+            $final = reset($finalExam);
+            if ($final['max_score'] > 0) {
+                $finalPercentage = (floatval($final['score_value']) / floatval($final['max_score'])) * 100;
+                $finalScore = ($finalPercentage * 20) / 100;
+            }
+        }
 
-    // Calculate overall grade (Class Standing + Exams)
-    $overallGrade = $totalClassStanding + $totalExamScore;
-    if ($overallGrade > 100) {
-        $overallGrade = 100;
+        $totalExamScore = $midtermScore + $finalScore;
+        if ($totalExamScore > 40) {
+            $totalExamScore = 40;
+        }
+
+        $overallGrade = $totalClassStanding + $totalExamScore;
+
+        if ($overallGrade > 100) {
+            $overallGrade = 100;
+        }
+
+        if ($overallGrade >= 90) {
+            $gwa = 1.00;
+        } elseif ($overallGrade >= 85) {
+            $gwa = 1.25;
+        } elseif ($overallGrade >= 80) {
+            $gwa = 1.50;
+        } elseif ($overallGrade >= 75) {
+            $gwa = 1.75;
+        } elseif ($overallGrade >= 70) {
+            $gwa = 2.00;
+        } elseif ($overallGrade >= 65) {
+            $gwa = 2.25;
+        } elseif ($overallGrade >= 60) {
+            $gwa = 2.50;
+        } elseif ($overallGrade >= 55) {
+            $gwa = 2.75;
+        } elseif ($overallGrade >= 50) {
+            $gwa = 3.00;
+        } else {
+            $gwa = 5.00;
+        }
+
+        if ($gwa <= 1.75) {
+            $riskLevel = 'low';
+            $riskDescription = 'Low Risk';
+            $interventionNeeded = false;
+        } elseif ($gwa <= 2.50) {
+            $riskLevel = 'medium';
+            $riskDescription = 'Medium Risk';
+            $interventionNeeded = false;
+        } else {
+            $riskLevel = 'high';
+            $riskDescription = 'High Risk';
+            $interventionNeeded = true;
+        }
+
+        $behavioralInsights = InterventionSystem::getBehavioralInsights($student['id'], $subject_id, $overallGrade, $riskLevel);
+        $interventions = InterventionSystem::getInterventions($student['id'], $subject_id, $riskLevel);
+        $recommendations = InterventionSystem::getRecommendations($student['id'], $subject_id, $overallGrade, $riskLevel);
     }
 }
 
-// Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['add_category'])) {
         $category_name = trim($_POST['category_name']);
@@ -310,7 +356,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     
-    // Handle attendance submission
     elseif (isset($_POST['add_attendance'])) {
         $category_id = intval($_POST['category_id']);
         $attendance_date = $_POST['attendance_date'];
@@ -320,7 +365,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error_message = 'Please select a date.';
         } else {
             try {
-                // Check if attendance already exists
                 $existing_attendance = supabaseFetch('student_subject_scores', [
                     'student_subject_id' => $subject_id,
                     'category_id' => $category_id,
@@ -364,7 +408,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $score_value = floatval($_POST['score_value']);
         
         try {
-            // Get the score to validate
             $score_data = supabaseFetch('student_subject_scores', ['id' => $score_id]);
             
             if ($score_data && count($score_data) > 0) {
@@ -413,10 +456,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $category_id = intval($_POST['category_id']);
         
         try {
-            // Delete all scores in this category
             supabaseDelete('student_subject_scores', ['category_id' => $category_id]);
-            
-            // Delete the category
             $result = supabaseDelete('student_class_standing_categories', ['id' => $category_id]);
             
             if ($result) {
@@ -444,19 +484,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $exam_name = $exam_type === 'midterm_exam' ? 'Midterm Exam' : 'Final Exam';
             
             try {
-                // Delete existing exam score
                 supabaseDelete('student_subject_scores', [
                     'student_subject_id' => $subject_id,
                     'score_type' => $exam_type
                 ]);
                 
-                // Insert new exam score
                 $insert_data = [
                     'student_subject_id' => $subject_id,
                     'score_type' => $exam_type,
                     'score_name' => $exam_name,
                     'score_value' => $score_value,
                     'max_score' => $max_score,
+                    'score_date' => date('Y-m-d'),
                     'created_at' => date('Y-m-d H:i:s')
                 ];
                 
