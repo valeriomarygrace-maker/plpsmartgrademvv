@@ -444,7 +444,6 @@ function calculateGWA($grade) {
             min-height: 100vh;
             color: var(--text-dark);
             line-height: 1.6;
-            overflow-x: hidden;
         }
 
         .sidebar {
@@ -455,20 +454,14 @@ function calculateGWA($grade) {
             display: flex;
             flex-direction: column;
             height: 100vh;
-            position: fixed;
+            position: sticky;
             top: 0;
-            left: 0;
             border-right: 1px solid rgba(0, 99, 65, 0.1);
-            overflow-y: auto;
-            z-index: 1000;
-            transform: translateX(0);
-            transition: transform 0.3s ease;
         }
 
         .sidebar-header {
             text-align: center;
             border-bottom: 1px solid rgba(0, 99, 65, 0.1);
-            padding-bottom: 1rem;
         }
 
         .logo-container {
@@ -503,7 +496,6 @@ function calculateGWA($grade) {
             font-size: 1.3rem;
             font-weight: 700;
             letter-spacing: 0.5px;
-            margin: 0.5rem 0;
         }
 
         .student-email {
@@ -514,7 +506,6 @@ function calculateGWA($grade) {
             padding: 0.5rem;
             border-radius: 6px;
             font-weight: 500;
-            background: var(--plp-green-pale);
         }
 
         .nav-menu {
@@ -532,7 +523,7 @@ function calculateGWA($grade) {
             display: flex;
             align-items: center;
             gap: 0.75rem;
-            padding: 0.75rem;
+            padding: 0.50rem;
             color: var(--text-medium);
             text-decoration: none;
             border-radius: var(--border-radius);
@@ -554,11 +545,10 @@ function calculateGWA($grade) {
 
         .sidebar-footer {
             border-top: 3px solid rgba(0, 99, 65, 0.1);
-            padding-top: 1rem;
         }
 
         .logout-btn {
-            margin-top: 1rem;
+            margin-top:1rem;
             background: transparent;
             color: var(--text-medium);
             padding: 0.75rem 1rem;
@@ -582,29 +572,25 @@ function calculateGWA($grade) {
 
         .main-content {
             flex: 1;
-            padding: 1rem 2.5rem;
+            padding: 1rem 2.5rem; 
             background: var(--plp-green-pale);
-            max-width: calc(100% - 320px);
-            margin-left: 320px;
+            max-width: 100%;
+            margin: 0 auto;
             width: 100%;
             overflow-y: auto;
-            min-height: 100vh;
-            transition: margin-left 0.3s ease;
         }
 
         .header {
             background: white;
-            padding: 1rem 1.5rem;
+            padding: 1rem 2rem;
             border-radius: var(--border-radius);
             box-shadow: var(--box-shadow);
-            margin-bottom: 1.5rem;
+            margin-bottom: 1rem;
             background: var(--plp-green-gradient);
             color: white;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            flex-wrap: wrap;
-            gap: 1rem;
         }
 
         .welcome {
@@ -1308,7 +1294,6 @@ function calculateGWA($grade) {
     </style>
 </head>
 <body>
-    <!-- Mobile Menu Toggle Button -->
     <button class="mobile-menu-toggle" id="mobileMenuToggle">
         <i class="fas fa-bars"></i>
     </button>
@@ -1552,6 +1537,27 @@ function calculateGWA($grade) {
             </div>
         </div>
     </div>
+
+        <!--  Logout Modal -->
+    <div class="modal" id="logoutModal">
+        <div class="modal-content" style="max-width: 450px; text-align: center;">
+            <h3 style="color: var(--plp-green); font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem;">
+                Confirm Logout
+            </h3>
+            <div style="color: var(--text-medium); margin-bottom: 2rem; line-height: 1.6;">
+                Are you sure you want to logout? You'll need<br>
+                to log in again to access your account.
+            </div>
+            <div style="display: flex; justify-content: center; gap: 1rem;">
+                <button class="modal-btn modal-btn-cancel" id="cancelLogout" style="min-width: 120px;">
+                    Cancel
+                </button>
+                <button class="modal-btn modal-btn-confirm" id="confirmLogout" style="min-width: 120px;">
+                    Yes, Logout
+                </button>
+            </div>
+        </div>
+    </div>
     
     <script>
         // Mobile menu functionality
@@ -1650,15 +1656,47 @@ function calculateGWA($grade) {
         setTimeout(() => {
             const alerts = document.querySelectorAll('.alert-success, .alert-error');
             alerts.forEach(alert => {
-                alert.style.transition = 'opacity 0.3s ease';
+                alert.style.transition = 'opacity 0.1s ease';
                 alert.style.opacity = '0';
                 setTimeout(() => {
                     if (alert.parentNode) {
                         alert.remove();
                     }
-                }, 300);
+                }, 100);
             });
-        }, 5000);
+        }, 1000);
+
+        // Logout modal functionality
+        const logoutBtn = document.querySelector('.logout-btn');
+        const logoutModal = document.getElementById('logoutModal');
+        const cancelLogout = document.getElementById('cancelLogout');
+        const confirmLogout = document.getElementById('confirmLogout');
+
+// Show modal when clicking logout button
+        logoutBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            logoutModal.classList.add('show');
+        });
+
+        // Hide modal when clicking cancel
+        cancelLogout.addEventListener('click', () => {
+            logoutModal.classList.remove('show');
+        });
+
+        // Handle logout confirmation
+        confirmLogout.addEventListener('click', () => {
+            window.location.href = 'logout.php';
+        });
+
+// Hide modal when clicking outside the modal content
+        const modals = [addSubjectModal, editSubjectModal, archiveSubjectModal, logoutModal];
+        modals.forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.remove('show');
+                }
+            });
+        });
     </script>
 </body>
 </html>

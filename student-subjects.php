@@ -1516,7 +1516,7 @@ if (isset($_GET['restored']) && $_GET['restored'] == '1') {
         </div>
     </div>
 
-    <!-- Updated Logout Modal -->
+    <!--  Logout Modal -->
     <div class="modal" id="logoutModal">
         <div class="modal-content" style="max-width: 450px; text-align: center;">
             <h3 style="color: var(--plp-green); font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem;">
