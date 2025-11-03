@@ -55,7 +55,29 @@ try {
     $error_message = 'Database error: ' . $e->getMessage();
 }
 
-// Handle ALL form submissions FIRST
+// UNAHIN ANG PAG-FETCH NG CATEGORIES PARA MA-DEFINE ANG $remainingAllocation
+$categories = [];
+$classStandings = [];
+$midtermExam = [];
+$finalExam = [];
+$allScores = [];
+
+try {
+    $categories = supabaseFetch('student_class_standing_categories', ['student_subject_id' => $subject_id]);
+    if (!$categories) $categories = [];
+} catch (Exception $e) {
+    $categories = [];
+}
+
+// DEFINE ANG $remainingAllocation DITO
+$totalClassStandingPercentage = 0;
+foreach ($categories as $category) {
+    $totalClassStandingPercentage += floatval($category['category_percentage']);
+}
+$remainingAllocation = 60 - $totalClassStandingPercentage;
+$canAddCategory = ($remainingAllocation > 0);
+
+// NGAYON PWEDE NA ANG FORM HANDLING GAMIT ANG $remainingAllocation
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Handle MAJOR EXAM form submission
     if (isset($_POST['add_exam'])) {
@@ -295,28 +317,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// NOW fetch data for display
-$categories = [];
-$classStandings = [];
-$midtermExam = [];
-$finalExam = [];
-$allScores = [];
-
-try {
-    $categories = supabaseFetch('student_class_standing_categories', ['student_subject_id' => $subject_id]);
-    if (!$categories) $categories = [];
-} catch (Exception $e) {
-    $categories = [];
-}
-
-$totalClassStandingPercentage = 0;
-foreach ($categories as $category) {
-    $totalClassStandingPercentage += floatval($category['category_percentage']);
-}
-$remainingAllocation = 60 - $totalClassStandingPercentage;
-$canAddCategory = ($remainingAllocation > 0);
-
-// Fetch ALL scores including MAJOR EXAMS
+// FETCH ALL SCORES FOR DISPLAY
 try {
     $allScores = supabaseFetch('student_subject_scores', ['student_subject_id' => $subject_id]);
     if (!$allScores) $allScores = [];
