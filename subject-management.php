@@ -55,136 +55,6 @@ try {
     $error_message = 'Database error: ' . $e->getMessage();
 }
 
-// Handle MAJOR EXAM form submissions FIRST
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['add_exam'])) {
-        $exam_type = $_POST['exam_type'];
-        $score_value = floatval($_POST['score_value']);
-        $max_score = floatval($_POST['max_score']);
-        
-        if ($score_value < 0 || $max_score <= 0) {
-            $error_message = 'Score value and maximum score must be positive numbers.';
-        } elseif ($score_value > $max_score) {
-            $error_message = 'Score value cannot exceed maximum score.';
-        } else {
-            $exam_name = $exam_type === 'midterm_exam' ? 'Midterm Exam' : 'Final Exam';
-            
-            try {
-                // DELETE any existing exam score for this subject and exam type
-                supabaseDelete('student_subject_scores', [
-                    'student_subject_id' => $subject_id,
-                    'score_type' => $exam_type
-                ]);
-                
-                // INSERT new exam score with EXACT values
-                $insert_data = [
-                    'student_subject_id' => $subject_id,
-                    'score_type' => $exam_type,
-                    'score_name' => $exam_name,
-                    'score_value' => $score_value,
-                    'max_score' => $max_score,
-                    'created_at' => date('Y-m-d H:i:s')
-                ];
-                
-                $result = supabaseInsert('student_subject_scores', $insert_data);
-                
-                if ($result) {
-                    $success_message = $exam_name . ' score added successfully!';
-                    // IMMEDIATE redirect to show updated scores
-                    header("Location: subject-management.php?subject_id=$subject_id");
-                    exit;
-                } else {
-                    $error_message = 'Failed to add exam score.';
-                }
-            } catch (Exception $e) {
-                $error_message = 'Database error: ' . $e->getMessage();
-            }
-        }
-    }
-    
-    // Other form handlers (class standing categories, etc.)
-    elseif (isset($_POST['add_category'])) {
-        $category_name = trim($_POST['category_name']);
-        $category_percentage = floatval($_POST['category_percentage']);
-        
-        $totalClassStandingPercentage = 0;
-        $categories = supabaseFetch('student_class_standing_categories', ['student_subject_id' => $subject_id]);
-        if ($categories) {
-            foreach ($categories as $category) {
-                $totalClassStandingPercentage += floatval($category['category_percentage']);
-            }
-        }
-        $remainingAllocation = 60 - $totalClassStandingPercentage;
-        
-        if (empty($category_name) || $category_percentage <= 0) {
-            $error_message = 'Please fill all fields with valid values.';
-        } elseif ($category_percentage > $remainingAllocation) {
-            $error_message = 'Cannot add category. Remaining allocation is only ' . $remainingAllocation . '%.';
-        } else {
-            try {
-                $insert_data = [
-                    'student_subject_id' => $subject_id,
-                    'category_name' => $category_name,
-                    'category_percentage' => $category_percentage,
-                    'created_at' => date('Y-m-d H:i:s')
-                ];
-                
-                $result = supabaseInsert('student_class_standing_categories', $insert_data);
-                
-                if ($result) {
-                    $success_message = 'Category added successfully!';
-                    header("Location: subject-management.php?subject_id=$subject_id");
-                    exit;
-                } else {
-                    $error_message = 'Failed to add category.';
-                }
-            } catch (Exception $e) {
-                $error_message = 'Database error: ' . $e->getMessage();
-            }
-        }
-    }
-    
-    elseif (isset($_POST['add_standing'])) {
-        $category_id = intval($_POST['category_id']);
-        $score_name = trim($_POST['score_name']);
-        $score_value = floatval($_POST['score_value']);
-        $max_score = floatval($_POST['max_score']);
-        $score_date = $_POST['score_date'];
-        
-        if (empty($score_name) || $score_value < 0 || $max_score <= 0 || empty($score_date)) {
-            $error_message = 'Please fill all fields with valid values.';
-        } elseif ($score_value > $max_score) {
-            $error_message = 'Score value cannot exceed maximum score.';
-        } else {
-            try {
-                $insert_data = [
-                    'student_subject_id' => $subject_id,
-                    'category_id' => $category_id,
-                    'score_type' => 'class_standing',
-                    'score_name' => $score_name,
-                    'score_value' => $score_value,
-                    'max_score' => $max_score,
-                    'score_date' => $score_date,
-                    'created_at' => date('Y-m-d H:i:s')
-                ];
-                
-                $result = supabaseInsert('student_subject_scores', $insert_data);
-                
-                if ($result) {
-                    $success_message = 'Score added successfully!';
-                    header("Location: subject-management.php?subject_id=$subject_id");
-                    exit;
-                } else {
-                    $error_message = 'Failed to add score.';
-                }
-            } catch (Exception $e) {
-                $error_message = 'Database error: ' . $e->getMessage();
-            }
-        }
-    }
-}
-
-// NOW fetch data for display
 $categories = [];
 $classStandings = [];
 $midtermExam = [];
@@ -205,16 +75,27 @@ foreach ($categories as $category) {
 $remainingAllocation = 60 - $totalClassStandingPercentage;
 $canAddCategory = ($remainingAllocation > 0);
 
-// Fetch ALL scores including MAJOR EXAMS
 try {
     $allScores = supabaseFetch('student_subject_scores', ['student_subject_id' => $subject_id]);
     if (!$allScores) $allScores = [];
+    
+    foreach ($allScores as &$score) {
+        if ($score['category_id']) {
+            $category_data = supabaseFetch('student_class_standing_categories', ['id' => $score['category_id']]);
+            if ($category_data && count($category_data) > 0) {
+                $score['category_name'] = $category_data[0]['category_name'];
+            } else {
+                $score['category_name'] = '';
+            }
+        } else {
+            $score['category_name'] = '';
+        }
+    }
     
 } catch (Exception $e) {
     $allScores = [];
 }
 
-// Filter scores - MAJOR EXAMS are separate from class standing
 $classStandings = array_filter($allScores, function($score) {
     return $score['score_type'] === 'class_standing';
 });
@@ -227,9 +108,22 @@ $finalExam = array_filter($allScores, function($score) {
     return $score['score_type'] === 'final_exam';
 });
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_POST['add_standing']) || isset($_POST['update_score']) || isset($_POST['add_exam']) || isset($_POST['add_attendance'])) {
+        InterventionSystem::logBehavior(
+            $student['id'], 
+            'grade_update', 
+            [
+                'subject_id' => $subject_id,
+                'subject_name' => $subject['subject_name'],
+                'action' => isset($_POST['add_standing']) ? 'add_score' : 'update_score'
+            ]
+        );
+    }
+}
+
 $hasScores = !empty($classStandings) || !empty($midtermExam) || !empty($finalExam);
 
-// Initialize calculation variables
 $totalClassStanding = 0;
 $midtermScore = 0;
 $finalScore = 0;
@@ -237,6 +131,7 @@ $overallGrade = 0;
 $gwa = 0;
 $riskLevel = 'no-data';
 $riskDescription = 'No Data Inputted';
+$interventionNeeded = false;
 $behavioralInsights = [];
 $interventions = [];
 $recommendations = [];
@@ -248,7 +143,7 @@ if (!$hasScores) {
     $midtermScore = 0;
     $finalScore = 0;
 } else {
-    // Calculate class standing (from categories)
+    // CLASS STANDING CALCULATION
     $categoryTotals = [];
     foreach ($categories as $category) {
         $categoryTotals[$category['id']] = [
@@ -294,7 +189,7 @@ if (!$hasScores) {
         $totalClassStanding = 60;
     }
 
-    // Calculate MAJOR EXAM scores - USE EXACT INPUT VALUES
+    // MAJOR EXAM CALCULATION
     $midtermScore = 0;
     $finalScore = 0;
 
@@ -325,7 +220,7 @@ if (!$hasScores) {
         $overallGrade = 100;
     }
 
-    // Calculate GWA
+    // GWA CALCULATION
     if ($overallGrade >= 90) {
         $gwa = 1.00;
     } elseif ($overallGrade >= 85) {
@@ -348,21 +243,264 @@ if (!$hasScores) {
         $gwa = 5.00;
     }
 
-    // Calculate risk level
+    // RISK LEVEL CALCULATION
     if ($gwa <= 1.75) {
         $riskLevel = 'low';
         $riskDescription = 'Low Risk';
+        $interventionNeeded = false;
     } elseif ($gwa <= 2.50) {
         $riskLevel = 'medium';
         $riskDescription = 'Medium Risk';
+        $interventionNeeded = false;
     } else {
         $riskLevel = 'high';
         $riskDescription = 'High Risk';
+        $interventionNeeded = true;
     }
 
     $behavioralInsights = InterventionSystem::getBehavioralInsights($student['id'], $subject_id, $overallGrade, $riskLevel);
     $interventions = InterventionSystem::getInterventions($student['id'], $subject_id, $riskLevel);
     $recommendations = InterventionSystem::getRecommendations($student['id'], $subject_id, $overallGrade, $riskLevel);
+}
+
+// FORM HANDLING
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // ADD CLASS STANDING CATEGORY
+    if (isset($_POST['add_category'])) {
+        $category_name = trim($_POST['category_name']);
+        $category_percentage = floatval($_POST['category_percentage']);
+        
+        if (empty($category_name) || $category_percentage <= 0) {
+            $error_message = 'Please fill all fields with valid values.';
+        } elseif ($category_percentage > $remainingAllocation) {
+            $error_message = 'Cannot add category. Remaining allocation is only ' . $remainingAllocation . '%.';
+        } else {
+            try {
+                $insert_data = [
+                    'student_subject_id' => $subject_id,
+                    'category_name' => $category_name,
+                    'category_percentage' => $category_percentage,
+                    'created_at' => date('Y-m-d H:i:s')
+                ];
+                
+                $result = supabaseInsert('student_class_standing_categories', $insert_data);
+                
+                if ($result) {
+                    $success_message = 'Category added successfully!';
+                    header("Location: subject-management.php?subject_id=$subject_id");
+                    exit;
+                } else {
+                    $error_message = 'Failed to add category.';
+                }
+            } catch (Exception $e) {
+                $error_message = 'Database error: ' . $e->getMessage();
+            }
+        }
+    }
+    
+    // ADD CLASS STANDING SCORE
+    elseif (isset($_POST['add_standing'])) {
+        $category_id = intval($_POST['category_id']);
+        $score_name = trim($_POST['score_name']);
+        $score_value = floatval($_POST['score_value']);
+        $max_score = floatval($_POST['max_score']);
+        $score_date = $_POST['score_date'];
+        
+        if (empty($score_name) || $score_value < 0 || $max_score <= 0 || empty($score_date)) {
+            $error_message = 'Please fill all fields with valid values.';
+        } elseif ($score_value > $max_score) {
+            $error_message = 'Score value cannot exceed maximum score.';
+        } else {
+            try {
+                $insert_data = [
+                    'student_subject_id' => $subject_id,
+                    'category_id' => $category_id,
+                    'score_type' => 'class_standing',
+                    'score_name' => $score_name,
+                    'score_value' => $score_value,
+                    'max_score' => $max_score,
+                    'score_date' => $score_date,
+                    'created_at' => date('Y-m-d H:i:s')
+                ];
+                
+                $result = supabaseInsert('student_subject_scores', $insert_data);
+                
+                if ($result) {
+                    $success_message = 'Score added successfully!';
+                    header("Location: subject-management.php?subject_id=$subject_id");
+                    exit;
+                } else {
+                    $error_message = 'Failed to add score.';
+                }
+            } catch (Exception $e) {
+                $error_message = 'Database error: ' . $e->getMessage();
+            }
+        }
+    }
+    
+    // ADD ATTENDANCE
+    elseif (isset($_POST['add_attendance'])) {
+        $category_id = intval($_POST['category_id']);
+        $attendance_date = $_POST['attendance_date'];
+        $attendance_status = $_POST['attendance_status'];
+        
+        if (empty($attendance_date)) {
+            $error_message = 'Please select a date.';
+        } else {
+            try {
+                $existing_attendance = supabaseFetch('student_subject_scores', [
+                    'student_subject_id' => $subject_id,
+                    'category_id' => $category_id,
+                    'score_date' => $attendance_date
+                ]);
+                
+                if ($existing_attendance && count($existing_attendance) > 0) {
+                    $error_message = 'Attendance already recorded for this date.';
+                } else {
+                    $score_value = ($attendance_status === 'present') ? 1 : 0;
+                    
+                    $insert_data = [
+                        'student_subject_id' => $subject_id,
+                        'category_id' => $category_id,
+                        'score_type' => 'class_standing',
+                        'score_name' => ucfirst($attendance_status),
+                        'score_value' => $score_value,
+                        'max_score' => 1,
+                        'score_date' => $attendance_date,
+                        'created_at' => date('Y-m-d H:i:s')
+                    ];
+                    
+                    $result = supabaseInsert('student_subject_scores', $insert_data);
+                    
+                    if ($result) {
+                        $success_message = 'Attendance recorded successfully!';
+                        header("Location: subject-management.php?subject_id=$subject_id");
+                        exit;
+                    } else {
+                        $error_message = 'Failed to record attendance.';
+                    }
+                }
+            } catch (Exception $e) {
+                $error_message = 'Database error: ' . $e->getMessage();
+            }
+        }
+    }
+    
+    // ADD MAJOR EXAM
+    elseif (isset($_POST['add_exam'])) {
+        $exam_type = $_POST['exam_type'];
+        $score_value = floatval($_POST['score_value']);
+        $max_score = floatval($_POST['max_score']);
+        
+        if ($score_value < 0 || $max_score <= 0) {
+            $error_message = 'Score value and maximum score must be positive numbers.';
+        } elseif ($score_value > $max_score) {
+            $error_message = 'Score value cannot exceed maximum score.';
+        } else {
+            $exam_name = $exam_type === 'midterm_exam' ? 'Midterm Exam' : 'Final Exam';
+            
+            try {
+                // Delete any existing exam score
+                supabaseDelete('student_subject_scores', [
+                    'student_subject_id' => $subject_id,
+                    'score_type' => $exam_type
+                ]);
+                
+                // Insert new exam score
+                $insert_data = [
+                    'student_subject_id' => $subject_id,
+                    'score_type' => $exam_type,
+                    'score_name' => $exam_name,
+                    'score_value' => $score_value,
+                    'max_score' => $max_score,
+                    'created_at' => date('Y-m-d H:i:s')
+                ];
+                
+                $result = supabaseInsert('student_subject_scores', $insert_data);
+                
+                if ($result) {
+                    $success_message = $exam_name . ' score added successfully!';
+                    header("Location: subject-management.php?subject_id=$subject_id");
+                    exit;
+                } else {
+                    $error_message = 'Failed to add exam score.';
+                }
+            } catch (Exception $e) {
+                $error_message = 'Database error: ' . $e->getMessage();
+            }
+        }
+    }
+    
+    // UPDATE SCORE
+    elseif (isset($_POST['update_score'])) {
+        $score_id = intval($_POST['score_id']);
+        $score_value = floatval($_POST['score_value']);
+        
+        try {
+            $score_data = supabaseFetch('student_subject_scores', ['id' => $score_id]);
+            
+            if ($score_data && count($score_data) > 0) {
+                $score = $score_data[0];
+                if ($score_value > $score['max_score']) {
+                    $error_message = 'Score value cannot exceed maximum score of ' . $score['max_score'];
+                } else {
+                    $update_data = ['score_value' => $score_value];
+                    $result = supabaseUpdate('student_subject_scores', $update_data, ['id' => $score_id]);
+                    
+                    if ($result) {
+                        $success_message = 'Score updated successfully!';
+                        header("Location: subject-management.php?subject_id=$subject_id");
+                        exit;
+                    } else {
+                        $error_message = 'Failed to update score.';
+                    }
+                }
+            } else {
+                $error_message = 'Score not found.';
+            }
+        } catch (Exception $e) {
+            $error_message = 'Database error: ' . $e->getMessage();
+        }
+    }
+    
+    // DELETE SCORE
+    elseif (isset($_POST['delete_score'])) {
+        $score_id = intval($_POST['score_id']);
+        
+        try {
+            $result = supabaseDelete('student_subject_scores', ['id' => $score_id]);
+            
+            if ($result) {
+                $success_message = 'Score deleted successfully!';
+                header("Location: subject-management.php?subject_id=$subject_id");
+                exit;
+            } else {
+                $error_message = 'Failed to delete score.';
+            }
+        } catch (Exception $e) {
+            $error_message = 'Database error: ' . $e->getMessage();
+        }
+    }
+    
+    // DELETE CATEGORY
+    elseif (isset($_POST['delete_category'])) {
+        $category_id = intval($_POST['category_id']);
+        
+        try {
+            supabaseDelete('student_subject_scores', ['category_id' => $category_id]);
+            $result = supabaseDelete('student_class_standing_categories', ['id' => $category_id]);
+            
+            if ($result) {
+                $success_message = 'Category deleted successfully!';
+                header("Location: subject-management.php?subject_id=$subject_id");
+                exit;
+            } else {
+                $error_message = 'Failed to delete category.';
+            }
+        } catch (Exception $e) {
+            $error_message = 'Database error: ' . $e->getMessage();
+        }
+    }
 }
 ?>
 
