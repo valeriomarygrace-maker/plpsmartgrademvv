@@ -1279,12 +1279,10 @@ function calculateGWA($grade) {
             .card,
             .subject-card,
             .modal-content {
-                background: #2d3748;
                 color: #e2e8f0;
             }
             
             .detail-item {
-                background: #4a5568;
             }
             
             .detail-value {

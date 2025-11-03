@@ -865,7 +865,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['profile_picture'])) 
             }
         }
 
-        /* Updated Logout Modal Styles */
         .modal {
             display: none;
             position: fixed;
