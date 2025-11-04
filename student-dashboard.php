@@ -1301,7 +1301,6 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
                     </div>
                 <?php endif; ?>
             </div>
-        </div>
 
         <!-- Semester High Risk Comparison -->
         <div class="card">
@@ -1335,6 +1334,7 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
             <?php endif; ?>
         </div>
     </div>
+    
 
     <!-- Logout Modal -->
     <div class="modal" id="logoutModal">
