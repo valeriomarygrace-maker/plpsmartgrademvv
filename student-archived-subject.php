@@ -1424,13 +1424,6 @@ function calculateGWA($grade) {
                                     </button>
                                 </form>
                                 <button type="button" class="btn-view" onclick="openViewModal(
-                                    '<?php echo htmlspecialchars($subject['subject_code']); ?>',
-                                    '<?php echo htmlspecialchars($subject['subject_name']); ?>',
-                                    '<?php echo htmlspecialchars($subject['credits']); ?>',
-                                    '<?php echo htmlspecialchars($subject['professor_name']); ?>',
-                                    '<?php echo htmlspecialchars($subject['schedule']); ?>',
-                                    '<?php echo htmlspecialchars($subject['semester']); ?>',
-                                    '<?php echo date('F j, Y g:i A', strtotime($subject['archived_at'])); ?>',
                                     <?php echo $subject['overall_grade'] ?? 0; ?>,
                                     <?php echo $subject['gwa'] ?? 0; ?>,
                                     <?php echo $subject['class_standing'] ?? 0; ?>,
@@ -1453,41 +1446,34 @@ function calculateGWA($grade) {
     <div class="modal" id="viewModal">
         <div class="modal-content">
             <h3 class="modal-title">
-                <i class="fas fa-info-circle"></i>
-                Archived Subject Details
+                <i class="fas fa-chart-line"></i>
+                Final Grade Summary
             </h3>
             
-            <div style="flex: 1; overflow: hidden; display: flex; flex-direction: column;">
-                <!-- Performance Overview -->
-                <div class="performance-overview">
-                    <h4 style="color: var(--plp-green); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
-                        <i class="fas fa-chart-line"></i>
-                        Final Performance Summary
-                    </h4>
-                    <div class="details-grid">
-                        <div class="detail-item">
-                            <div class="detail-label">Overall Grade</div>
-                            <div class="detail-value" id="view_overall_grade" style="font-size: 1.4rem; font-weight: 700; color: var(--plp-green); margin: 0.5rem 0;">--</div>
-                            <div class="risk-badge no-data" id="view_risk_badge" style="display: none; padding: 0.4rem 1rem; border-radius: 15px; font-size: 0.8rem; font-weight: 600;">No Data</div>
-                        </div>
-                        
-                        <div class="detail-item">
-                            <div class="detail-label">GWA</div>
-                            <div class="detail-value" id="view_gwa" style="font-size: 1.4rem; font-weight: 700; color: var(--plp-green); margin: 0.5rem 0;">--</div>
-                            <div class="detail-label" id="view_risk_description" style="font-size: 0.85rem; color: var(--text-medium); margin-top: 0.5rem;">No Data Inputted</div>
-                        </div>
-                        
-                        <div class="detail-item">
-                            <div class="detail-label">Class Standing</div>
-                            <div class="detail-value" id="view_class_standing" style="font-size: 1.4rem; font-weight: 700; color: var(--plp-green); margin: 0.5rem 0;">--</div>
-                            <div class="detail-label" style="font-size: 0.85rem; color: var(--text-medium);">of 60%</div>
-                        </div>
-                        
-                        <div class="detail-item">
-                            <div class="detail-label">Exams</div>
-                            <div class="detail-value" id="view_exams_score" style="font-size: 1.4rem; font-weight: 700; color: var(--plp-green); margin: 0.5rem 0;">--</div>
-                            <div class="detail-label" style="font-size: 0.85rem; color: var(--text-medium);">of 40%</div>
-                        </div>
+            <div class="performance-overview">
+                <div class="details-grid">
+                    <div class="detail-item">
+                        <div class="detail-label">Overall Grade</div>
+                        <div class="detail-value" id="view_overall_grade" style="font-size: 1.4rem; font-weight: 700; color: var(--plp-green); margin: 0.5rem 0;">--</div>
+                        <div class="risk-badge no-data" id="view_risk_badge" style="display: none; padding: 0.4rem 1rem; border-radius: 15px; font-size: 0.8rem; font-weight: 600;">No Data</div>
+                    </div>
+                    
+                    <div class="detail-item">
+                        <div class="detail-label">GWA</div>
+                        <div class="detail-value" id="view_gwa" style="font-size: 1.4rem; font-weight: 700; color: var(--plp-green); margin: 0.5rem 0;">--</div>
+                        <div class="detail-label" id="view_risk_description" style="font-size: 0.85rem; color: var(--text-medium); margin-top: 0.5rem;">No Data Inputted</div>
+                    </div>
+                    
+                    <div class="detail-item">
+                        <div class="detail-label">Class Standing</div>
+                        <div class="detail-value" id="view_class_standing" style="font-size: 1.4rem; font-weight: 700; color: var(--plp-green); margin: 0.5rem 0;">--</div>
+                        <div class="detail-label" style="font-size: 0.85rem; color: var(--text-medium;">of 60%</div>
+                    </div>
+                    
+                    <div class="detail-item">
+                        <div class="detail-label">Major Exams</div>
+                        <div class="detail-value" id="view_exams_score" style="font-size: 1.4rem; font-weight: 700; color: var(--plp-green); margin: 0.5rem 0;">--</div>
+                        <div class="detail-label" style="font-size: 0.85rem; color: var(--text-medium;">of 40%</div>
                     </div>
                 </div>
             </div>
@@ -1500,7 +1486,7 @@ function calculateGWA($grade) {
         </div>
     </div>
 
-        <!--  Logout Modal -->
+    <!-- Logout Modal -->
     <div class="modal" id="logoutModal">
         <div class="modal-content" style="max-width: 450px; text-align: center;">
             <h3 style="color: var(--plp-green); font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem;">
@@ -1563,19 +1549,9 @@ function calculateGWA($grade) {
         });
 
         function openViewModal(
-            subjectCode, subjectName, credits, professor, schedule, semester, archivedDate,
             overallGrade = 0, gwa = 0, classStanding = 0, examsScore = 0, riskLevel = 'no-data', 
             riskDescription = 'No Data Inputted', hasScores = false
         ) {
-            // Set basic subject details
-            document.getElementById('view_subject_code').textContent = subjectCode;
-            document.getElementById('view_subject_name').textContent = subjectName;
-            document.getElementById('view_credits').textContent = credits + ' Credits';
-            document.getElementById('view_professor').textContent = professor;
-            document.getElementById('view_schedule').textContent = schedule;
-            document.getElementById('view_semester').textContent = semester;
-            document.getElementById('view_archived_date').textContent = archivedDate;
-            
             // Set performance data
             const overallGradeNum = parseFloat(overallGrade) || 0;
             const gwaNum = parseFloat(gwa) || 0;
@@ -1591,7 +1567,7 @@ function calculateGWA($grade) {
             // Set risk badge
             const riskBadge = document.getElementById('view_risk_badge');
             if (hasScores && riskLevel !== 'no-data') {
-                riskBadge.textContent = riskLevel.charAt(0).toUpperCase() + riskLevel.slice(1);
+                riskBadge.textContent = riskLevel.charAt(0).toUpperCase() + riskLevel.slice(1) + ' Risk';
                 riskBadge.className = 'risk-badge ' + riskLevel;
                 riskBadge.style.display = 'inline-block';
             } else {
@@ -1600,6 +1576,7 @@ function calculateGWA($grade) {
                 riskBadge.style.display = 'inline-block';
             }
             
+            // Show modal
             document.getElementById('viewModal').classList.add('show');
         }
 
@@ -1634,7 +1611,7 @@ function calculateGWA($grade) {
         const cancelLogout = document.getElementById('cancelLogout');
         const confirmLogout = document.getElementById('confirmLogout');
 
-// Show modal when clicking logout button
+        // Show modal when clicking logout button
         logoutBtn.addEventListener('click', (e) => {
             e.preventDefault();
             logoutModal.classList.add('show');
@@ -1650,14 +1627,11 @@ function calculateGWA($grade) {
             window.location.href = 'logout.php';
         });
 
-// Hide modal when clicking outside the modal content
-        const modals = [addSubjectModal, editSubjectModal, archiveSubjectModal, logoutModal];
-        modals.forEach(modal => {
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    modal.classList.remove('show');
-                }
-            });
+        // Hide modal when clicking outside the modal content
+        window.addEventListener('click', (e) => {
+            if (e.target === logoutModal) {
+                logoutModal.classList.remove('show');
+            }
         });
     </script>
 </body>

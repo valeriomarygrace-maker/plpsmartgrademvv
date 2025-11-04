@@ -245,22 +245,25 @@ function calculateGWA($grade) {
 }
 
 /**
- * Get semester risk data for bar chart - UPDATED FOR CONSISTENT RISK CALCULATION
+ * Get semester risk data for bar chart - UPDATED FOR DUAL RISK DISPLAY
  */
 function getSemesterRiskData($student_id) {
     $data = [
         'first_semester' => [
             'high_risk_count' => 0,
+            'low_risk_count' => 0,
             'total_subjects' => 0,
             'subjects' => []
         ],
         'second_semester' => [
             'high_risk_count' => 0,
+            'low_risk_count' => 0,
             'total_subjects' => 0,
             'subjects' => []
         ],
         'total_archived_subjects' => 0,
-        'total_high_risk' => 0
+        'total_high_risk' => 0,
+        'total_low_risk' => 0
     ];
     
     try {
@@ -282,6 +285,7 @@ function getSemesterRiskData($student_id) {
                     $performance_data = supabaseFetch('archived_subject_performance', ['archived_subject_id' => $archived_subject['id']]);
                     
                     $is_high_risk = false;
+                    $is_low_risk = false;
                     $final_grade = 0;
                     $risk_level = 'no-data';
                     
@@ -291,8 +295,8 @@ function getSemesterRiskData($student_id) {
                         $risk_level = $performance['risk_level'];
                         
                         // Use the same risk level definition as archived subjects page
-                        // High risk includes both 'high' and 'failed' risk levels
                         $is_high_risk = ($risk_level === 'high' || $risk_level === 'failed');
+                        $is_low_risk = ($risk_level === 'low' || $risk_level === 'medium');
                     } else {
                         // Calculate performance if not stored (same as archived subjects page)
                         $calculated_performance = calculateArchivedSubjectPerformance($archived_subject['id']);
@@ -300,11 +304,15 @@ function getSemesterRiskData($student_id) {
                             $final_grade = $calculated_performance['overall_grade'];
                             $risk_level = $calculated_performance['risk_level'];
                             $is_high_risk = ($risk_level === 'high' || $risk_level === 'failed');
+                            $is_low_risk = ($risk_level === 'low' || $risk_level === 'medium');
                         }
                     }
                     
                     if ($is_high_risk) {
                         $data['total_high_risk']++;
+                    }
+                    if ($is_low_risk) {
+                        $data['total_low_risk']++;
                     }
                     
                     // Categorize by semester
@@ -313,24 +321,32 @@ function getSemesterRiskData($student_id) {
                         if ($is_high_risk) {
                             $data['first_semester']['high_risk_count']++;
                         }
+                        if ($is_low_risk) {
+                            $data['first_semester']['low_risk_count']++;
+                        }
                         $data['first_semester']['subjects'][] = [
                             'subject_code' => $subject_info['subject_code'],
                             'subject_name' => $subject_info['subject_name'],
                             'final_grade' => $final_grade,
                             'risk_level' => $risk_level,
-                            'is_high_risk' => $is_high_risk
+                            'is_high_risk' => $is_high_risk,
+                            'is_low_risk' => $is_low_risk
                         ];
                     } elseif (strpos($semester, 'second') !== false || strpos($semester, '2') !== false) {
                         $data['second_semester']['total_subjects']++;
                         if ($is_high_risk) {
                             $data['second_semester']['high_risk_count']++;
                         }
+                        if ($is_low_risk) {
+                            $data['second_semester']['low_risk_count']++;
+                        }
                         $data['second_semester']['subjects'][] = [
                             'subject_code' => $subject_info['subject_code'],
                             'subject_name' => $subject_info['subject_name'],
                             'final_grade' => $final_grade,
                             'risk_level' => $risk_level,
-                            'is_high_risk' => $is_high_risk
+                            'is_high_risk' => $is_high_risk,
+                            'is_low_risk' => $is_low_risk
                         ];
                     }
                 }
@@ -1125,6 +1141,28 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
                 grid-template-columns: 1fr;
             }
         }
+        .three-column-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .three-column-grid .card {
+            margin-bottom: 0;
+        }
+
+        @media (max-width: 1200px) {
+            .three-column-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .three-column-grid {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1206,8 +1244,9 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
             </div>
         </div>
 
-        <!-- Main Content Grid -->
-        <div class="dashboard-grid">
+        <!-- Three Column Grid: Active Subjects, Recent Scores, High Risk by Semester -->
+        <div class="three-column-grid">
+            <!-- Active Subjects -->
             <div class="card">
                 <div class="card-header">
                     <div class="card-title">
@@ -1302,28 +1341,139 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
                 <?php endif; ?>
             </div>
 
-        <!-- Semester High Risk Comparison -->
-        <div class="card">
+            <!-- High Risk Subjects by Semester -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fas fa-chart-bar"></i>
+                        Risk Overview
+                    </div>
+                </div>
+                <?php if ($semester_risk_data['total_archived_subjects'] > 0): ?>
+                    <div style="text-align: center; padding: 1rem;">
+                        <div class="bar-chart-wrapper" style="height: 200px;">
+                            <canvas id="riskOverviewChart"></canvas>
+                        </div>
+                        <div style="display: flex; justify-content: space-around; margin-top: 1rem;">
+                            <div style="text-align: center;">
+                                <div style="font-size: 1.5rem; font-weight: 700; color: #dc3545;"><?php echo $semester_risk_data['total_high_risk']; ?></div>
+                                <div style="font-size: 0.8rem; color: var(--text-medium);">High Risk</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 1.5rem; font-weight: 700; color: #28a745;"><?php echo $semester_risk_data['total_low_risk']; ?></div>
+                                <div style="font-size: 0.8rem; color: var(--text-medium);">Low Risk</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="text-align: center; margin-top: 1rem;">
+                        <a href="#detailed-risk-analysis" style="color: var(--plp-green); text-decoration: none; font-size: 0.9rem;">
+                            View Detailed Analysis ↓
+                        </a>
+                    </div>
+                <?php else: ?>
+                    <div class="empty-state">
+                        <i class="fas fa-archive"></i>
+                        <p>No Archived Subjects</p>
+                        <small>Archive subjects to see risk analysis</small>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <!-- Detailed Semester Risk Comparison -->
+        <div class="card" id="detailed-risk-analysis">
             <div class="card-header">
                 <div class="card-title">
                     <i class="fas fa-chart-bar"></i>
-                    High Risk Subjects by Semester
+                    Risk Analysis by Semester
                 </div>
             </div>
             
             <?php if ($semester_risk_data['total_archived_subjects'] > 0): ?>
                 <div class="bar-chart-container">
                     <div class="bar-chart-title">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        High Risk Subjects Comparison
+                        <i class="fas fa-chart-bar"></i>
+                        High & Low Risk Subjects by Semester
                     </div>
                     <div class="bar-chart-wrapper">
                         <canvas id="highRiskBarChart"></canvas>
                     </div>
+                    
+                    <div class="bar-chart-stats">
+                        <div class="bar-stat-card">
+                            <div class="bar-stat-value"><?php echo $semester_risk_data['first_semester']['high_risk_count']; ?></div>
+                            <div class="bar-stat-label">First Sem High Risk</div>
+                        </div>
+                        <div class="bar-stat-card">
+                            <div class="bar-stat-value"><?php echo $semester_risk_data['first_semester']['low_risk_count']; ?></div>
+                            <div class="bar-stat-label">First Sem Low Risk</div>
+                        </div>
+                        <div class="bar-stat-card">
+                            <div class="bar-stat-value"><?php echo $semester_risk_data['second_semester']['high_risk_count']; ?></div>
+                            <div class="bar-stat-label">Second Sem High Risk</div>
+                        </div>
+                        <div class="bar-stat-card">
+                            <div class="bar-stat-value"><?php echo $semester_risk_data['second_semester']['low_risk_count']; ?></div>
+                            <div class="bar-stat-label">Second Sem Low Risk</div>
+                        </div>
+                    </div>
+
+                    <!-- Subject Details (same as before) -->
+                    <div class="subject-details">
+                        <!-- First Semester Subjects -->
+                        <?php if (!empty($semester_risk_data['first_semester']['subjects'])): ?>
+                            <div class="semester-subjects">
+                                <div class="semester-subject-title">
+                                    <i class="fas fa-book"></i> First Semester Subjects
+                                </div>
+                                <?php foreach ($semester_risk_data['first_semester']['subjects'] as $subject): ?>
+                                    <div class="subject-detail-item">
+                                        <div class="subject-detail-info">
+                                            <div class="subject-detail-code"><?php echo htmlspecialchars($subject['subject_code']); ?></div>
+                                            <div class="subject-detail-name"><?php echo htmlspecialchars($subject['subject_name']); ?></div>
+                                        </div>
+                                        <div class="subject-detail-grade">
+                                            <div class="subject-final-grade <?php echo $subject['is_high_risk'] ? 'grade-high-risk' : 'grade-safe'; ?>">
+                                                <?php echo $subject['final_grade'] > 0 ? number_format($subject['final_grade'], 1) . '%' : 'No Data'; ?>
+                                            </div>
+                                            <span class="risk-badge <?php echo $subject['risk_level']; ?>">
+                                                <?php echo ucfirst($subject['risk_level']); ?> Risk
+                                            </span>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php endif; ?>
+
+                        <!-- Second Semester Subjects -->
+                        <?php if (!empty($semester_risk_data['second_semester']['subjects'])): ?>
+                            <div class="semester-subjects">
+                                <div class="semester-subject-title">
+                                    <i class="fas fa-book"></i> Second Semester Subjects
+                                </div>
+                                <?php foreach ($semester_risk_data['second_semester']['subjects'] as $subject): ?>
+                                    <div class="subject-detail-item">
+                                        <div class="subject-detail-info">
+                                            <div class="subject-detail-code"><?php echo htmlspecialchars($subject['subject_code']); ?></div>
+                                            <div class="subject-detail-name"><?php echo htmlspecialchars($subject['subject_name']); ?></div>
+                                        </div>
+                                        <div class="subject-detail-grade">
+                                            <div class="subject-final-grade <?php echo $subject['is_high_risk'] ? 'grade-high-risk' : 'grade-safe'; ?>">
+                                                <?php echo $subject['final_grade'] > 0 ? number_format($subject['final_grade'], 1) . '%' : 'No Data'; ?>
+                                            </div>
+                                            <span class="risk-badge <?php echo $subject['risk_level']; ?>">
+                                                <?php echo ucfirst($subject['risk_level']); ?> Risk
+                                            </span>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php endif; ?>
+                    </div>
                 </div>
             <?php else: ?>
                 <div class="empty-state">
-                    <i class="fas fa-archive" style="font-size: 2.5rem; color: var(--text-light); margin-bottom: 1rem;"></i>
+                    <i class="fas fa-archive"></i>
                     <p>No Archived Subjects Found</p>
                     <small>Subjects will appear here once you archive them from your active subjects</small>
                     <br>
@@ -1334,185 +1484,98 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
             <?php endif; ?>
         </div>
     </div>
-    
-
-    <!-- Logout Modal -->
-    <div class="modal" id="logoutModal">
-        <div class="modal-content" style="max-width: 450px; text-align: center;">
-            <h3 style="color: var(--plp-green); font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem;">
-                Confirm Logout
-            </h3>
-            <div style="color: var(--text-medium); margin-bottom: 2rem; line-height: 1.6;">
-                Are you sure you want to logout? You'll need<br>
-                to log in again to access your account.
-            </div>
-            <div style="display: flex; justify-content: center; gap: 1rem;">
-                <button class="modal-btn modal-btn-cancel" id="cancelLogout" style="min-width: 120px;">
-                    Cancel
-                </button>
-                <button class="modal-btn modal-btn-confirm" id="confirmLogout" style="min-width: 120px;">
-                    Yes, Logout
-                </button>
-            </div>
-        </div>
-    </div>
 
     <script>
-        // Auto-hide success/error messages after 5 seconds
-        setTimeout(() => {
-            const alerts = document.querySelectorAll('.alert-error');
-            alerts.forEach(alert => {
-                alert.style.transition = 'opacity 0.3s ease';
-                alert.style.opacity = '0';
-                setTimeout(() => {
-                    if (alert.parentNode) {
-                        alert.remove();
-                    }
-                }, 300);
-            });
-        }, 5000);
-
-        // Add subtle animations to metric cards
-        document.addEventListener('DOMContentLoaded', function() {
-            const metricCards = document.querySelectorAll('.metric-card');
-            metricCards.forEach((card, index) => {
-                card.style.animationDelay = `${index * 0.1}s`;
-                card.style.animation = 'fadeInUp 0.6s ease-out';
-            });
-        });
-
-        // Initialize Bar Chart for High Risk Subjects by Semester
-        function initializeHighRiskBarChart() {
-            // Get semester risk data from PHP
+        // Initialize Charts
+        function initializeCharts() {
             const semesterRiskData = <?php echo json_encode($semester_risk_data); ?>;
             
-            // Only initialize if there are archived subjects
             if (semesterRiskData.total_archived_subjects > 0) {
-                const highRiskCtx = document.getElementById('highRiskBarChart').getContext('2d');
-                const highRiskData = {
-                    labels: ['First Semester', 'Second Semester'],
-                    datasets: [{
-                        label: 'High Risk Subjects',
-                        data: [
-                            semesterRiskData.first_semester.high_risk_count || 0,
-                            semesterRiskData.second_semester.high_risk_count || 0
-                        ],
-                        backgroundColor: [
-                            '#dc3545', // First Semester - Red
-                            '#ff6b6b'  // Second Semester - Light Red
-                        ],
-                        borderColor: [
-                            '#c53030',
-                            '#ff5252'
-                        ],
-                        borderWidth: 2,
-                        borderRadius: 8,
-                        borderSkipped: false,
-                    }]
-                };
-                
-                new Chart(highRiskCtx, {
-                    type: 'bar',
-                    data: highRiskData,
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                display: true,
-                                position: 'top',
-                                labels: {
-                                    padding: 15,
-                                    usePointStyle: true,
-                                    font: {
-                                        size: 12
-                                    }
-                                }
-                            },
-                            tooltip: {
-                                callbacks: {
-                                    label: function(context) {
-                                        const label = context.dataset.label || '';
-                                        const value = context.raw || 0;
-                                        const semester = context.label;
-                                        const totalSubjects = semester === 'First Semester' 
-                                            ? semesterRiskData.first_semester.total_subjects 
-                                            : semesterRiskData.second_semester.total_subjects;
-                                        const percentage = totalSubjects > 0 ? Math.round((value / totalSubjects) * 100) : 0;
-                                        return `${label}: ${value} out of ${totalSubjects} subjects (${percentage}%)`;
+                // Risk Overview Chart (for the 3-column grid)
+                const riskOverviewCtx = document.getElementById('riskOverviewChart')?.getContext('2d');
+                if (riskOverviewCtx) {
+                    new Chart(riskOverviewCtx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['High Risk', 'Low Risk'],
+                            datasets: [{
+                                data: [
+                                    semesterRiskData.total_high_risk,
+                                    semesterRiskData.total_low_risk
+                                ],
+                                backgroundColor: ['#dc3545', '#28a745'],
+                                borderWidth: 2,
+                                borderColor: '#fff'
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            cutout: '70%',
+                            plugins: {
+                                legend: {
+                                    position: 'bottom',
+                                    labels: {
+                                        padding: 15,
+                                        usePointStyle: true
                                     }
                                 }
                             }
-                        },
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                title: {
-                                    display: true,
-                                    text: 'Number of High Risk Subjects',
-                                    font: {
-                                        size: 12,
-                                        weight: 'bold'
-                                    }
-                                },
-                                ticks: {
-                                    stepSize: 1,
-                                    precision: 0
-                                }
-                            },
-                            x: {
-                                title: {
-                                    display: true,
-                                    text: 'Semester',
-                                    font: {
-                                        size: 12,
-                                        weight: 'bold'
-                                    }
-                                }
-                            }
-                        },
-                        animation: {
-                            duration: 1000,
-                            easing: 'easeOutQuart'
                         }
-                    }
-                });
+                    });
+                }
+
+                // Detailed Bar Chart
+                const highRiskCtx = document.getElementById('highRiskBarChart')?.getContext('2d');
+                if (highRiskCtx) {
+                    new Chart(highRiskCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: ['First Semester', 'Second Semester'],
+                            datasets: [
+                                {
+                                    label: 'High Risk',
+                                    data: [
+                                        semesterRiskData.first_semester.high_risk_count,
+                                        semesterRiskData.second_semester.high_risk_count
+                                    ],
+                                    backgroundColor: '#dc3545',
+                                    borderColor: '#c53030',
+                                    borderWidth: 2
+                                },
+                                {
+                                    label: 'Low Risk',
+                                    data: [
+                                        semesterRiskData.first_semester.low_risk_count,
+                                        semesterRiskData.second_semester.low_risk_count
+                                    ],
+                                    backgroundColor: '#28a745',
+                                    borderColor: '#2f855a',
+                                    borderWidth: 2
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                x: {
+                                    stacked: false,
+                                },
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: {
+                                        stepSize: 1
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
             }
         }
 
-        // Initialize charts when page loads
-        document.addEventListener('DOMContentLoaded', function() {
-            initializeHighRiskBarChart();
-        });
-
-        // Logout modal functionality
-        const logoutBtn = document.querySelector('.logout-btn');
-        const logoutModal = document.getElementById('logoutModal');
-        const cancelLogout = document.getElementById('cancelLogout');
-        const confirmLogout = document.getElementById('confirmLogout');
-
-        // Show modal when clicking logout button
-        logoutBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            logoutModal.classList.add('show');
-        });
-
-        // Hide modal when clicking cancel
-        cancelLogout.addEventListener('click', () => {
-            logoutModal.classList.remove('show');
-        });
-
-        // Handle logout confirmation
-        confirmLogout.addEventListener('click', () => {
-            window.location.href = 'logout.php';
-        });
-
-        // Hide modal when clicking outside the modal content
-        logoutModal.addEventListener('click', (e) => {
-            if (e.target === logoutModal) {
-                logoutModal.classList.remove('show');
-            }
-        });
+        document.addEventListener('DOMContentLoaded', initializeCharts);
     </script>
 </body>
 </html>
