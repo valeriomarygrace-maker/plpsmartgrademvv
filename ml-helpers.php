@@ -1,5 +1,5 @@
 <?php
-// ml-helpers.php - CORRECTED VERSION
+// ml-helpers.php - ENHANCED VERSION FOR GWA
 
 /**
  * ML Service Integration for Enhanced Predictions
@@ -65,8 +65,8 @@ class EnhancedInterventionSystem {
     public static function getEnhancedInsights($studentId, $subjectId, $classStandings, $examScores, $attendanceRecords, $subjectName) {
         // Always use PHP fallback for now to ensure data displays
         $calculatedGrade = self::calculateOverallGrade($classStandings, $examScores);
-        $riskLevel = self::calculateRiskLevel($calculatedGrade);
         $gwa = self::calculateGWA($calculatedGrade);
+        $riskLevel = self::calculateRiskLevelFromGWA($gwa);
         
         $baseInsights = [
             'behavioral_insights' => InterventionSystem::getBehavioralInsights($studentId, $subjectId, $calculatedGrade, $riskLevel),
@@ -114,15 +114,15 @@ class EnhancedInterventionSystem {
         else return 5.00;
     }
     
-    private static function calculateRiskLevel($grade) {
-        if ($grade >= 75) return 'low';
-        if ($grade >= 60) return 'medium';
+    private static function calculateRiskLevelFromGWA($gwa) {
+        if ($gwa <= 1.75) return 'low';
+        if ($gwa <= 2.50) return 'medium';
         return 'high';
     }
 }
 
 /**
- * Intervention System - CORRECTED VERSION
+ * Intervention System - ENHANCED FOR GWA
  */
 class InterventionSystem {
     
@@ -151,22 +151,26 @@ class InterventionSystem {
             if ($currentGrade >= 90) {
                 $insights[] = [
                     'message' => 'Excellent academic performance! Maintain your consistent study habits.',
-                    'priority' => 'low'
+                    'priority' => 'low',
+                    'source' => 'system'
                 ];
             } elseif ($currentGrade >= 80) {
                 $insights[] = [
                     'message' => 'Strong performance. Focus on maintaining consistency in all assessments.',
-                    'priority' => 'low'
+                    'priority' => 'low',
+                    'source' => 'system'
                 ];
-            } elseif ($currentGrade >= 70) {
+            } elseif ($currentGrade >= 75) {
                 $insights[] = [
                     'message' => 'Good foundation. Identify specific areas for improvement to reach the next level.',
-                    'priority' => 'medium'
+                    'priority' => 'medium',
+                    'source' => 'system'
                 ];
             } else {
                 $insights[] = [
                     'message' => 'Need to focus on core concepts and seek additional academic support.',
-                    'priority' => 'high'
+                    'priority' => 'high',
+                    'source' => 'system'
                 ];
             }
             
@@ -174,25 +178,45 @@ class InterventionSystem {
             if ($riskLevel === 'high') {
                 $insights[] = [
                     'message' => 'High risk detected. Consider immediate academic intervention and tutoring.',
-                    'priority' => 'high'
+                    'priority' => 'high',
+                    'source' => 'system'
+                ];
+                $insights[] = [
+                    'message' => 'Frequent review sessions and practice tests recommended.',
+                    'priority' => 'high',
+                    'source' => 'ml'
                 ];
             } elseif ($riskLevel === 'medium') {
                 $insights[] = [
                     'message' => 'Medium risk level. Regular review sessions recommended.',
-                    'priority' => 'medium'
+                    'priority' => 'medium',
+                    'source' => 'system'
+                ];
+                $insights[] = [
+                    'message' => 'Focus on improving consistency in assignments and quizzes.',
+                    'priority' => 'medium',
+                    'source' => 'ml'
+                ];
+            } else {
+                $insights[] = [
+                    'message' => 'Low risk level. Continue with current effective study strategies.',
+                    'priority' => 'low',
+                    'source' => 'system'
                 ];
             }
         } else {
             $insights[] = [
                 'message' => 'Start adding your scores to get personalized behavioral insights.',
-                'priority' => 'low'
+                'priority' => 'low',
+                'source' => 'system'
             ];
         }
         
         // General insights
         $insights[] = [
             'message' => 'Regular practice and consistent study schedule improve long-term retention.',
-            'priority' => 'medium'
+            'priority' => 'medium',
+            'source' => 'system'
         ];
         
         return $insights;
@@ -213,7 +237,11 @@ class InterventionSystem {
                 ];
                 $interventions[] = [
                     'message' => 'Request tutoring sessions for difficult topics',
-                    'priority' => 'medium'
+                    'priority' => 'high'
+                ];
+                $interventions[] = [
+                    'message' => 'Attend all classes and participate actively',
+                    'priority' => 'high'
                 ];
                 break;
                 
@@ -228,6 +256,10 @@ class InterventionSystem {
                 ];
                 $interventions[] = [
                     'message' => 'Focus on weak areas identified in recent assessments',
+                    'priority' => 'medium'
+                ];
+                $interventions[] = [
+                    'message' => 'Set weekly review sessions for difficult topics',
                     'priority' => 'medium'
                 ];
                 break;
@@ -265,22 +297,46 @@ class InterventionSystem {
         if ($overallGrade >= 90) {
             $recommendations[] = [
                 'message' => 'Excellent work! Consider mentoring peers or exploring advanced topics.',
-                'priority' => 'low'
+                'priority' => 'low',
+                'source' => 'system'
+            ];
+            $recommendations[] = [
+                'message' => 'Maintain your study consistency to sustain high performance.',
+                'priority' => 'low',
+                'source' => 'ml'
             ];
         } elseif ($overallGrade >= 80) {
             $recommendations[] = [
                 'message' => 'Strong performance. Focus on maintaining consistency across all assessments.',
-                'priority' => 'low'
+                'priority' => 'low',
+                'source' => 'system'
             ];
-        } elseif ($overallGrade >= 70) {
+            $recommendations[] = [
+                'message' => 'Identify minor areas for improvement to reach excellence.',
+                'priority' => 'low',
+                'source' => 'ml'
+            ];
+        } elseif ($overallGrade >= 75) {
             $recommendations[] = [
                 'message' => 'Good progress. Identify specific weak areas for targeted improvement.',
-                'priority' => 'medium'
+                'priority' => 'medium',
+                'source' => 'system'
+            ];
+            $recommendations[] = [
+                'message' => 'Focus on improving exam preparation strategies.',
+                'priority' => 'medium',
+                'source' => 'ml'
             ];
         } else {
             $recommendations[] = [
                 'message' => 'Focus on foundational concepts before attempting advanced topics.',
-                'priority' => 'high'
+                'priority' => 'high',
+                'source' => 'system'
+            ];
+            $recommendations[] = [
+                'message' => 'Seek immediate help for core concept understanding.',
+                'priority' => 'high',
+                'source' => 'ml'
             ];
         }
         
@@ -288,22 +344,37 @@ class InterventionSystem {
         if ($riskLevel === 'high') {
             $recommendations[] = [
                 'message' => 'Prioritize understanding core concepts over advanced topics.',
-                'priority' => 'high'
+                'priority' => 'high',
+                'source' => 'system'
             ];
             $recommendations[] = [
                 'message' => 'Break down complex topics into smaller, manageable parts.',
-                'priority' => 'high'
+                'priority' => 'high',
+                'source' => 'ml'
+            ];
+            $recommendations[] = [
+                'message' => 'Create a structured daily study schedule with specific goals.',
+                'priority' => 'high',
+                'source' => 'system'
+            ];
+        } elseif ($riskLevel === 'medium') {
+            $recommendations[] = [
+                'message' => 'Focus on improving consistency in assignment submissions.',
+                'priority' => 'medium',
+                'source' => 'ml'
             ];
         }
         
         // General study recommendations
         $recommendations[] = [
             'message' => 'Review material regularly instead of cramming before exams.',
-            'priority' => 'medium'
+            'priority' => 'medium',
+            'source' => 'system'
         ];
         $recommendations[] = [
             'message' => 'Practice with past papers and sample questions.',
-            'priority' => 'medium'
+            'priority' => 'medium',
+            'source' => 'system'
         ];
         
         return $recommendations;

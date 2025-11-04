@@ -511,7 +511,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 ?>
 
-<!-- The rest of your HTML remains exactly the same -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -521,7 +520,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* Your existing CSS styles remain exactly the same */
         :root {
             --plp-green: #006341;
             --plp-green-light: #008856;
@@ -1522,10 +1520,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <div class="performance-label">
                             <?php 
                             if ($gwa <= 1.00) echo 'Excellent';
-                            elseif ($gwa <= 1.25) echo 'Very Good ';
+                            elseif ($gwa <= 1.25) echo 'Very Good';
                             elseif ($gwa <= 1.50) echo 'Good';
                             elseif ($gwa <= 1.75) echo 'Satisfactory';
-                            elseif ($gwa <= 2.00) echo 'Passing';
+                            elseif ($gwa <= 2.00) echo 'Fair';
                             elseif ($gwa <= 2.25) echo 'Needs Improvement';
                             elseif ($gwa <= 2.50) echo 'Needs Improvement';
                             elseif ($gwa <= 2.75) echo 'Poor';
@@ -1711,6 +1709,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <?php 
                         $midterm = reset($midtermExam);
                         ?>
+                        <p style="color: var(--text-medium); margin-top: 0.5rem; font-size: 0.9rem;">
+                            Score: <?php echo $midterm['score_value']; ?>/<?php echo $midterm['max_score']; ?>
+                        </p>
+                        <p style="color: var(--text-light); font-size: 0.75rem; margin-top: 0.3rem;">
+                            Weighted: <?php echo number_format($midtermScore, 1); ?>%
+                        </p>
                     <?php else: ?>
                         <p style="color: var(--text-light); margin-top: 0.5rem; font-size: 0.9rem;">
                             Click to add score
@@ -1726,6 +1730,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <?php 
                         $final = reset($finalExam);
                         ?>
+                        <p style="color: var(--text-medium); margin-top: 0.5rem; font-size: 0.9rem;">
+                            Score: <?php echo $final['score_value']; ?>/<?php echo $final['max_score']; ?>
+                        </p>
+                        <p style="color: var(--text-light); font-size: 0.75rem; margin-top: 0.3rem;">
+                            Weighted: <?php echo number_format($finalScore, 1); ?>%
+                        </p>
                     <?php else: ?>
                         <p style="color: var(--text-light); margin-top: 0.5rem; font-size: 0.9rem;">
                             Click to add score
@@ -1858,7 +1868,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <label for="category_percentage" class="form-label">Percentage Weight</label>
                         <input type="number" id="category_percentage" name="category_percentage" class="form-input" min="1" max="<?php echo 60 - $totalClassStandingPercentage; ?>" required placeholder="Enter percentage">
                         <p style="text-align: left; margin-top: 0.5rem; color: var(--text-medium); font-size: 0.85rem;">
-                            Remaining allocation: <?php echo 60 - $totalClassStandingPercentage; ?>%
+                            Remaining allocation: <?php echo remainingAllocation; ?>%
                         </p>
                     </div>
                     
@@ -1974,7 +1984,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             <form id="deleteScoreForm" method="POST" style="margin-top: 1rem; border-top: 1px solid #eee; padding-top: 1rem;">
                 <input type="hidden" name="delete_score" value="1">
-                <input type="hidden" name="score_id" value="<?php echo $score['id']; ?>">
+                <input type="hidden" name="score_id" id="deleteScoreId">
                 <button type="submit" class="modal-btn" style="background: var(--danger); color: white; width: 100%;" onclick="return confirm('Are you sure you want to delete this score?')">
                     Delete Score
                 </button>
@@ -2064,22 +2074,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             });
         });
 
-        // Load existing exam scores into modal when opening
-        const examModal = document.getElementById('examModal');
-        if (examModal) {
-            examModal.addEventListener('show', function() {
-                const examType = document.getElementById('examType').value;
-                loadExistingExamScore(examType);
-            });
+        // Auto-show interventions tab if risk level is medium or high
+        const riskBadge = document.querySelector('.risk-badge');
+        if (riskBadge && (riskBadge.classList.contains('medium') || riskBadge.classList.contains('high'))) {
+            // Auto-select interventions tab for medium/high risk after a short delay
+            setTimeout(() => {
+                document.querySelector('.insight-tab[data-tab="interventions"]').click();
+            }, 500);
         }
     });
-
-    function loadExistingExamScore(examType) {
-        // This function would load existing exam scores if any
-        // For now, we'll just reset the form to ensure clean state
-        document.getElementById('exam_score').value = '';
-        document.getElementById('max_score').value = '';
-    }
 
     function openAddCategoryModal() {
         document.getElementById('addCategoryModal').classList.add('show');
@@ -2145,10 +2148,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         document.getElementById('examModalTitle').textContent = 
             examType === 'midterm_exam' ? 'Add Midterm Exam Score' : 'Add Final Exam Score';
         
-        // ALWAYS reset form values to empty to ensure clean state
+        // Reset form values first
         document.getElementById('examForm').reset();
         document.getElementById('exam_score').value = '';
         document.getElementById('max_score').value = '';
+        
+        // Load existing scores if available
+        <?php if (!empty($midtermExam)): ?>
+        if (examType === 'midterm_exam') {
+            const midterm = <?php echo json_encode(reset($midtermExam)); ?>;
+            if (midterm && midterm.score_value !== undefined) {
+                document.getElementById('exam_score').value = midterm.score_value;
+                document.getElementById('max_score').value = midterm.max_score;
+            }
+        }
+        <?php endif; ?>
+        
+        <?php if (!empty($finalExam)): ?>
+        if (examType === 'final_exam') {
+            const final = <?php echo json_encode(reset($finalExam)); ?>;
+            if (final && final.score_value !== undefined) {
+                document.getElementById('exam_score').value = final.score_value;
+                document.getElementById('max_score').value = final.max_score;
+            }
+        }
+        <?php endif; ?>
         
         document.getElementById('examModal').classList.add('show');
     }
@@ -2175,6 +2199,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if (e.target === document.getElementById('examModal')) {
             closeExamModal();
+        }
+        if (e.target === document.getElementById('logoutModal')) {
+            closeLogoutModal();
         }
     });
 
@@ -2249,6 +2276,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     const cancelLogout = document.getElementById('cancelLogout');
     const confirmLogout = document.getElementById('confirmLogout');
 
+    function closeLogoutModal() {
+        logoutModal.classList.remove('show');
+    }
+
     // Show modal when clicking logout button
     logoutBtn.addEventListener('click', (e) => {
         e.preventDefault();
@@ -2257,7 +2288,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Hide modal when clicking cancel
     cancelLogout.addEventListener('click', () => {
-        logoutModal.classList.remove('show');
+        closeLogoutModal();
     });
 
     // Handle logout confirmation
@@ -2268,7 +2299,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Hide modal when clicking outside the modal content
     logoutModal.addEventListener('click', (e) => {
         if (e.target === logoutModal) {
-            logoutModal.classList.remove('show');
+            closeLogoutModal();
         }
     });
 </script>
