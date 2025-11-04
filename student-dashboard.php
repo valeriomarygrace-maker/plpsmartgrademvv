@@ -245,13 +245,22 @@ function calculateGWA($grade) {
 }
 
 /**
- * Get semester risk data for pie charts - UPDATED FOR SINGLE PIE CHART
+ * Get semester risk data for bar chart - UPDATED FOR BAR CHART BY SEMESTER
  */
 function getSemesterRiskData($student_id) {
     $data = [
-        'high_risk_count' => 0,
-        'other_subjects_count' => 0,
-        'total_archived_subjects' => 0
+        'first_semester' => [
+            'high_risk_count' => 0,
+            'total_subjects' => 0,
+            'subjects' => []
+        ],
+        'second_semester' => [
+            'high_risk_count' => 0,
+            'total_subjects' => 0,
+            'subjects' => []
+        ],
+        'total_archived_subjects' => 0,
+        'total_high_risk' => 0
     ];
     
     try {
@@ -262,19 +271,57 @@ function getSemesterRiskData($student_id) {
             $data['total_archived_subjects'] = count($archived_subjects);
             
             foreach ($archived_subjects as $archived_subject) {
-                // Get performance data for archived subject
-                $performance_data = supabaseFetch('archived_subject_performance', ['archived_subject_id' => $archived_subject['id']]);
+                // Get subject info to determine semester
+                $subject_data = supabaseFetch('subjects', ['id' => $archived_subject['subject_id']]);
                 
-                if ($performance_data && count($performance_data) > 0) {
-                    $performance = $performance_data[0];
-                    if ($performance['risk_level'] === 'high') {
-                        $data['high_risk_count']++;
+                if ($subject_data && count($subject_data) > 0) {
+                    $subject_info = $subject_data[0];
+                    $semester = strtolower($subject_info['semester']);
+                    
+                    // Get performance data for archived subject
+                    $performance_data = supabaseFetch('archived_subject_performance', ['archived_subject_id' => $archived_subject['id']]);
+                    
+                    $is_high_risk = false;
+                    $final_grade = 0;
+                    
+                    if ($performance_data && count($performance_data) > 0) {
+                        $performance = $performance_data[0];
+                        $final_grade = $performance['overall_grade'];
+                        
+                        // Determine high risk based on FINAL GRADE (not GWA)
+                        // High risk: below 75% final grade
+                        if ($final_grade < 75 && $final_grade > 0) {
+                            $is_high_risk = true;
+                            $data['total_high_risk']++;
+                        }
+                    }
+                    
+                    // Categorize by semester
+                    if (strpos($semester, 'first') !== false || strpos($semester, '1') !== false) {
+                        $data['first_semester']['total_subjects']++;
+                        if ($is_high_risk) {
+                            $data['first_semester']['high_risk_count']++;
+                        }
+                        $data['first_semester']['subjects'][] = [
+                            'subject_code' => $subject_info['subject_code'],
+                            'subject_name' => $subject_info['subject_name'],
+                            'final_grade' => $final_grade,
+                            'is_high_risk' => $is_high_risk
+                        ];
+                    } elseif (strpos($semester, 'second') !== false || strpos($semester, '2') !== false) {
+                        $data['second_semester']['total_subjects']++;
+                        if ($is_high_risk) {
+                            $data['second_semester']['high_risk_count']++;
+                        }
+                        $data['second_semester']['subjects'][] = [
+                            'subject_code' => $subject_info['subject_code'],
+                            'subject_name' => $subject_info['subject_name'],
+                            'final_grade' => $final_grade,
+                            'is_high_risk' => $is_high_risk
+                        ];
                     }
                 }
             }
-            
-            // Calculate other subjects count (non-high risk)
-            $data['other_subjects_count'] = $data['total_archived_subjects'] - $data['high_risk_count'];
         }
         
     } catch (Exception $e) {
@@ -693,43 +740,8 @@ function getSemesterRiskData($student_id) {
             color: #718096;
         }
 
-        /* Graph Styles */
-        .graph-container {
-            height: 250px;
-            position: relative;
-            margin-top: 1rem;
-        }
-
-        .semester-stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 0.75rem;
-            margin-top: 1rem;
-        }
-
-        .stat-card {
-            background: var(--plp-green-pale);
-            padding: 0.75rem;
-            border-radius: var(--border-radius);
-            text-align: center;
-            border-left: 3px solid var(--plp-green);
-        }
-
-        .stat-value {
-            font-size: 1.2rem;
-            font-weight: 700;
-            color: var(--plp-green);
-            margin-bottom: 0.25rem;
-        }
-
-        .stat-label {
-            font-size: 0.75rem;
-            color: var(--text-medium);
-            font-weight: 500;
-        }
-
-        /* Single Pie Chart Styles */
-        .pie-chart-container {
+        /* Bar Chart Styles */
+        .bar-chart-container {
             background: white;
             padding: 1.5rem;
             border-radius: var(--border-radius);
@@ -738,7 +750,7 @@ function getSemesterRiskData($student_id) {
             margin-top: 1rem;
         }
 
-        .pie-chart-title {
+        .bar-chart-title {
             color: var(--plp-green);
             font-size: 1.1rem;
             font-weight: 600;
@@ -749,20 +761,20 @@ function getSemesterRiskData($student_id) {
             gap: 0.5rem;
         }
 
-        .pie-chart-wrapper {
+        .bar-chart-wrapper {
             position: relative;
-            height: 250px;
+            height: 300px;
             margin: 0 auto;
         }
 
-        .pie-chart-stats {
+        .bar-chart-stats {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 1rem;
             margin-top: 1rem;
         }
 
-        .pie-stat-card {
+        .bar-stat-card {
             background: var(--plp-green-pale);
             padding: 1rem;
             border-radius: var(--border-radius);
@@ -770,17 +782,100 @@ function getSemesterRiskData($student_id) {
             border-left: 3px solid var(--plp-green);
         }
 
-        .pie-stat-value {
+        .bar-stat-value {
             font-size: 1.5rem;
             font-weight: 700;
             color: var(--plp-green);
             margin-bottom: 0.25rem;
         }
 
-        .pie-stat-label {
+        .bar-stat-label {
             font-size: 0.8rem;
             color: var(--text-medium);
             font-weight: 500;
+        }
+
+        .semester-comparison {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: #f8fafc;
+            border-radius: var(--border-radius);
+            border-left: 4px solid var(--plp-green);
+        }
+
+        .comparison-title {
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .comparison-text {
+            color: var(--text-medium);
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        /* Subject List Styles */
+        .subject-details {
+            margin-top: 1.5rem;
+        }
+
+        .semester-subjects {
+            margin-bottom: 1.5rem;
+        }
+
+        .semester-subject-title {
+            font-weight: 600;
+            color: var(--plp-green);
+            margin-bottom: 0.75rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--plp-green-lighter);
+        }
+
+        .subject-detail-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem;
+            background: var(--plp-green-pale);
+            margin-bottom: 0.5rem;
+            border-radius: 8px;
+            border-left: 3px solid var(--plp-green);
+        }
+
+        .subject-detail-info {
+            flex: 1;
+        }
+
+        .subject-detail-code {
+            font-weight: 600;
+            color: var(--plp-green);
+            font-size: 0.85rem;
+        }
+
+        .subject-detail-name {
+            color: var(--text-dark);
+            font-size: 0.8rem;
+        }
+
+        .subject-detail-grade {
+            text-align: right;
+        }
+
+        .subject-final-grade {
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+
+        .grade-high-risk {
+            color: var(--danger);
+        }
+
+        .grade-safe {
+            color: var(--success);
         }
 
         /* Modal Styles */
@@ -886,17 +981,13 @@ function getSemesterRiskData($student_id) {
                 grid-template-columns: 1fr;
             }
             
-            .semester-stats {
-                grid-template-columns: repeat(2, 1fr);
-            }
-            
-            .pie-chart-stats {
+            .bar-chart-stats {
                 grid-template-columns: 1fr;
             }
         }
 
         @media (max-width: 480px) {
-            .pie-chart-stats {
+            .bar-chart-stats {
                 grid-template-columns: 1fr;
             }
         }
@@ -1078,58 +1169,119 @@ function getSemesterRiskData($student_id) {
             </div>
         </div>
 
-        <!-- High Risk Subjects Analysis -->
+        <!-- Semester High Risk Comparison -->
         <div class="card">
             <div class="card-header">
                 <div class="card-title">
-                    <i class="fas fa-chart-pie"></i>
-                    High Risk Subjects Analysis
+                    <i class="fas fa-chart-bar"></i>
+                    High Risk Subjects by Semester
                 </div>
             </div>
             
             <?php if ($semester_risk_data['total_archived_subjects'] > 0): ?>
-                <div class="pie-chart-container">
-                    <div class="pie-chart-title">
+                <div class="bar-chart-container">
+                    <div class="bar-chart-title">
                         <i class="fas fa-exclamation-triangle"></i>
-                        High Risk Subjects in Archived Records
+                        High Risk Subjects Comparison (Based on Final Grade)
                     </div>
-                    <div class="pie-chart-wrapper">
-                        <canvas id="highRiskPieChart"></canvas>
-                    </div>
-                    
-                    <div class="pie-chart-stats">
-                        <div class="pie-stat-card">
-                            <div class="pie-stat-value"><?php echo $semester_risk_data['high_risk_count']; ?></div>
-                            <div class="pie-stat-label">High Risk Subjects</div>
-                        </div>
-                        <div class="pie-stat-card">
-                            <div class="pie-stat-value"><?php echo $semester_risk_data['total_archived_subjects']; ?></div>
-                            <div class="pie-stat-label">Total Archived Subjects</div>
-                        </div>
+                    <div class="bar-chart-wrapper">
+                        <canvas id="highRiskBarChart"></canvas>
                     </div>
                     
-                    <?php if ($semester_risk_data['high_risk_count'] > 0): ?>
-                        <div style="margin-top: 1rem; padding: 1rem; background: #fef5e7; border-radius: var(--border-radius); border-left: 4px solid var(--warning);">
-                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
-                                <i class="fas fa-exclamation-triangle" style="color: var(--warning);"></i>
-                                <strong style="color: var(--text-dark);">Attention Needed</strong>
-                            </div>
-                            <p style="color: var(--text-medium); font-size: 0.9rem; margin: 0;">
-                                You have <?php echo $semester_risk_data['high_risk_count']; ?> high-risk subject(s) in your academic history. 
-                                Consider reviewing these subjects and seeking academic support if needed.
-                            </p>
+                    <div class="bar-chart-stats">
+                        <div class="bar-stat-card">
+                            <div class="bar-stat-value"><?php echo $semester_risk_data['first_semester']['high_risk_count']; ?></div>
+                            <div class="bar-stat-label">First Semester High Risk</div>
                         </div>
-                    <?php else: ?>
-                        <div style="margin-top: 1rem; padding: 1rem; background: #f0f9ff; border-radius: var(--border-radius); border-left: 4px solid var(--info);">
-                            <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                <i class="fas fa-check-circle" style="color: var(--info);"></i>
-                                <strong style="color: var(--text-dark);">Good Performance</strong>
-                            </div>
-                            <p style="color: var(--text-medium); font-size: 0.9rem; margin: 0.5rem 0 0 0;">
-                                No high-risk subjects found in your archived records. Keep up the good work!
-                            </p>
+                        <div class="bar-stat-card">
+                            <div class="bar-stat-value"><?php echo $semester_risk_data['second_semester']['high_risk_count']; ?></div>
+                            <div class="bar-stat-label">Second Semester High Risk</div>
                         </div>
-                    <?php endif; ?>
+                    </div>
+
+                    <!-- Semester Comparison Analysis -->
+                    <div class="semester-comparison">
+                        <div class="comparison-title">
+                            <i class="fas fa-chart-line"></i>
+                            Semester Performance Analysis
+                        </div>
+                        <div class="comparison-text">
+                            <?php
+                            $first_sem_high_risk = $semester_risk_data['first_semester']['high_risk_count'];
+                            $second_sem_high_risk = $semester_risk_data['second_semester']['high_risk_count'];
+                            $total_high_risk = $first_sem_high_risk + $second_sem_high_risk;
+                            
+                            if ($total_high_risk > 0) {
+                                if ($first_sem_high_risk > $second_sem_high_risk) {
+                                    echo "First semester has more high-risk subjects. Consider reviewing your study strategies from the beginning of the academic year.";
+                                } elseif ($second_sem_high_risk > $first_sem_high_risk) {
+                                    echo "Second semester shows more high-risk subjects. Focus on maintaining consistency throughout the entire academic year.";
+                                } else {
+                                    echo "Both semesters have equal high-risk subject counts. Maintain balanced study habits across all semesters.";
+                                }
+                            } else {
+                                echo "Excellent! No high-risk subjects found in either semester. Continue maintaining your strong academic performance.";
+                            }
+                            ?>
+                        </div>
+                    </div>
+
+                    <!-- Subject Details -->
+                    <div class="subject-details">
+                        <!-- First Semester Subjects -->
+                        <?php if (!empty($semester_risk_data['first_semester']['subjects'])): ?>
+                            <div class="semester-subjects">
+                                <div class="semester-subject-title">
+                                    <i class="fas fa-book"></i> First Semester Subjects
+                                </div>
+                                <?php foreach ($semester_risk_data['first_semester']['subjects'] as $subject): ?>
+                                    <div class="subject-detail-item">
+                                        <div class="subject-detail-info">
+                                            <div class="subject-detail-code"><?php echo htmlspecialchars($subject['subject_code']); ?></div>
+                                            <div class="subject-detail-name"><?php echo htmlspecialchars($subject['subject_name']); ?></div>
+                                        </div>
+                                        <div class="subject-detail-grade">
+                                            <div class="subject-final-grade <?php echo $subject['is_high_risk'] ? 'grade-high-risk' : 'grade-safe'; ?>">
+                                                <?php echo $subject['final_grade'] > 0 ? number_format($subject['final_grade'], 1) . '%' : 'No Data'; ?>
+                                            </div>
+                                            <?php if ($subject['is_high_risk']): ?>
+                                                <span class="risk-badge high">High Risk</span>
+                                            <?php else: ?>
+                                                <span class="risk-badge low">Safe</span>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php endif; ?>
+
+                        <!-- Second Semester Subjects -->
+                        <?php if (!empty($semester_risk_data['second_semester']['subjects'])): ?>
+                            <div class="semester-subjects">
+                                <div class="semester-subject-title">
+                                    <i class="fas fa-book"></i> Second Semester Subjects
+                                </div>
+                                <?php foreach ($semester_risk_data['second_semester']['subjects'] as $subject): ?>
+                                    <div class="subject-detail-item">
+                                        <div class="subject-detail-info">
+                                            <div class="subject-detail-code"><?php echo htmlspecialchars($subject['subject_code']); ?></div>
+                                            <div class="subject-detail-name"><?php echo htmlspecialchars($subject['subject_name']); ?></div>
+                                        </div>
+                                        <div class="subject-detail-grade">
+                                            <div class="subject-final-grade <?php echo $subject['is_high_risk'] ? 'grade-high-risk' : 'grade-safe'; ?>">
+                                                <?php echo $subject['final_grade'] > 0 ? number_format($subject['final_grade'], 1) . '%' : 'No Data'; ?>
+                                            </div>
+                                            <?php if ($subject['is_high_risk']): ?>
+                                                <span class="risk-badge high">High Risk</span>
+                                            <?php else: ?>
+                                                <span class="risk-badge low">Safe</span>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php endif; ?>
+                    </div>
                 </div>
             <?php else: ?>
                 <div class="empty-state">
@@ -1190,65 +1342,99 @@ function getSemesterRiskData($student_id) {
             });
         });
 
-        // Initialize Single Pie Chart for High Risk Subjects
-        function initializeHighRiskPieChart() {
+        // Initialize Bar Chart for High Risk Subjects by Semester
+        function initializeHighRiskBarChart() {
             // Get semester risk data from PHP
             const semesterRiskData = <?php echo json_encode($semester_risk_data); ?>;
             
             // Only initialize if there are archived subjects
             if (semesterRiskData.total_archived_subjects > 0) {
-                const highRiskCtx = document.getElementById('highRiskPieChart').getContext('2d');
+                const highRiskCtx = document.getElementById('highRiskBarChart').getContext('2d');
                 const highRiskData = {
-                    labels: ['High Risk Subjects', 'Other Subjects'],
+                    labels: ['First Semester', 'Second Semester'],
                     datasets: [{
+                        label: 'High Risk Subjects',
                         data: [
-                            semesterRiskData.high_risk_count || 0,
-                            semesterRiskData.other_subjects_count || 0
+                            semesterRiskData.first_semester.high_risk_count || 0,
+                            semesterRiskData.second_semester.high_risk_count || 0
                         ],
                         backgroundColor: [
-                            '#dc3545', // High Risk - Red
-                            '#e0f2e9'  // Other Subjects - Light Green
+                            '#dc3545', // First Semester - Red
+                            '#ff6b6b'  // Second Semester - Light Red
                         ],
                         borderColor: [
                             '#c53030',
-                            '#006341'
+                            '#ff5252'
                         ],
-                        borderWidth: 2
+                        borderWidth: 2,
+                        borderRadius: 8,
+                        borderSkipped: false,
                     }]
                 };
                 
                 new Chart(highRiskCtx, {
-                    type: 'pie',
+                    type: 'bar',
                     data: highRiskData,
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
                         plugins: {
                             legend: {
-                                position: 'bottom',
+                                display: true,
+                                position: 'top',
                                 labels: {
                                     padding: 15,
                                     usePointStyle: true,
                                     font: {
-                                        size: 11
+                                        size: 12
                                     }
                                 }
                             },
                             tooltip: {
                                 callbacks: {
                                     label: function(context) {
-                                        const label = context.label || '';
+                                        const label = context.dataset.label || '';
                                         const value = context.raw || 0;
-                                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                        const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
-                                        return `${label}: ${value} (${percentage}%)`;
+                                        const semester = context.label;
+                                        const totalSubjects = semester === 'First Semester' 
+                                            ? semesterRiskData.first_semester.total_subjects 
+                                            : semesterRiskData.second_semester.total_subjects;
+                                        const percentage = totalSubjects > 0 ? Math.round((value / totalSubjects) * 100) : 0;
+                                        return `${label}: ${value} out of ${totalSubjects} subjects (${percentage}%)`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Number of High Risk Subjects',
+                                    font: {
+                                        size: 12,
+                                        weight: 'bold'
+                                    }
+                                },
+                                ticks: {
+                                    stepSize: 1,
+                                    precision: 0
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Semester',
+                                    font: {
+                                        size: 12,
+                                        weight: 'bold'
                                     }
                                 }
                             }
                         },
                         animation: {
-                            animateScale: true,
-                            animateRotate: true
+                            duration: 1000,
+                            easing: 'easeOutQuart'
                         }
                     }
                 });
@@ -1257,7 +1443,7 @@ function getSemesterRiskData($student_id) {
 
         // Initialize charts when page loads
         document.addEventListener('DOMContentLoaded', function() {
-            initializeHighRiskPieChart();
+            initializeHighRiskBarChart();
         });
 
         // Logout modal functionality

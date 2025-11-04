@@ -1412,6 +1412,10 @@ function calculateGWA($grade) {
                                 </div>
                                 <div class="info-item">
                                     <i class="fas fa-clock"></i>
+                                    <span><strong>Final Grades:</strong> <?php echo $subject['risk_level'] ?? 'no-data'; ?></span>
+                                </div>
+                                <div class="info-item">
+                                    <i class="fas fa-clock"></i>
                                     <span><strong>Archived:</strong> <?php echo date('M j, Y g:i A', strtotime($subject['archived_at'])); ?></span>
                                 </div>
                             </div>
@@ -1424,19 +1428,10 @@ function calculateGWA($grade) {
                                     </button>
                                 </form>
                                 <button type="button" class="btn-view" onclick="openViewModal(
-                                    '<?php echo htmlspecialchars($subject['subject_code']); ?>',
-                                    '<?php echo htmlspecialchars($subject['subject_name']); ?>',
-                                    '<?php echo htmlspecialchars($subject['credits']); ?>',
-                                    '<?php echo htmlspecialchars($subject['professor_name']); ?>',
-                                    '<?php echo htmlspecialchars($subject['schedule']); ?>',
-                                    '<?php echo htmlspecialchars($subject['semester']); ?>',
-                                    '<?php echo date('F j, Y g:i A', strtotime($subject['archived_at'])); ?>',
                                     <?php echo $subject['overall_grade'] ?? 0; ?>,
                                     <?php echo $subject['gwa'] ?? 0; ?>,
                                     <?php echo $subject['class_standing'] ?? 0; ?>,
                                     <?php echo $subject['exams_score'] ?? 0; ?>,
-                                    '<?php echo $subject['risk_level'] ?? 'no-data'; ?>',
-                                    '<?php echo addslashes($subject['risk_description'] ?? 'No Data Inputted'); ?>',
                                     <?php echo $subject['has_scores'] ? 'true' : 'false'; ?>
                                 )">
                                     <i class="fas fa-eye"></i> View Details
