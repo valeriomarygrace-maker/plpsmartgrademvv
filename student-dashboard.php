@@ -260,7 +260,7 @@ function getSemesterRiskData($student_id) {
                     if ($performance) {
                         $risk_level = $performance['risk_level'] ?? 'no-data';
                     } else {
-                        // Calculate risk level from overall grade if no performance data exists
+                        // Calculate risk level from overall grade if no performance data
                         $overall_grade = $performance['overall_grade'] ?? 0;
                         if ($overall_grade > 0) {
                             $gwa = $performance['gwa'] ?? calculateGWA($overall_grade);
@@ -281,34 +281,20 @@ function getSemesterRiskData($student_id) {
             foreach ($semester_subjects as $semester => $subjects) {
                 $total_subjects = count($subjects);
                 $high_risk_count = 0;
-                $medium_risk_count = 0;
-                $low_risk_count = 0;
-                $no_data_count = 0;
                 
                 foreach ($subjects as $subject) {
-                    switch ($subject['risk_level']) {
-                        case 'high':
-                            $high_risk_count++;
-                            break;
-                        case 'medium':
-                            $medium_risk_count++;
-                            break;
-                        case 'low':
-                            $low_risk_count++;
-                            break;
-                        default:
-                            $no_data_count++;
-                            break;
+                    if ($subject['risk_level'] === 'high') {
+                        $high_risk_count++;
                     }
                 }
+                
+                $high_risk_percentage = $total_subjects > 0 ? round(($high_risk_count / $total_subjects) * 100) : 0;
                 
                 $semester_data[] = [
                     'semester' => $semester,
                     'total_subjects' => $total_subjects,
                     'high_risk_count' => $high_risk_count,
-                    'medium_risk_count' => $medium_risk_count,
-                    'low_risk_count' => $low_risk_count,
-                    'no_data_count' => $no_data_count,
+                    'high_risk_percentage' => $high_risk_percentage,
                     'subjects' => $subjects
                 ];
             }
@@ -354,7 +340,6 @@ function calculateGWA($grade) {
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        /* Your existing CSS remains the same */
         :root {
             --plp-green: #006341;
             --plp-green-light: #008856;
@@ -598,6 +583,7 @@ function calculateGWA($grade) {
             transition: var(--transition);
         }
 
+
         .metric-value {
             font-size: 1.8rem;
             font-weight: 700;
@@ -788,6 +774,88 @@ function calculateGWA($grade) {
             font-weight: 500;
         }
 
+        .semester-list {
+            margin-top: 1rem;
+        }
+
+        .semester-item {
+            padding: 0.75rem;
+            border-bottom: 1px solid var(--plp-green-lighter);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .semester-item:last-child {
+            border-bottom: none;
+        }
+
+        .semester-name {
+            font-weight: 600;
+            color: var(--text-dark);
+            font-size: 0.9rem;
+        }
+
+        .semester-risk {
+            text-align: right;
+        }
+
+        .risk-percentage {
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+
+        .risk-percentage.high {
+            color: var(--danger);
+        }
+
+        .risk-percentage.medium {
+            color: var(--warning);
+        }
+
+        .risk-percentage.low {
+            color: var(--success);
+        }
+
+        .subject-count {
+            font-size: 0.8rem;
+            color: var(--text-light);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+            }
+            
+            .main-content {
+                padding: 1.5rem;
+            }
+            
+            .header {
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }
+            
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .metrics-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .semester-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
         /* Risk Breakdown Styles */
         .risk-breakdown {
             margin-top: 1rem;
@@ -826,8 +894,6 @@ function calculateGWA($grade) {
             font-weight: 700;
             font-size: 0.9rem;
         }
-
-        /* Modal */
         .modal {
             display: none;
             position: fixed;
@@ -898,97 +964,6 @@ function calculateGWA($grade) {
 
         .modal-btn-confirm:hover {
             transform: translateY(-2px);
-        }
-
-        /* Gauge Chart Styles */
-        .gauge-container {
-            position: relative;
-            height: 200px;
-            margin: 20px 0;
-        }
-
-        .gauge-chart {
-            position: relative;
-        }
-
-        .gauge-value {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            text-align: center;
-        }
-
-        .gauge-number {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--text-dark);
-            line-height: 1;
-        }
-
-        .gauge-label {
-            font-size: 0.9rem;
-            color: var(--text-medium);
-            margin-top: 0.5rem;
-        }
-
-        .risk-indicators {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 10px;
-            padding: 0 20px;
-        }
-
-        .risk-indicator {
-            text-align: center;
-            font-size: 0.75rem;
-            color: var(--text-light);
-        }
-
-        .risk-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            margin: 0 auto 5px;
-        }
-
-        .risk-low .risk-dot { background: #28a745; }
-        .risk-medium .risk-dot { background: #ffc107; }
-        .risk-high .risk-dot { background: #dc3545; }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            body {
-                flex-direction: column;
-            }
-            
-            .sidebar {
-                width: 100%;
-                height: auto;
-                position: relative;
-            }
-            
-            .main-content {
-                padding: 1.5rem;
-            }
-            
-            .header {
-                flex-direction: column;
-                gap: 1rem;
-                text-align: center;
-            }
-            
-            .dashboard-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .metrics-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .semester-stats {
-                grid-template-columns: repeat(2, 1fr);
-            }
         }
     </style>
 </head>
@@ -1163,215 +1138,52 @@ function calculateGWA($grade) {
                 <?php endif; ?>
             </div>
 
-            <!-- Semester Risk Gauge Chart -->
+            <!-- Semester Risk Pie Chart -->
             <div class="card">
                 <div class="card-header">
                     <div class="card-title">
-                        <i class="fas fa-gauge-high"></i>
-                        Academic Risk Level
+                        <i class="fas fa-chart-pie"></i>
+                        Semester Risk Distribution
                     </div>
                 </div>
                 <?php if (!empty($semester_risk_data)): ?>
-                    <?php 
-                    // Calculate total risk distribution across all semesters
-                    $total_high_risk = 0;
-                    $total_medium_risk = 0;
-                    $total_low_risk = 0;
-                    $total_no_data = 0;
-                    $total_subjects = 0;
-                    
-                    foreach ($semester_risk_data as $semester) {
-                        foreach ($semester['subjects'] as $subject) {
-                            $total_subjects++;
-                            switch ($subject['risk_level']) {
-                                case 'high':
-                                    $total_high_risk++;
-                                    break;
-                                case 'medium':
-                                    $total_medium_risk++;
-                                    break;
-                                case 'low':
-                                    $total_low_risk++;
-                                    break;
-                                default:
-                                    $total_no_data++;
-                                    break;
+                    <div class="graph-container">
+                        <canvas id="semesterRiskChart"></canvas>
+                    </div>
+                    <div class="semester-stats">
+                        <?php 
+                        $total_high_risk = 0;
+                        $total_medium_risk = 0;
+                        $total_low_risk = 0;
+                        $total_subjects = 0;
+                        
+                        foreach ($semester_risk_data as $semester) {
+                            foreach ($semester['subjects'] as $subject) {
+                                $total_subjects++;
+                                switch ($subject['risk_level']) {
+                                    case 'high':
+                                        $total_high_risk++;
+                                        break;
+                                    case 'medium':
+                                        $total_medium_risk++;
+                                        break;
+                                    case 'low':
+                                        $total_low_risk++;
+                                        break;
+                                }
                             }
                         }
-                    }
-                    
-                    // Calculate overall risk score (0-100, where 0 is low risk, 100 is high risk)
-                    $weighted_risk_score = 0;
-                    if ($total_subjects > 0) {
-                        $weighted_risk_score = (
-                            ($total_high_risk * 100) + 
-                            ($total_medium_risk * 50) + 
-                            ($total_low_risk * 10)
-                        ) / $total_subjects;
                         
-                        // Ensure score is between 0-100
-                        $weighted_risk_score = min(100, max(0, $weighted_risk_score));
-                    }
-                    
-                    // Determine risk level based on weighted score
-                    $overall_risk_level = 'no-data';
-                    $risk_color = '#6c757d';
-                    
-                    if ($total_subjects > 0) {
-                        if ($weighted_risk_score >= 70) {
-                            $overall_risk_level = 'high';
-                            $risk_color = '#dc3545';
-                        } elseif ($weighted_risk_score >= 30) {
-                            $overall_risk_level = 'medium';
-                            $risk_color = '#ffc107';
-                        } else {
-                            $overall_risk_level = 'low';
-                            $risk_color = '#28a745';
-                        }
-                    }
-                    
-                    $high_risk_percentage = $total_subjects > 0 ? round(($total_high_risk / $total_subjects) * 100) : 0;
-                    $medium_risk_percentage = $total_subjects > 0 ? round(($total_medium_risk / $total_subjects) * 100) : 0;
-                    $low_risk_percentage = $total_subjects > 0 ? round(($total_low_risk / $total_subjects) * 100) : 0;
-                    $no_data_percentage = $total_subjects > 0 ? round(($total_no_data / $total_subjects) * 100) : 0;
-                    ?>
-                    
-                    <div class="graph-container">
-                        <canvas id="semesterRiskGauge"></canvas>
+                        $high_risk_percentage = $total_subjects > 0 ? round(($total_high_risk / $total_subjects) * 100) : 0;
+                        $medium_risk_percentage = $total_subjects > 0 ? round(($total_medium_risk / $total_subjects) * 100) : 0;
+                        $low_risk_percentage = $total_subjects > 0 ? round(($total_low_risk / $total_subjects) * 100) : 0;
+                        ?>
                     </div>
-                    
-                    <!-- Risk Breakdown -->
-                    <div class="risk-breakdown">
-                        <div class="breakdown-item">
-                            <div class="risk-color" style="background-color: #dc3545;"></div>
-                            <div class="risk-info">
-                                <span class="risk-label">High Risk Subjects</span>
-                                <span class="risk-percentage" style="color: #dc3545;">
-                                    <?php echo $total_high_risk; ?> (<?php echo $high_risk_percentage; ?>%)
-                                </span>
-                            </div>
-                        </div>
-                        <div class="breakdown-item">
-                            <div class="risk-color" style="background-color: #ffc107;"></div>
-                            <div class="risk-info">
-                                <span class="risk-label">Medium Risk Subjects</span>
-                                <span class="risk-percentage" style="color: #ffc107;">
-                                    <?php echo $total_medium_risk; ?> (<?php echo $medium_risk_percentage; ?>%)
-                                </span>
-                            </div>
-                        </div>
-                        <div class="breakdown-item">
-                            <div class="risk-color" style="background-color: #28a745;"></div>
-                            <div class="risk-info">
-                                <span class="risk-label">Low Risk Subjects</span>
-                                <span class="risk-percentage" style="color: #28a745;">
-                                    <?php echo $total_low_risk; ?> (<?php echo $low_risk_percentage; ?>%)
-                                </span>
-                            </div>
-                        </div>
-                        <?php if ($total_no_data > 0): ?>
-                        <div class="breakdown-item">
-                            <div class="risk-color" style="background-color: #6c757d;"></div>
-                            <div class="risk-info">
-                                <span class="risk-label">No Data</span>
-                                <span class="risk-percentage" style="color: #6c757d;">
-                                    <?php echo $total_no_data; ?> (<?php echo $no_data_percentage; ?>%)
-                                </span>
-                            </div>
-                        </div>
-                        <?php endif; ?>
-                    </div>
-                    
-                    <!-- Overall Risk Assessment -->
-                    <div class="semester-stats">
-                        <div class="stat-card">
-                            <div class="stat-value"><?php echo $total_subjects; ?></div>
-                            <div class="stat-label">Total Subjects</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value"><?php echo count($semester_risk_data); ?></div>
-                            <div class="stat-label">Semesters</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value" style="color: <?php echo $risk_color; ?>;">
-                                <?php echo ucfirst($overall_risk_level); ?>
-                            </div>
-                            <div class="stat-label">Overall Risk</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value"><?php echo round($weighted_risk_score); ?>%</div>
-                            <div class="stat-label">Risk Score</div>
-                        </div>
-                    </div>
-                    
-                    <script>
-                        document.addEventListener('DOMContentLoaded', function() {
-                            const ctx = document.getElementById('semesterRiskGauge').getContext('2d');
-                            
-                            const riskScore = <?php echo $weighted_risk_score; ?>;
-                            const overallRiskLevel = '<?php echo $overall_risk_level; ?>';
-                            const riskColor = '<?php echo $risk_color; ?>';
-                            
-                            // Create gauge chart
-                            const gaugeChart = new Chart(ctx, {
-                                type: 'doughnut',
-                                data: {
-                                    datasets: [{
-                                        data: [riskScore, 100 - riskScore],
-                                        backgroundColor: [
-                                            riskColor,
-                                            '#f8f9fa'
-                                        ],
-                                        borderWidth: 0,
-                                        circumference: 180,
-                                        rotation: 270
-                                    }]
-                                },
-                                options: {
-                                    responsive: true,
-                                    maintainAspectRatio: false,
-                                    cutout: '70%',
-                                    circumference: 180,
-                                    rotation: 270,
-                                    plugins: {
-                                        legend: {
-                                            display: false
-                                        },
-                                        tooltip: {
-                                            enabled: false
-                                        }
-                                    },
-                                    animation: {
-                                        animateRotate: true,
-                                        animateScale: true
-                                    }
-                                },
-                                plugins: [{
-                                    id: 'gaugeText',
-                                    afterDraw: (chart) => {
-                                        const { ctx, chartArea: { width, height } } = chart;
-                                        ctx.save();
-                                        ctx.font = 'bold 24px Poppins';
-                                        ctx.fillStyle = riskColor;
-                                        ctx.textAlign = 'center';
-                                        ctx.textBaseline = 'middle';
-                                        ctx.fillText(riskScore + '%', width / 2, height / 2 + 20);
-                                        
-                                        ctx.font = '14px Poppins';
-                                        ctx.fillStyle = '#6c757d';
-                                        ctx.fillText('Overall Risk: ' + overallRiskLevel.charAt(0).toUpperCase() + overallRiskLevel.slice(1), width / 2, height / 2 + 50);
-                                        ctx.restore();
-                                    }
-                                }]
-                            });
-                        });
-                    </script>
-                    
                 <?php else: ?>
                     <div class="empty-state">
-                        <i class="fas fa-gauge-high"></i>
+                        <i class="fas fa-chart-pie"></i>
                         <p>No semester data available</p>
-                        <small>Complete and archive subjects to see risk assessment</small>
+                        <small>Complete and archive subjects to see risk distribution</small>
                         <br>
                         <a href="student-semester-grades.php" style="color: var(--plp-green); text-decoration: none; font-size: 0.9rem; margin-top: 0.5rem; display: inline-block;">
                             View History Records
@@ -1426,6 +1238,90 @@ function calculateGWA($grade) {
                 card.style.animation = 'fadeInUp 0.6s ease-out';
             });
         });
+
+        // Semester Risk Pie Chart
+        <?php if (!empty($semester_risk_data)): ?>
+        document.addEventListener('DOMContentLoaded', function() {
+            const ctx = document.getElementById('semesterRiskChart').getContext('2d');
+            
+            // Calculate total risk distribution across all semesters
+            let totalHighRisk = 0;
+            let totalMediumRisk = 0;
+            let totalLowRisk = 0;
+            let totalNoData = 0;
+            
+            <?php foreach ($semester_risk_data as $semester): ?>
+                <?php foreach ($semester['subjects'] as $subject): ?>
+                    switch('<?php echo $subject['risk_level']; ?>') {
+                        case 'high':
+                            totalHighRisk++;
+                            break;
+                        case 'medium':
+                            totalMediumRisk++;
+                            break;
+                        case 'low':
+                            totalLowRisk++;
+                            break;
+                        default:
+                            totalNoData++;
+                            break;
+                    }
+                <?php endforeach; ?>
+            <?php endforeach; ?>
+            
+            const totalSubjects = totalHighRisk + totalMediumRisk + totalLowRisk + totalNoData;
+            
+            const chart = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: ['High Risk', 'Medium Risk', 'Low Risk', 'No Data'],
+                    datasets: [{
+                        data: [totalHighRisk, totalMediumRisk, totalLowRisk, totalNoData],
+                        backgroundColor: [
+                            '#dc3545', // High Risk - Red
+                            '#ffc107', // Medium Risk - Yellow
+                            '#28a745', // Low Risk - Green
+                            '#6c757d'  // No Data - Gray
+                        ],
+                        borderColor: '#ffffff',
+                        borderWidth: 3,
+                        hoverOffset: 15
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                usePointStyle: true,
+                                padding: 20,
+                                font: {
+                                    size: 11
+                                }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.raw || 0;
+                                    const percentage = totalSubjects > 0 ? ((value / totalSubjects) * 100).toFixed(1) : 0;
+                                    return `${label}: ${value} subjects (${percentage}%)`;
+                                }
+                            }
+                        }
+                    },
+                    cutout: '50%', // Makes it a donut chart
+                    animation: {
+                        animateScale: true,
+                        animateRotate: true
+                    }
+                }
+            });
+        });
+        <?php endif; ?>
 
         // Logout modal functionality
         const logoutBtn = document.querySelector('.logout-btn');
