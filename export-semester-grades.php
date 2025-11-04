@@ -85,7 +85,7 @@ try {
     echo "<title>PLP SmartGrade - Semester Grades</title>";
     echo "<style>";
     echo "body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; color: #333; line-height: 1.4; }";
-    echo ".header { background: linear-gradient(135deg, #006341 0%, #008856 100%); color: white; padding: 25px; border-radius: 8px; margin-bottom: 25px; }";
+    echo ".header { background: linear-gradient(135deg, #006341 0%, #008856 100%); color: #006341; padding: 25px; border-radius: 8px; margin-bottom: 25px; }";
     echo ".header h1 { margin: 0 0 10px 0; font-size: 24px; font-weight: 700; }";
     echo ".header h2 { margin: 0 0 15px 0; font-size: 18px; font-weight: 600; opacity: 0.9; }";
     echo ".student-info { background: #f8fcf9; padding: 20px; border-radius: 6px; border-left: 4px solid #006341; margin-bottom: 20px; }";
@@ -120,9 +120,7 @@ try {
     
     // Header
     echo "<div class='header'>";
-    echo "<h1>🏛️ PLP SMARTGRADE - OFFICIAL GRADE REPORT</h1>";
-    echo "<h2>Academic Semester: " . htmlspecialchars($selected_semester) . "</h2>";
-    echo "<p style='margin: 0; opacity: 0.9;'>Pamantasan ng Lungsod ng Pasig</p>";
+    echo "<h1>PLP SMARTGRADE - OFFICIAL GRADE REPORT</h1>";
     echo "</div>";
     
     // Student Information
