@@ -1711,12 +1711,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <?php 
                         $midterm = reset($midtermExam);
                         ?>
-                        <p style="color: var(--text-medium); margin-top: 0.5rem; font-size: 0.9rem;">
-                            Score: <strong><?php echo htmlspecialchars($midterm['score_value']); ?></strong>/<strong><?php echo htmlspecialchars($midterm['max_score']); ?></strong>
-                        </p>
-                        <p style="color: var(--text-light); font-size: 0.75rem; margin-top: 0.3rem;">
-                            Percentage: <?php echo number_format(($midterm['score_value'] / $midterm['max_score']) * 100, 1); ?>%
-                        </p>
                     <?php else: ?>
                         <p style="color: var(--text-light); margin-top: 0.5rem; font-size: 0.9rem;">
                             Click to add score
@@ -1732,12 +1726,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <?php 
                         $final = reset($finalExam);
                         ?>
-                        <p style="color: var(--text-medium); margin-top: 0.5rem; font-size: 0.9rem;">
-                            Score: <strong><?php echo htmlspecialchars($final['score_value']); ?></strong>/<strong><?php echo htmlspecialchars($final['max_score']); ?></strong>
-                        </p>
-                        <p style="color: var(--text-light); font-size: 0.75rem; margin-top: 0.3rem;">
-                            Percentage: <?php echo number_format(($final['score_value'] / $final['max_score']) * 100, 1); ?>%
-                        </p>
                     <?php else: ?>
                         <p style="color: var(--text-light); margin-top: 0.5rem; font-size: 0.9rem;">
                             Click to add score
