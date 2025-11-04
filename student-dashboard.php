@@ -354,6 +354,7 @@ function calculateGWA($grade) {
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
+        /* Your existing CSS remains the same */
         :root {
             --plp-green: #006341;
             --plp-green-light: #008856;
@@ -597,7 +598,6 @@ function calculateGWA($grade) {
             transition: var(--transition);
         }
 
-
         .metric-value {
             font-size: 1.8rem;
             font-weight: 700;
@@ -788,88 +788,6 @@ function calculateGWA($grade) {
             font-weight: 500;
         }
 
-        .semester-list {
-            margin-top: 1rem;
-        }
-
-        .semester-item {
-            padding: 0.75rem;
-            border-bottom: 1px solid var(--plp-green-lighter);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .semester-item:last-child {
-            border-bottom: none;
-        }
-
-        .semester-name {
-            font-weight: 600;
-            color: var(--text-dark);
-            font-size: 0.9rem;
-        }
-
-        .semester-risk {
-            text-align: right;
-        }
-
-        .risk-percentage {
-            font-weight: 700;
-            font-size: 0.9rem;
-        }
-
-        .risk-percentage.high {
-            color: var(--danger);
-        }
-
-        .risk-percentage.medium {
-            color: var(--warning);
-        }
-
-        .risk-percentage.low {
-            color: var(--success);
-        }
-
-        .subject-count {
-            font-size: 0.8rem;
-            color: var(--text-light);
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            body {
-                flex-direction: column;
-            }
-            
-            .sidebar {
-                width: 100%;
-                height: auto;
-                position: relative;
-            }
-            
-            .main-content {
-                padding: 1.5rem;
-            }
-            
-            .header {
-                flex-direction: column;
-                gap: 1rem;
-                text-align: center;
-            }
-            
-            .dashboard-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .metrics-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .semester-stats {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
         /* Risk Breakdown Styles */
         .risk-breakdown {
             margin-top: 1rem;
@@ -908,6 +826,8 @@ function calculateGWA($grade) {
             font-weight: 700;
             font-size: 0.9rem;
         }
+
+        /* Modal */
         .modal {
             display: none;
             position: fixed;
@@ -979,6 +899,7 @@ function calculateGWA($grade) {
         .modal-btn-confirm:hover {
             transform: translateY(-2px);
         }
+
         /* Gauge Chart Styles */
         .gauge-container {
             position: relative;
@@ -1034,6 +955,41 @@ function calculateGWA($grade) {
         .risk-low .risk-dot { background: #28a745; }
         .risk-medium .risk-dot { background: #ffc107; }
         .risk-high .risk-dot { background: #dc3545; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+            }
+            
+            .main-content {
+                padding: 1.5rem;
+            }
+            
+            .header {
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }
+            
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .metrics-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .semester-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
     </style>
 </head>
 <body>
@@ -1207,6 +1163,7 @@ function calculateGWA($grade) {
                 <?php endif; ?>
             </div>
 
+            <!-- Semester Risk Gauge Chart -->
             <div class="card">
                 <div class="card-header">
                     <div class="card-title">
@@ -1346,8 +1303,84 @@ function calculateGWA($grade) {
                             <div class="stat-label">Risk Score</div>
                         </div>
                     </div>
+                    
+                    <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            const ctx = document.getElementById('semesterRiskGauge').getContext('2d');
+                            
+                            const riskScore = <?php echo $weighted_risk_score; ?>;
+                            const overallRiskLevel = '<?php echo $overall_risk_level; ?>';
+                            const riskColor = '<?php echo $risk_color; ?>';
+                            
+                            // Create gauge chart
+                            const gaugeChart = new Chart(ctx, {
+                                type: 'doughnut',
+                                data: {
+                                    datasets: [{
+                                        data: [riskScore, 100 - riskScore],
+                                        backgroundColor: [
+                                            riskColor,
+                                            '#f8f9fa'
+                                        ],
+                                        borderWidth: 0,
+                                        circumference: 180,
+                                        rotation: 270
+                                    }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    cutout: '70%',
+                                    circumference: 180,
+                                    rotation: 270,
+                                    plugins: {
+                                        legend: {
+                                            display: false
+                                        },
+                                        tooltip: {
+                                            enabled: false
+                                        }
+                                    },
+                                    animation: {
+                                        animateRotate: true,
+                                        animateScale: true
+                                    }
+                                },
+                                plugins: [{
+                                    id: 'gaugeText',
+                                    afterDraw: (chart) => {
+                                        const { ctx, chartArea: { width, height } } = chart;
+                                        ctx.save();
+                                        ctx.font = 'bold 24px Poppins';
+                                        ctx.fillStyle = riskColor;
+                                        ctx.textAlign = 'center';
+                                        ctx.textBaseline = 'middle';
+                                        ctx.fillText(riskScore + '%', width / 2, height / 2 + 20);
+                                        
+                                        ctx.font = '14px Poppins';
+                                        ctx.fillStyle = '#6c757d';
+                                        ctx.fillText('Overall Risk: ' + overallRiskLevel.charAt(0).toUpperCase() + overallRiskLevel.slice(1), width / 2, height / 2 + 50);
+                                        ctx.restore();
+                                    }
+                                }]
+                            });
+                        });
+                    </script>
+                    
+                <?php else: ?>
+                    <div class="empty-state">
+                        <i class="fas fa-gauge-high"></i>
+                        <p>No semester data available</p>
+                        <small>Complete and archive subjects to see risk assessment</small>
+                        <br>
+                        <a href="student-semester-grades.php" style="color: var(--plp-green); text-decoration: none; font-size: 0.9rem; margin-top: 0.5rem; display: inline-block;">
+                            View History Records
+                        </a>
                     </div>
+                <?php endif; ?>
             </div>
+        </div>
+    </div>
 
     <!-- Logout Modal -->
     <div class="modal" id="logoutModal">
@@ -1370,115 +1403,58 @@ function calculateGWA($grade) {
         </div>
     </div>
 
- <script>
-            document.addEventListener('DOMContentLoaded', function() {
-                const ctx = document.getElementById('semesterRiskGauge').getContext('2d');
-                
-                const riskScore = <?php echo $weighted_risk_score; ?>;
-                const overallRiskLevel = '<?php echo $overall_risk_level; ?>';
-                
-                // Create gauge chart
-                const gaugeChart = new Chart(ctx, {
-                    type: 'doughnut',
-                    data: {
-                        datasets: [{
-                            data: [riskScore, 100 - riskScore],
-                            backgroundColor: [
-                                '<?php echo $risk_color; ?>',
-                                '#f8f9fa'
-                            ],
-                            borderWidth: 0,
-                            circumference: 180,
-                            rotation: 270
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        cutout: '70%',
-                        circumference: 180,
-                        rotation: 270,
-                        plugins: {
-                            legend: {
-                                display: false
-                            },
-                            tooltip: {
-                                enabled: false
-                            },
-                            annotation: {
-                                annotations: {
-                                    line1: {
-                                        type: 'line',
-                                        borderColor: '#6c757d',
-                                        borderWidth: 2,
-                                        scaleID: 'y',
-                                        value: 0,
-                                        borderDash: [5, 5],
-                                        label: {
-                                            content: 'Risk Score: ' + riskScore + '%',
-                                            enabled: true,
-                                            position: 'center',
-                                            backgroundColor: 'rgba(0,0,0,0.8)',
-                                            color: 'white',
-                                            font: {
-                                                size: 14,
-                                                weight: 'bold'
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        animation: {
-                            animateRotate: true,
-                            animateScale: true
-                        }
-                    },
-                    plugins: [{
-                        id: 'gaugeText',
-                        afterDraw: (chart) => {
-                            const { ctx, chartArea: { width, height } } = chart;
-                            ctx.save();
-                            ctx.font = 'bold 24px Poppins';
-                            ctx.fillStyle = '<?php echo $risk_color; ?>';
-                            ctx.textAlign = 'center';
-                            ctx.textBaseline = 'middle';
-                            ctx.fillText(riskScore + '%', width / 2, height / 2 + 20);
-                            
-                            ctx.font = '14px Poppins';
-                            ctx.fillStyle = '#6c757d';
-                            ctx.fillText('Overall Risk: ' + overallRiskLevel.charAt(0).toUpperCase() + overallRiskLevel.slice(1), width / 2, height / 2 + 50);
-                            ctx.restore();
-                        }
-                    }]
-                });
-                
-                // Add risk level indicators
-                const riskLevels = [
-                    { level: 'Low', min: 0, max: 30, color: '#28a745' },
-                    { level: 'Medium', min: 30, max: 70, color: '#ffc107' },
-                    { level: 'High', min: 70, max: 100, color: '#dc3545' }
-                ];
-                
-                // Add risk level markers to the gauge
-                riskLevels.forEach(level => {
-                    const marker = document.createElement('div');
-                    marker.style.position = 'absolute';
-                    marker.style.bottom = '10px';
-                    marker.style.left = ((level.min + level.max) / 2) + '%';
-                    marker.style.transform = 'translateX(-50%)';
-                    marker.style.background = level.color;
-                    marker.style.color = 'white';
-                    marker.style.padding = '2px 6px';
-                    marker.style.borderRadius = '10px';
-                    marker.style.fontSize = '10px';
-                    marker.style.fontWeight = 'bold';
-                    marker.style.zIndex = '10';
-                    marker.textContent = level.level;
-                    
-                    document.querySelector('.graph-container').appendChild(marker);
-                });
+    <script>
+        // Auto-hide success/error messages after 5 seconds
+        setTimeout(() => {
+            const alerts = document.querySelectorAll('.alert-error');
+            alerts.forEach(alert => {
+                alert.style.transition = 'opacity 0.3s ease';
+                alert.style.opacity = '0';
+                setTimeout(() => {
+                    if (alert.parentNode) {
+                        alert.remove();
+                    }
+                }, 300);
             });
-        </script>
+        }, 5000);
+
+        // Add subtle animations to metric cards
+        document.addEventListener('DOMContentLoaded', function() {
+            const metricCards = document.querySelectorAll('.metric-card');
+            metricCards.forEach((card, index) => {
+                card.style.animationDelay = `${index * 0.1}s`;
+                card.style.animation = 'fadeInUp 0.6s ease-out';
+            });
+        });
+
+        // Logout modal functionality
+        const logoutBtn = document.querySelector('.logout-btn');
+        const logoutModal = document.getElementById('logoutModal');
+        const cancelLogout = document.getElementById('cancelLogout');
+        const confirmLogout = document.getElementById('confirmLogout');
+
+        // Show modal when clicking logout button
+        logoutBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            logoutModal.classList.add('show');
+        });
+
+        // Hide modal when clicking cancel
+        cancelLogout.addEventListener('click', () => {
+            logoutModal.classList.remove('show');
+        });
+
+        // Handle logout confirmation
+        confirmLogout.addEventListener('click', () => {
+            window.location.href = 'logout.php';
+        });
+
+        // Hide modal when clicking outside the modal content
+        logoutModal.addEventListener('click', (e) => {
+            if (e.target === logoutModal) {
+                logoutModal.classList.remove('show');
+            }
+        });
+    </script>
 </body>
 </html>
