@@ -1088,14 +1088,6 @@ function calculateGWA($grade) {
                     <div class="metric-value"><?php echo count(getUniqueProfessors($student['id'])); ?></div>
                     <div class="metric-label">Professors</div>
                 </div>
-                <div class="metric-card">
-                    <div class="metric-value"><?php echo $performance_metrics['subjects_with_scores']; ?></div>
-                    <div class="metric-label">Subjects with Scores</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-value"><?php echo $performance_metrics['average_grade']; ?>%</div>
-                    <div class="metric-label">Average Grade</div>
-                </div>
             </div>
         </div>
 
