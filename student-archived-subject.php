@@ -878,7 +878,7 @@ function calculateGWA($grade) {
             padding: 2rem;
             border-radius: var(--border-radius-lg);
             box-shadow: var(--box-shadow-lg);
-            max-width: 500px;
+            max-width: 700px;
             width: 100%;
             transform: translateY(20px);
             transition: transform 0.3s ease;
@@ -941,83 +941,35 @@ function calculateGWA($grade) {
             transform: translateY(-2px);
         }
 
-        /* NEW: Simplified Performance Overview for Modal */
         .performance-overview {
             margin-bottom: 1.5rem;
         }
 
-        .performance-header {
-            text-align: center;
-            margin-bottom: 1.5rem;
-        }
-
-        .performance-subject-code {
-            font-size: 1.1rem;
-            color: var(--plp-green);
-            font-weight: 600;
-            margin-bottom: 0.25rem;
-        }
-
-        .performance-subject-name {
-            font-size: 1rem;
-            color: var(--text-dark);
-            font-weight: 500;
-        }
-
-        .performance-grid {
+        .details-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 1rem;
-            margin-bottom: 1.5rem;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
         }
 
-        .performance-card {
-            background: var(--plp-green-pale);
-            padding: 1.25rem;
-            border-radius: var(--border-radius);
+        .detail-item {
             text-align: center;
-            border: 2px solid var(--plp-green-lighter);
-            transition: var(--transition);
+            padding: 1rem;
+            background: var(--plp-green-pale);
+            border-radius: var(--border-radius);
         }
 
-        .performance-card:hover {
-            transform: translateY(-2px);
-            border-color: var(--plp-green);
-        }
-
-        .performance-value {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: var(--plp-green);
+        .detail-label {
+            font-size: 0.8rem;
+            color: var(--text-light);
+            font-weight: 600;
             margin-bottom: 0.25rem;
         }
 
-        .performance-label {
-            font-size: 0.85rem;
-            color: var(--text-medium);
-            font-weight: 500;
-        }
-
-        .risk-summary {
-            background: var(--plp-green-pale);
-            padding: 1.25rem;
-            border-radius: var(--border-radius);
-            text-align: center;
-            border-left: 4px solid var(--plp-green);
-        }
-
-        .risk-title {
+        .detail-value {
             font-size: 1rem;
             color: var(--text-dark);
-            font-weight: 600;
-            margin-bottom: 0.75rem;
-        }
-
-        .risk-description {
-            font-size: 0.9rem;
-            color: var(--text-medium);
-            margin-bottom: 0.75rem;
-            line-height: 1.4;
+            font-weight: 500;
         }
 
         /* Mobile Menu Toggle */
@@ -1042,7 +994,33 @@ function calculateGWA($grade) {
             transform: scale(1.05);
         }
 
-        /* Responsive Styles */
+        /* Enhanced Responsive Styles */
+        @media (max-width: 1200px) {
+            .main-content {
+                padding: 1rem 2rem;
+            }
+            
+            .subjects-grid {
+                grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+                gap: 1.25rem;
+            }
+        }
+
+        @media (max-width: 1024px) {
+            .sidebar {
+                width: 280px;
+            }
+            
+            .main-content {
+                margin-left: 280px;
+                max-width: calc(100% - 280px);
+            }
+            
+            .card {
+                padding: 1.5rem;
+            }
+        }
+
         @media (max-width: 768px) {
             body {
                 flex-direction: column;
@@ -1110,9 +1088,9 @@ function calculateGWA($grade) {
                 width: 100%;
             }
             
-            .performance-grid {
+            .details-grid {
                 grid-template-columns: 1fr;
-                gap: 0.75rem;
+                gap: 0.5rem;
             }
             
             .modal-content {
@@ -1183,12 +1161,12 @@ function calculateGWA($grade) {
                 margin-bottom: 1rem;
             }
             
-            .performance-card {
-                padding: 1rem;
+            .detail-item {
+                padding: 0.75rem;
             }
             
-            .performance-value {
-                font-size: 1.5rem;
+            .detail-value {
+                font-size: 0.9rem;
             }
             
             .alert-success,
@@ -1203,6 +1181,112 @@ function calculateGWA($grade) {
             
             .empty-state i {
                 font-size: 2.5rem;
+            }
+        }
+
+        @media (max-width: 360px) {
+            .main-content {
+                padding: 0.5rem;
+            }
+            
+            .header {
+                padding: 0.5rem;
+            }
+            
+            .welcome {
+                font-size: 1.1rem;
+            }
+            
+            .card {
+                padding: 0.75rem;
+            }
+            
+            .subject-card {
+                padding: 0.75rem;
+            }
+            
+            .btn-restore,
+            .btn-view {
+                font-size: 0.8rem;
+                padding: 0.4rem 0.8rem;
+            }
+            
+            .modal-content {
+                padding: 0.75rem;
+            }
+        }
+
+        /* Print Styles */
+        @media print {
+            .sidebar,
+            .mobile-menu-toggle,
+            .subject-actions,
+            .modal {
+                display: none !important;
+            }
+            
+            .main-content {
+                margin-left: 0;
+                max-width: 100%;
+                padding: 0;
+            }
+            
+            .card {
+                box-shadow: none;
+                border: 1px solid #ddd;
+            }
+            
+            .subject-card {
+                break-inside: avoid;
+                margin-bottom: 1rem;
+            }
+        }
+
+        /* High contrast mode support */
+        @media (prefers-contrast: high) {
+            :root {
+                --plp-green: #004d33;
+                --plp-green-light: #006341;
+                --plp-green-lighter: #e0f2e9;
+                --text-dark: #000000;
+                --text-medium: #333333;
+                --text-light: #666666;
+            }
+            
+            .subject-card {
+                border: 2px solid var(--plp-green);
+            }
+        }
+
+        /* Reduced motion support */
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                transition: none !important;
+                animation: none !important;
+            }
+            
+            .subject-card:hover {
+                transform: none;
+            }
+            
+            .modal-content {
+                transform: none;
+            }
+        }
+
+        /* Dark mode support */
+        @media (prefers-color-scheme: dark) {
+            .card,
+            .subject-card,
+            .modal-content {
+                color: #e2e8f0;
+            }
+            
+            .detail-item {
+            }
+            
+            .detail-value {
+                color: #e2e8f0;
             }
         }
     </style>
@@ -1342,6 +1426,11 @@ function calculateGWA($grade) {
                                 <button type="button" class="btn-view" onclick="openViewModal(
                                     '<?php echo htmlspecialchars($subject['subject_code']); ?>',
                                     '<?php echo htmlspecialchars($subject['subject_name']); ?>',
+                                    '<?php echo htmlspecialchars($subject['credits']); ?>',
+                                    '<?php echo htmlspecialchars($subject['professor_name']); ?>',
+                                    '<?php echo htmlspecialchars($subject['schedule']); ?>',
+                                    '<?php echo htmlspecialchars($subject['semester']); ?>',
+                                    '<?php echo date('F j, Y g:i A', strtotime($subject['archived_at'])); ?>',
                                     <?php echo $subject['overall_grade'] ?? 0; ?>,
                                     <?php echo $subject['gwa'] ?? 0; ?>,
                                     <?php echo $subject['class_standing'] ?? 0; ?>,
@@ -1350,7 +1439,7 @@ function calculateGWA($grade) {
                                     '<?php echo addslashes($subject['risk_description'] ?? 'No Data Inputted'); ?>',
                                     <?php echo $subject['has_scores'] ? 'true' : 'false'; ?>
                                 )">
-                                    <i class="fas fa-eye"></i> View Performance
+                                    <i class="fas fa-eye"></i> View Details
                                 </button>
                             </div>
                         </div>
@@ -1360,50 +1449,45 @@ function calculateGWA($grade) {
         </div>
     </div>
 
-    <!-- View Performance Modal -->
+    <!-- View Details Modal -->
     <div class="modal" id="viewModal">
         <div class="modal-content">
             <h3 class="modal-title">
-                <i class="fas fa-chart-line"></i>
-                Final Performance Summary
+                <i class="fas fa-info-circle"></i>
+                Archived Subject Details
             </h3>
             
             <div style="flex: 1; overflow: hidden; display: flex; flex-direction: column;">
-                <!-- Subject Header -->
-                <div class="performance-header">
-                    <div class="performance-subject-code" id="view_subject_code"></div>
-                    <div class="performance-subject-name" id="view_subject_name"></div>
-                </div>
-
                 <!-- Performance Overview -->
                 <div class="performance-overview">
-                    <div class="performance-grid">
-                        <div class="performance-card">
-                            <div class="performance-value" id="view_overall_grade">--</div>
-                            <div class="performance-label">Overall Grade</div>
+                    <h4 style="color: var(--plp-green); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-chart-line"></i>
+                        Final Performance Summary
+                    </h4>
+                    <div class="details-grid">
+                        <div class="detail-item">
+                            <div class="detail-label">Overall Grade</div>
+                            <div class="detail-value" id="view_overall_grade" style="font-size: 1.4rem; font-weight: 700; color: var(--plp-green); margin: 0.5rem 0;">--</div>
+                            <div class="risk-badge no-data" id="view_risk_badge" style="display: none; padding: 0.4rem 1rem; border-radius: 15px; font-size: 0.8rem; font-weight: 600;">No Data</div>
                         </div>
                         
-                        <div class="performance-card">
-                            <div class="performance-value" id="view_gwa">--</div>
-                            <div class="performance-label">GWA</div>
+                        <div class="detail-item">
+                            <div class="detail-label">GWA</div>
+                            <div class="detail-value" id="view_gwa" style="font-size: 1.4rem; font-weight: 700; color: var(--plp-green); margin: 0.5rem 0;">--</div>
+                            <div class="detail-label" id="view_risk_description" style="font-size: 0.85rem; color: var(--text-medium); margin-top: 0.5rem;">No Data Inputted</div>
                         </div>
                         
-                        <div class="performance-card">
-                            <div class="performance-value" id="view_class_standing">--</div>
-                            <div class="performance-label">Class Standing</div>
+                        <div class="detail-item">
+                            <div class="detail-label">Class Standing</div>
+                            <div class="detail-value" id="view_class_standing" style="font-size: 1.4rem; font-weight: 700; color: var(--plp-green); margin: 0.5rem 0;">--</div>
+                            <div class="detail-label" style="font-size: 0.85rem; color: var(--text-medium);">of 60%</div>
                         </div>
                         
-                        <div class="performance-card">
-                            <div class="performance-value" id="view_exams_score">--</div>
-                            <div class="performance-label">Exams Score</div>
+                        <div class="detail-item">
+                            <div class="detail-label">Exams</div>
+                            <div class="detail-value" id="view_exams_score" style="font-size: 1.4rem; font-weight: 700; color: var(--plp-green); margin: 0.5rem 0;">--</div>
+                            <div class="detail-label" style="font-size: 0.85rem; color: var(--text-medium);">of 40%</div>
                         </div>
-                    </div>
-
-                    <!-- Risk Summary -->
-                    <div class="risk-summary">
-                        <div class="risk-title">Risk Assessment</div>
-                        <div class="risk-description" id="view_risk_description">No Data Inputted</div>
-                        <div class="risk-badge no-data" id="view_risk_badge" style="display: none;">No Data</div>
                     </div>
                 </div>
             </div>
@@ -1416,7 +1500,7 @@ function calculateGWA($grade) {
         </div>
     </div>
 
-    <!-- Logout Modal -->
+        <!--  Logout Modal -->
     <div class="modal" id="logoutModal">
         <div class="modal-content" style="max-width: 450px; text-align: center;">
             <h3 style="color: var(--plp-green); font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem;">
@@ -1479,12 +1563,18 @@ function calculateGWA($grade) {
         });
 
         function openViewModal(
-            subjectCode, subjectName, overallGrade = 0, gwa = 0, classStanding = 0, examsScore = 0, 
-            riskLevel = 'no-data', riskDescription = 'No Data Inputted', hasScores = false
+            subjectCode, subjectName, credits, professor, schedule, semester, archivedDate,
+            overallGrade = 0, gwa = 0, classStanding = 0, examsScore = 0, riskLevel = 'no-data', 
+            riskDescription = 'No Data Inputted', hasScores = false
         ) {
-            // Set subject header
+            // Set basic subject details
             document.getElementById('view_subject_code').textContent = subjectCode;
             document.getElementById('view_subject_name').textContent = subjectName;
+            document.getElementById('view_credits').textContent = credits + ' Credits';
+            document.getElementById('view_professor').textContent = professor;
+            document.getElementById('view_schedule').textContent = schedule;
+            document.getElementById('view_semester').textContent = semester;
+            document.getElementById('view_archived_date').textContent = archivedDate;
             
             // Set performance data
             const overallGradeNum = parseFloat(overallGrade) || 0;
@@ -1501,7 +1591,7 @@ function calculateGWA($grade) {
             // Set risk badge
             const riskBadge = document.getElementById('view_risk_badge');
             if (hasScores && riskLevel !== 'no-data') {
-                riskBadge.textContent = riskLevel.charAt(0).toUpperCase() + riskLevel.slice(1) + ' Risk';
+                riskBadge.textContent = riskLevel.charAt(0).toUpperCase() + riskLevel.slice(1);
                 riskBadge.className = 'risk-badge ' + riskLevel;
                 riskBadge.style.display = 'inline-block';
             } else {
@@ -1544,7 +1634,7 @@ function calculateGWA($grade) {
         const cancelLogout = document.getElementById('cancelLogout');
         const confirmLogout = document.getElementById('confirmLogout');
 
-        // Show modal when clicking logout button
+// Show modal when clicking logout button
         logoutBtn.addEventListener('click', (e) => {
             e.preventDefault();
             logoutModal.classList.add('show');
@@ -1560,11 +1650,14 @@ function calculateGWA($grade) {
             window.location.href = 'logout.php';
         });
 
-        // Hide modal when clicking outside the modal content
-        logoutModal.addEventListener('click', (e) => {
-            if (e.target === logoutModal) {
-                logoutModal.classList.remove('show');
-            }
+// Hide modal when clicking outside the modal content
+        const modals = [addSubjectModal, editSubjectModal, archiveSubjectModal, logoutModal];
+        modals.forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.remove('show');
+                }
+            });
         });
     </script>
 </body>
