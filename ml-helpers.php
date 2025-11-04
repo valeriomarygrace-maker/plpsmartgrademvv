@@ -114,10 +114,10 @@ class EnhancedInterventionSystem {
         else return 5.00;
     }
     
-    private static function calculateRiskLevelFromGWA($gwa) {
-        if ($gwa <= 1.75) return 'low';
-        if ($gwa <= 2.50) return 'medium';
-        return 'high';
+    private static function determineRiskLevel($gwa) {
+    if ($gwa <= 1.75) return 'low';
+    if ($gwa <= 2.50) return 'medium';
+    return 'high';
     }
 }
 

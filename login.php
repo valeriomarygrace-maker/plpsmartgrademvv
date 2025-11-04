@@ -112,8 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PAMANTASAN NG LUNGSOD NG PASIG - SMART GRADE AI</title>
-        <style>
-        /* Your existing CSS styles remain exactly the same */
+    <style>
         :root {
             --plp-green: #006341;
             --plp-green-light: #008856;

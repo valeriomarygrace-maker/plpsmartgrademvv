@@ -224,7 +224,7 @@ if ($hasScores) {
         $gwa = 5.00;
     }
 
-    // RISK LEVEL CALCULATION
+    // RISK LEVEL CALCULATION - BASED ON GWA
     if ($gwa <= 1.75) {
         $riskLevel = 'low';
         $riskDescription = 'Low Risk';

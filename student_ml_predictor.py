@@ -19,7 +19,7 @@ class StudentGradePredictor:
         self.feature_names = ['class_standing_avg', 'exam_score_avg', 'attendance_rate', 'score_consistency']
     
     def generate_sample_data(self, num_students=500):
-        """Generate training data"""
+        """Generate training data with GWA-based risk"""
         np.random.seed(42)
         data = []
         for _ in range(num_students):
@@ -28,9 +28,11 @@ class StudentGradePredictor:
             attendance = np.random.normal(85, 10)
             consistency = np.random.normal(70, 12)
             
+            # Calculate GWA first
             overall_grade = (class_standing * 0.6) + (exam_score * 0.4)
             gwa = self.calculate_gwa(overall_grade)
             
+            # Risk based on GWA
             if gwa <= 1.75: risk = 'low'
             elif gwa <= 2.50: risk = 'medium'
             else: risk = 'high'
