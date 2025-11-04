@@ -1292,10 +1292,6 @@ function calculateGWA($grade) {
     </style>
 </head>
 <body>
-    <button class="mobile-menu-toggle" id="mobileMenuToggle">
-        <i class="fas fa-bars"></i>
-    </button>
-
     <div class="sidebar">
         <div class="sidebar-header">
             <div class="logo-container">
@@ -1306,7 +1302,7 @@ function calculateGWA($grade) {
             <div class="portal-title">PLPSMARTGRADE</div>
             <div class="student-email"><?php echo htmlspecialchars($student['email']); ?></div>
         </div>
-        
+
         <ul class="nav-menu">
             <li class="nav-item">
                 <a href="student-dashboard.php" class="nav-link">
@@ -1333,7 +1329,7 @@ function calculateGWA($grade) {
                 </a>
             </li>
             <li class="nav-item">
-                <a href="student-semester-grades.php" class="nav-link">
+                <a href="student-semester-grades.php" class="nav-link ">
                     <i class="fas fa-history"></i>
                     History Records
                 </a>
@@ -1488,42 +1484,6 @@ function calculateGWA($grade) {
                             <div class="detail-value" id="view_exams_score" style="font-size: 1.4rem; font-weight: 700; color: var(--plp-green); margin: 0.5rem 0;">--</div>
                             <div class="detail-label" style="font-size: 0.85rem; color: var(--text-medium);">of 40%</div>
                         </div>
-                    </div>
-                </div>
-                
-                <!-- Subject Details -->
-                <h4 style="color: var(--plp-green); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
-                    <i class="fas fa-book"></i>
-                    Subject Information
-                </h4>
-                <div class="details-grid" style="grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem;">
-                    <div class="detail-item" style="padding: 0.75rem;">
-                        <div class="detail-label">Subject Code</div>
-                        <div class="detail-value" id="view_subject_code" style="font-weight: 600;"></div>
-                    </div>
-                    <div class="detail-item" style="padding: 0.75rem;">
-                        <div class="detail-label">Subject Name</div>
-                        <div class="detail-value" id="view_subject_name" style="font-weight: 600;"></div>
-                    </div>
-                    <div class="detail-item" style="padding: 0.75rem;">
-                        <div class="detail-label">Credits</div>
-                        <div class="detail-value" id="view_credits" style="font-weight: 600;"></div>
-                    </div>
-                    <div class="detail-item" style="padding: 0.75rem;">
-                        <div class="detail-label">Semester</div>
-                        <div class="detail-value" id="view_semester" style="font-weight: 600;"></div>
-                    </div>
-                    <div class="detail-item" style="grid-column: 1 / -1; padding: 0.75rem;">
-                        <div class="detail-label">Professor</div>
-                        <div class="detail-value" id="view_professor" style="font-weight: 600;"></div>
-                    </div>
-                    <div class="detail-item" style="grid-column: 1 / -1; padding: 0.75rem;">
-                        <div class="detail-label">Schedule</div>
-                        <div class="detail-value" id="view_schedule" style="font-weight: 600;"></div>
-                    </div>
-                    <div class="detail-item" style="grid-column: 1 / -1; padding: 0.75rem;">
-                        <div class="detail-label">Archived Date</div>
-                        <div class="detail-value" id="view_archived_date" style="font-weight: 600;"></div>
                     </div>
                 </div>
             </div>
