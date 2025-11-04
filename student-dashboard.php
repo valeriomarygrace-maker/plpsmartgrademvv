@@ -229,7 +229,7 @@ function getUniqueProfessors($student_id) {
 }
 
 /**
- * Get semester risk data for the graph
+ * Get semester risk data for the graph - UPDATED FOR PIE CHART
  */
 function getSemesterRiskData($student_id) {
     $semester_data = [];
@@ -277,24 +277,41 @@ function getSemesterRiskData($student_id) {
                 }
             }
             
-            // Calculate high-risk percentage for each semester
+            // Calculate risk distribution for each semester
             foreach ($semester_subjects as $semester => $subjects) {
                 $total_subjects = count($subjects);
                 $high_risk_count = 0;
+                $medium_risk_count = 0;
+                $low_risk_count = 0;
+                $no_data_count = 0;
                 
                 foreach ($subjects as $subject) {
-                    if ($subject['risk_level'] === 'high') {
-                        $high_risk_count++;
+                    switch ($subject['risk_level']) {
+                        case 'high':
+                            $high_risk_count++;
+                            break;
+                        case 'medium':
+                            $medium_risk_count++;
+                            break;
+                        case 'low':
+                            $low_risk_count++;
+                            break;
+                        default:
+                            $no_data_count++;
+                            break;
                     }
                 }
-                
-                $high_risk_percentage = $total_subjects > 0 ? round(($high_risk_count / $total_subjects) * 100) : 0;
                 
                 $semester_data[] = [
                     'semester' => $semester,
                     'total_subjects' => $total_subjects,
                     'high_risk_count' => $high_risk_count,
-                    'high_risk_percentage' => $high_risk_percentage,
+                    'medium_risk_count' => $medium_risk_count,
+                    'low_risk_count' => $low_risk_count,
+                    'no_data_count' => $no_data_count,
+                    'high_risk_percentage' => $total_subjects > 0 ? round(($high_risk_count / $total_subjects) * 100) : 0,
+                    'medium_risk_percentage' => $total_subjects > 0 ? round(($medium_risk_count / $total_subjects) * 100) : 0,
+                    'low_risk_percentage' => $total_subjects > 0 ? round(($low_risk_count / $total_subjects) * 100) : 0,
                     'subjects' => $subjects
                 ];
             }
@@ -583,7 +600,6 @@ function calculateGWA($grade) {
             transition: var(--transition);
         }
 
-
         .metric-value {
             font-size: 1.8rem;
             font-weight: 700;
@@ -822,6 +838,109 @@ function calculateGWA($grade) {
             color: var(--text-light);
         }
 
+        /* NEW: Pie Chart Container */
+        .pie-chart-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .pie-chart-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+        }
+
+        .pie-chart-legend {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8rem;
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .legend-text {
+            color: var(--text-medium);
+            font-weight: 500;
+        }
+
+        /* NEW: Semester Pie Charts */
+        .semester-pie-charts {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1rem;
+        }
+
+        .semester-pie-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            border-left: 4px solid var(--plp-green);
+        }
+
+        .semester-pie-header {
+            text-align: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--plp-green-lighter);
+        }
+
+        .semester-pie-title {
+            color: var(--plp-green);
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .semester-pie-subtitle {
+            color: var(--text-medium);
+            font-size: 0.8rem;
+            margin-top: 0.25rem;
+        }
+
+        .semester-pie-chart {
+            height: 180px;
+            position: relative;
+            margin-bottom: 1rem;
+        }
+
+        .semester-pie-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.5rem;
+            font-size: 0.75rem;
+        }
+
+        .pie-stat {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.25rem 0;
+        }
+
+        .pie-stat-label {
+            color: var(--text-medium);
+        }
+
+        .pie-stat-value {
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             body {
@@ -855,115 +974,16 @@ function calculateGWA($grade) {
             .semester-stats {
                 grid-template-columns: repeat(2, 1fr);
             }
-        }
-        /* Risk Breakdown Styles */
-        .risk-breakdown {
-            margin-top: 1rem;
-            padding-top: 1rem;
-            border-top: 1px solid var(--plp-green-lighter);
+            
+            .semester-pie-charts {
+                grid-template-columns: 1fr;
+            }
         }
 
-        .breakdown-item {
-            display: flex;
-            align-items: center;
-            padding: 0.5rem 0;
-            gap: 0.75rem;
-        }
-
-        .risk-color {
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            flex-shrink: 0;
-        }
-
-        .risk-info {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-grow: 1;
-        }
-
-        .risk-label {
-            font-weight: 500;
-            color: var(--text-dark);
-            font-size: 0.85rem;
-        }
-
-        .risk-percentage {
-            font-weight: 700;
-            font-size: 0.9rem;
-        }
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(4px);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
-        .modal.show {
-            display: flex;
-            opacity: 1;
-        }
-
-        .modal-content {
-            background: white;
-            padding: 2.5rem;
-            border-radius: var(--border-radius-lg);
-            box-shadow: var(--box-shadow-lg);
-            max-width: 600px;
-            width: 90%;
-            transform: translateY(20px);
-            transition: transform 0.3s ease;
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-
-        .modal.show .modal-content {
-            transform: translateY(0);
-        }
-
-        .modal-btn {
-            font-size: 1rem;
-            font-weight: 600;
-            border: none;
-            padding: 0.75rem 1.5rem;
-            border-radius: 50px;
-            cursor: pointer;
-            transition: var(--transition);
-            font-family: 'Poppins', sans-serif;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .modal-btn-cancel {
-            background: #f1f5f9;
-            color: var(--text-medium);
-        }
-
-        .modal-btn-cancel:hover {
-            background: #e2e8f0;
-            transform: translateY(-2px);
-        }
-
-        .modal-btn-confirm {
-            background: var(--plp-green-gradient);
-            color: white;
-            box-shadow: 0 4px 12px rgba(0, 99, 65, 0.3);
-        }
-
-        .modal-btn-confirm:hover {
-            transform: translateY(-2px);
+        @media (max-width: 480px) {
+            .semester-pie-stats {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
@@ -1043,6 +1063,14 @@ function calculateGWA($grade) {
                     <div class="metric-value"><?php echo count(getUniqueProfessors($student['id'])); ?></div>
                     <div class="metric-label">Professors</div>
                 </div>
+                <div class="metric-card">
+                    <div class="metric-value"><?php echo $performance_metrics['subjects_with_scores']; ?></div>
+                    <div class="metric-label">Subjects with Scores</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value"><?php echo $performance_metrics['average_grade']; ?>%</div>
+                    <div class="metric-label">Average Grade</div>
+                </div>
             </div>
         </div>
 
@@ -1085,6 +1113,10 @@ function calculateGWA($grade) {
                                             </span>
                                         </div>
                                     <?php else: ?>
+                                        <div class="grade-value grade-no-data">No Data</div>
+                                        <div class="gwa-value">
+                                            <span class="risk-badge no-data">No Data</span>
+                                        </div>
                                     <?php endif; ?>
                                 </div>
                             </li>
@@ -1138,7 +1170,7 @@ function calculateGWA($grade) {
                 <?php endif; ?>
             </div>
 
-            <!-- Semester Risk Pie Chart -->
+            <!-- Semester Risk Pie Charts -->
             <div class="card">
                 <div class="card-header">
                     <div class="card-title">
@@ -1147,37 +1179,62 @@ function calculateGWA($grade) {
                     </div>
                 </div>
                 <?php if (!empty($semester_risk_data)): ?>
-                    <div class="graph-container">
-                        <canvas id="semesterRiskChart"></canvas>
+                    <div class="pie-chart-container">
+                        <!-- Overall Risk Pie Chart -->
+                        <div class="pie-chart-wrapper">
+                            <canvas id="overallRiskChart"></canvas>
+                        </div>
+                        <div class="pie-chart-legend">
+                            <div class="legend-item">
+                                <div class="legend-color" style="background-color: #dc3545;"></div>
+                                <span class="legend-text">High Risk</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color" style="background-color: #ffc107;"></div>
+                                <span class="legend-text">Medium Risk</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color" style="background-color: #28a745;"></div>
+                                <span class="legend-text">Low Risk</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color" style="background-color: #6c757d;"></div>
+                                <span class="legend-text">No Data</span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="semester-stats">
-                        <?php 
-                        $total_high_risk = 0;
-                        $total_medium_risk = 0;
-                        $total_low_risk = 0;
-                        $total_subjects = 0;
-                        
-                        foreach ($semester_risk_data as $semester) {
-                            foreach ($semester['subjects'] as $subject) {
-                                $total_subjects++;
-                                switch ($subject['risk_level']) {
-                                    case 'high':
-                                        $total_high_risk++;
-                                        break;
-                                    case 'medium':
-                                        $total_medium_risk++;
-                                        break;
-                                    case 'low':
-                                        $total_low_risk++;
-                                        break;
-                                }
-                            }
-                        }
-                        
-                        $high_risk_percentage = $total_subjects > 0 ? round(($total_high_risk / $total_subjects) * 100) : 0;
-                        $medium_risk_percentage = $total_subjects > 0 ? round(($total_medium_risk / $total_subjects) * 100) : 0;
-                        $low_risk_percentage = $total_subjects > 0 ? round(($total_low_risk / $total_subjects) * 100) : 0;
-                        ?>
+                    
+                    <!-- Individual Semester Pie Charts -->
+                    <div class="semester-pie-charts">
+                        <?php foreach ($semester_risk_data as $semester): ?>
+                            <div class="semester-pie-card">
+                                <div class="semester-pie-header">
+                                    <div class="semester-pie-title"><?php echo htmlspecialchars($semester['semester']); ?></div>
+                                    <div class="semester-pie-subtitle"><?php echo $semester['total_subjects']; ?> Subjects</div>
+                                </div>
+                                <div class="semester-pie-chart">
+                                    <canvas id="pieChart<?php echo str_replace(' ', '', $semester['semester']); ?>"></canvas>
+                                </div>
+                                <div class="semester-pie-stats">
+                                    <div class="pie-stat">
+                                        <span class="pie-stat-label">High Risk:</span>
+                                        <span class="pie-stat-value"><?php echo $semester['high_risk_count']; ?> (<?php echo $semester['high_risk_percentage']; ?>%)</span>
+                                    </div>
+                                    <div class="pie-stat">
+                                        <span class="pie-stat-label">Medium Risk:</span>
+                                        <span class="pie-stat-value"><?php echo $semester['medium_risk_count']; ?> (<?php echo $semester['medium_risk_percentage']; ?>%)</span>
+                                    </div>
+                                    <div class="pie-stat">
+                                        <span class="pie-stat-label">Low Risk:</span>
+                                        <span class="pie-stat-value"><?php echo $semester['low_risk_count']; ?> (<?php echo $semester['low_risk_percentage']; ?>%)</span>
+                                    </div>
+                                    <div class="pie-stat">
+                                        <span class="pie-stat-label">No Data:</span>
+                                        <span class="pie-stat-value"><?php echo $semester['no_data_count']; ?></span>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
                     </div>
                 <?php else: ?>
                     <div class="empty-state">
@@ -1239,11 +1296,9 @@ function calculateGWA($grade) {
             });
         });
 
-        // Semester Risk Pie Chart
+        // Overall Risk Pie Chart
         <?php if (!empty($semester_risk_data)): ?>
         document.addEventListener('DOMContentLoaded', function() {
-            const ctx = document.getElementById('semesterRiskChart').getContext('2d');
-            
             // Calculate total risk distribution across all semesters
             let totalHighRisk = 0;
             let totalMediumRisk = 0;
@@ -1251,27 +1306,17 @@ function calculateGWA($grade) {
             let totalNoData = 0;
             
             <?php foreach ($semester_risk_data as $semester): ?>
-                <?php foreach ($semester['subjects'] as $subject): ?>
-                    switch('<?php echo $subject['risk_level']; ?>') {
-                        case 'high':
-                            totalHighRisk++;
-                            break;
-                        case 'medium':
-                            totalMediumRisk++;
-                            break;
-                        case 'low':
-                            totalLowRisk++;
-                            break;
-                        default:
-                            totalNoData++;
-                            break;
-                    }
-                <?php endforeach; ?>
+                totalHighRisk += <?php echo $semester['high_risk_count']; ?>;
+                totalMediumRisk += <?php echo $semester['medium_risk_count']; ?>;
+                totalLowRisk += <?php echo $semester['low_risk_count']; ?>;
+                totalNoData += <?php echo $semester['no_data_count']; ?>;
             <?php endforeach; ?>
             
             const totalSubjects = totalHighRisk + totalMediumRisk + totalLowRisk + totalNoData;
             
-            const chart = new Chart(ctx, {
+            // Overall Risk Chart
+            const overallCtx = document.getElementById('overallRiskChart').getContext('2d');
+            const overallChart = new Chart(overallCtx, {
                 type: 'pie',
                 data: {
                     labels: ['High Risk', 'Medium Risk', 'Low Risk', 'No Data'],
@@ -1293,14 +1338,7 @@ function calculateGWA($grade) {
                     maintainAspectRatio: false,
                     plugins: {
                         legend: {
-                            position: 'bottom',
-                            labels: {
-                                usePointStyle: true,
-                                padding: 20,
-                                font: {
-                                    size: 11
-                                }
-                            }
+                            display: false
                         },
                         tooltip: {
                             callbacks: {
@@ -1313,13 +1351,61 @@ function calculateGWA($grade) {
                             }
                         }
                     },
-                    cutout: '50%', // Makes it a donut chart
+                    cutout: '50%',
                     animation: {
                         animateScale: true,
                         animateRotate: true
                     }
                 }
             });
+
+            // Individual Semester Pie Charts
+            <?php foreach ($semester_risk_data as $semester): ?>
+                const ctx<?php echo str_replace(' ', '', $semester['semester']); ?> = document.getElementById('pieChart<?php echo str_replace(' ', '', $semester['semester']); ?>').getContext('2d');
+                const chart<?php echo str_replace(' ', '', $semester['semester']); ?> = new Chart(ctx<?php echo str_replace(' ', '', $semester['semester']); ?>, {
+                    type: 'pie',
+                    data: {
+                        labels: ['High', 'Medium', 'Low', 'No Data'],
+                        datasets: [{
+                            data: [
+                                <?php echo $semester['high_risk_count']; ?>,
+                                <?php echo $semester['medium_risk_count']; ?>,
+                                <?php echo $semester['low_risk_count']; ?>,
+                                <?php echo $semester['no_data_count']; ?>
+                            ],
+                            backgroundColor: [
+                                '#dc3545',
+                                '#ffc107', 
+                                '#28a745',
+                                '#6c757d'
+                            ],
+                            borderColor: '#ffffff',
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const label = context.label || '';
+                                        const value = context.raw || 0;
+                                        const total = <?php echo $semester['total_subjects']; ?>;
+                                        const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                                        return `${label} Risk: ${value} (${percentage}%)`;
+                                    }
+                                }
+                            }
+                        },
+                        cutout: '40%'
+                    }
+                });
+            <?php endforeach; ?>
         });
         <?php endif; ?>
 
