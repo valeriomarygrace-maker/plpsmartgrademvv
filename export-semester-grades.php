@@ -145,8 +145,6 @@ try {
         echo "<th width='8%' class='text-center'>Credits</th>";
         echo "<th width='10%' class='text-center'>Grade %</th>";
         echo "<th width='8%' class='text-center'>GWA</th>";
-        echo "<th width='10%' class='text-center'>Status</th>";
-        echo "<th width='15%'>Remarks</th>";
         echo "</tr>";
         echo "</thead>";
         echo "<tbody>";
@@ -192,8 +190,6 @@ try {
             echo "<td class='text-center'><strong>" . htmlspecialchars($subject['credits']) . "</strong></td>";
             echo "<td class='text-center " . $grade_class . "'><strong>" . $subject['overall_grade'] . "</strong></td>";
             echo "<td class='text-center'><strong>" . $subject['gwa'] . "</strong></td>";
-            echo "<td class='text-center'><span class='risk-badge " . $risk_class . "'>" . $risk_display . "</span></td>";
-            echo "<td style='font-size: 11px;'>" . htmlspecialchars($subject['risk_description']) . "</td>";
             echo "</tr>";
         }
         
@@ -228,46 +224,12 @@ try {
             $remark_class = 'risk-no-data';
         }
         
-        echo "<div class='summary'>";
-        echo "<h3>📊 SEMESTER ACADEMIC SUMMARY</h3>";
-        echo "<div class='summary-grid'>";
-        echo "<div class='summary-item'>";
-        echo "<div class='label'>Total Subjects Enrolled</div>";
-        echo "<div class='value'>" . $total_subjects . "</div>";
-        echo "</div>";
-        echo "<div class='summary-item'>";
-        echo "<div class='label'>Total Academic Credits</div>";
-        echo "<div class='value'>" . $total_credits . "</div>";
-        echo "</div>";
-        echo "<div class='summary-item'>";
-        echo "<div class='label'>Graded Subjects</div>";
-        echo "<div class='value'>" . $graded_subjects . " / " . $total_subjects . "</div>";
-        echo "</div>";
-        echo "<div class='summary-item'>";
-        echo "<div class='label'>Semester GWA</div>";
-        echo "<div class='value " . ($semester_gwa > 0 ? $remark_class : '') . "'>" . ($semester_gwa > 0 ? number_format($semester_gwa, 2) : '--') . "</div>";
-        echo "</div>";
-        echo "</div>";
-        
-        echo "<div style='margin-top: 20px; padding: 15px; background: white; border-radius: 6px; border-left: 4px solid #006341;'>";
-        echo "<div class='label'>Overall Academic Standing</div>";
-        echo "<div class='value " . $remark_class . "' style='font-size: 16px;'>" . $overall_remark . "</div>";
-        echo "</div>";
-        echo "</div>";
-        
     } else {
         echo "<div style='text-align: center; padding: 40px; background: #f8fcf9; border-radius: 6px; margin: 20px 0;'>";
         echo "<h3 style='color: #666;'>No Grade Data Available</h3>";
         echo "<p>No academic records found for " . htmlspecialchars($selected_semester) . "</p>";
         echo "</div>";
     }
-    
-    // Footer
-    echo "<div class='footer'>";
-    echo "<p><strong>Official Document - PLP SmartGrade System</strong></p>";
-    echo "<p>Pamantasan ng Lungsod ng Pasig | This is a system-generated report.</p>";
-    echo "<p>For discrepancies, please contact the Registrar's Office.</p>";
-    echo "</div>";
     
     echo "</body>";
     echo "</html>";
