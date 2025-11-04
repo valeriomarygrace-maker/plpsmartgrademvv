@@ -120,7 +120,7 @@ try {
     
     // Header
     echo "<div class='header'>";
-    echo "<h1>PLP SMARTGRADE - OFFICIAL GRADE REPORT</h1>";
+    echo "<h1>PLP SMARTGRADE: " . htmlspecialchars($selected_semester) . "</h1>";
     echo "</div>";
     
     // Student Information
