@@ -224,11 +224,11 @@ if ($hasScores) {
         $gwa = 5.00;
     }
 
-   // ALWAYS GENERATE INSIGHTS WHEN SCORES EXIST 
+
 $behavioralInsights = InterventionSystem::getBehavioralInsights($student['id'], $subject_id, $overallGrade, 'general');
 $interventions = InterventionSystem::getInterventions($student['id'], $subject_id, 'general');
-$recommendations = InterventionSystem::getRecommendations($student['id'], $subject_id, $overallGrade, 'general');
-    
+$recommendations = InterventionSystem::getRecommendations($student['id'], $subject_id, $overallGrade, 'general');    
+
 } else {
     // NO SCORES - SHOW ENCOURAGING MESSAGES
     $overallGrade = 0;

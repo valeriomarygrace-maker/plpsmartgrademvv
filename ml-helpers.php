@@ -66,13 +66,13 @@ class EnhancedInterventionSystem {
         // Always use PHP fallback for now to ensure data displays
         $calculatedGrade = self::calculateOverallGrade($classStandings, $examScores);
         $gwa = self::calculateGWA($calculatedGrade);
-        $riskLevel = self::calculateRiskLevelFromGWA($gwa);
+        $performanceLevel = 'general'; // Changed from riskLevel
         
         $baseInsights = [
-            'behavioral_insights' => InterventionSystem::getBehavioralInsights($studentId, $subjectId, $calculatedGrade, $riskLevel),
-            'interventions' => InterventionSystem::getInterventions($studentId, $subjectId, $riskLevel),
-            'recommendations' => InterventionSystem::getRecommendations($studentId, $subjectId, $calculatedGrade, $riskLevel),
-            'risk_level' => $riskLevel,
+            'behavioral_insights' => InterventionSystem::getBehavioralInsights($studentId, $subjectId, $calculatedGrade, $performanceLevel),
+            'interventions' => InterventionSystem::getInterventions($studentId, $subjectId, $performanceLevel),
+            'recommendations' => InterventionSystem::getRecommendations($studentId, $subjectId, $calculatedGrade, $performanceLevel),
+            'performance_level' => $performanceLevel, // Changed from risk_level
             'overall_grade' => $calculatedGrade,
             'gwa' => $gwa,
             'source' => 'php_fallback'
@@ -115,9 +115,9 @@ class EnhancedInterventionSystem {
     }
     
     private static function determineRiskLevel($gwa) {
-    if ($gwa <= 1.75) return 'low';
-    if ($gwa <= 2.50) return 'medium';
-    return 'high';
+        if ($gwa <= 1.75) return 'low';
+        if ($gwa <= 2.50) return 'medium';
+        return 'high';
     }
 }
 
@@ -144,72 +144,30 @@ class InterventionSystem {
     }
     
     public static function getBehavioralInsights($studentId, $subjectId, $currentGrade = 0, $performanceLevel = 'general') {
-    $insights = [];
-    
-    // ALWAYS RETURN INSIGHTS - EVEN WITH NO SCORES
-    if ($currentGrade == 0) {
-        // No scores yet - encouraging messages
-        $insights[] = [
-            'message' => 'Welcome! Start adding your scores to get personalized behavioral insights and track your academic progress.',
-            'priority' => 'low',
-            'source' => 'system'
-        ];
-        $insights[] = [
-            'message' => 'Regular score tracking helps identify patterns in your learning behavior and study effectiveness.',
-            'priority' => 'low',
-            'source' => 'ml'
-        ];
-        return $insights;
-    }
-    
-    // Grade-based insights only (no risk level)
-    if ($currentGrade >= 90) {
-        $insights[] = [
-            'message' => 'Excellent academic performance! Your consistent study habits are paying off.',
-            'priority' => 'low',
-            'source' => 'system'
-        ];
-    } elseif ($currentGrade >= 80) {
-        $insights[] = [
-            'message' => 'Strong performance detected. Focus on maintaining consistency across all assessment types.',
-            'priority' => 'low',
-            'source' => 'system'
-        ];
-    } elseif ($currentGrade >= 75) {
-        $insights[] = [
-            'message' => 'Solid foundation established. Target specific weak areas for focused improvement.',
-            'priority' => 'medium',
-            'source' => 'system'
-        ];
-    } else {
-        $insights[] = [
-            'message' => 'Focus needed on core concepts. Seek additional academic support and resources.',
-            'priority' => 'high',
-            'source' => 'system'
-        ];
-    }
-    
-    // General behavioral insights
-    $insights[] = [
-        'message' => 'Regular practice and consistent study schedule significantly improve long-term knowledge retention.',
-        'priority' => 'medium',
-        'source' => 'system'
-    ];
-    
-    return $insights;
-}
+        $insights = [];
         
-        // Grade-based insights
+        // ALWAYS RETURN INSIGHTS - EVEN WITH NO SCORES
+        if ($currentGrade == 0) {
+            // No scores yet - encouraging messages
+            $insights[] = [
+                'message' => 'Welcome! Start adding your scores to get personalized behavioral insights and track your academic progress.',
+                'priority' => 'low',
+                'source' => 'system'
+            ];
+            $insights[] = [
+                'message' => 'Regular score tracking helps identify patterns in your learning behavior and study effectiveness.',
+                'priority' => 'low',
+                'source' => 'ml'
+            ];
+            return $insights;
+        }
+        
+        // Grade-based insights only (no risk level)
         if ($currentGrade >= 90) {
             $insights[] = [
                 'message' => 'Excellent academic performance! Your consistent study habits are paying off.',
                 'priority' => 'low',
                 'source' => 'system'
-            ];
-            $insights[] = [
-                'message' => 'Maintain your current study routine and consider mentoring peers to reinforce your understanding.',
-                'priority' => 'low',
-                'source' => 'ml'
             ];
         } elseif ($currentGrade >= 80) {
             $insights[] = [
@@ -217,62 +175,16 @@ class InterventionSystem {
                 'priority' => 'low',
                 'source' => 'system'
             ];
-            $insights[] = [
-                'message' => 'Identify specific areas where minor improvements can elevate you to excellence level.',
-                'priority' => 'medium',
-                'source' => 'ml'
-            ];
         } elseif ($currentGrade >= 75) {
             $insights[] = [
                 'message' => 'Solid foundation established. Target specific weak areas for focused improvement.',
                 'priority' => 'medium',
                 'source' => 'system'
             ];
-            $insights[] = [
-                'message' => 'Consistent practice on challenging topics can help bridge the gap to higher performance levels.',
-                'priority' => 'medium',
-                'source' => 'ml'
-            ];
         } else {
             $insights[] = [
                 'message' => 'Focus needed on core concepts. Seek additional academic support and resources.',
                 'priority' => 'high',
-                'source' => 'system'
-            ];
-            $insights[] = [
-                'message' => 'Implement structured study sessions with clear learning objectives for each topic.',
-                'priority' => 'high',
-                'source' => 'ml'
-            ];
-        }
-        
-        // Risk level insights
-        if ($riskLevel === 'high') {
-            $insights[] = [
-                'message' => 'High academic risk detected. Immediate intervention and structured support recommended.',
-                'priority' => 'high',
-                'source' => 'system'
-            ];
-            $insights[] = [
-                'message' => 'Frequent review sessions and practice tests can help build foundational understanding.',
-                'priority' => 'high',
-                'source' => 'ml'
-            ];
-        } elseif ($riskLevel === 'medium') {
-            $insights[] = [
-                'message' => 'Medium risk level identified. Regular review and practice sessions recommended.',
-                'priority' => 'medium',
-                'source' => 'system'
-            ];
-            $insights[] = [
-                'message' => 'Focus on improving consistency in assignments and quizzes to stabilize performance.',
-                'priority' => 'medium',
-                'source' => 'ml'
-            ];
-        } else {
-            $insights[] = [
-                'message' => 'Low risk level. Your current study strategies are effective - continue with this approach.',
-                'priority' => 'low',
                 'source' => 'system'
             ];
         }
@@ -282,11 +194,6 @@ class InterventionSystem {
             'message' => 'Regular practice and consistent study schedule significantly improve long-term knowledge retention.',
             'priority' => 'medium',
             'source' => 'system'
-        ];
-        $insights[] = [
-            'message' => 'Active learning techniques like self-testing enhance understanding better than passive reviewing.',
-            'priority' => 'medium',
-            'source' => 'ml'
         ];
         
         return $insights;
@@ -321,7 +228,7 @@ class InterventionSystem {
         return $interventions;
     }
     
-    public static function getRecommendations($studentId, $subjectId, $overallGrade, $riskLevel = 'medium') {
+    public static function getRecommendations($studentId, $subjectId, $overallGrade, $performanceLevel = 'general') {
         $recommendations = [];
         
         // ALWAYS RETURN RECOMMENDATIONS - EVEN WITH NO SCORES
@@ -411,36 +318,6 @@ class InterventionSystem {
             ];
         }
         
-        // Risk-based recommendations
-        if ($riskLevel === 'high') {
-            $recommendations[] = [
-                'message' => 'Create structured daily study schedule with specific, achievable learning objectives.',
-                'priority' => 'high',
-                'source' => 'system'
-            ];
-            $recommendations[] = [
-                'message' => 'Focus on mastering core concepts before attempting complex applications.',
-                'priority' => 'high',
-                'source' => 'ml'
-            ];
-            $recommendations[] = [
-                'message' => 'Utilize all available academic support resources consistently.',
-                'priority' => 'high',
-                'source' => 'system'
-            ];
-        } elseif ($riskLevel === 'medium') {
-            $recommendations[] = [
-                'message' => 'Focus on improving consistency in assignment submissions and preparation.',
-                'priority' => 'medium',
-                'source' => 'ml'
-            ];
-            $recommendations[] = [
-                'message' => 'Develop systematic approach to exam preparation and review.',
-                'priority' => 'medium',
-                'source' => 'system'
-            ];
-        }
-        
         // General study recommendations
         $recommendations[] = [
             'message' => 'Implement spaced repetition technique for better long-term retention of key concepts.',
@@ -488,15 +365,11 @@ class InterventionSystem {
             
             $overallGrade = $maxPossible > 0 ? ($totalScore / $maxPossible) * 100 : 0;
             
-            // Determine risk level
-            $gwa = self::calculateGWAFromGrade($overallGrade);
-            $riskLevel = self::determineRiskLevel($gwa);
-            
-            // Generate fresh insights
+            // Generate fresh insights without risk level
             return [
-                'behavioralInsights' => self::getBehavioralInsights($student_id, $subject_id, $overallGrade, $riskLevel),
-                'interventions' => self::getInterventions($student_id, $subject_id, $riskLevel),
-                'recommendations' => self::getRecommendations($student_id, $subject_id, $overallGrade, $riskLevel)
+                'behavioralInsights' => self::getBehavioralInsights($student_id, $subject_id, $overallGrade, 'general'),
+                'interventions' => self::getInterventions($student_id, $subject_id, 'general'),
+                'recommendations' => self::getRecommendations($student_id, $subject_id, $overallGrade, 'general')
             ];
             
         } catch (Exception $e) {
@@ -522,22 +395,16 @@ class InterventionSystem {
         elseif ($grade >= 50) return 3.00;
         else return 5.00;
     }
-    
-    private static function determineRiskLevel($gwa) {
-        if ($gwa <= 1.75) return 'low';
-        if ($gwa <= 2.50) return 'medium';
-        return 'high';
-    }
 }
 
 /**
  * Helper function to ensure insights are always available
  */
-function ensureInsightsAvailable($studentId, $subjectId, $overallGrade = 0, $riskLevel = 'no-data') {
+function ensureInsightsAvailable($studentId, $subjectId, $overallGrade = 0, $performanceLevel = 'no-data') {
     return [
-        'behavioral' => InterventionSystem::getBehavioralInsights($studentId, $subjectId, $overallGrade, $riskLevel),
-        'interventions' => InterventionSystem::getInterventions($studentId, $subjectId, $riskLevel),
-        'recommendations' => InterventionSystem::getRecommendations($studentId, $subjectId, $overallGrade, $riskLevel)
+        'behavioral' => InterventionSystem::getBehavioralInsights($studentId, $subjectId, $overallGrade, $performanceLevel),
+        'interventions' => InterventionSystem::getInterventions($studentId, $subjectId, $performanceLevel),
+        'recommendations' => InterventionSystem::getRecommendations($studentId, $subjectId, $overallGrade, $performanceLevel)
     ];
 }
 ?>
