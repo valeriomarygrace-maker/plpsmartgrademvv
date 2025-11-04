@@ -1365,11 +1365,6 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
                             </div>
                         </div>
                     </div>
-                    <div style="text-align: center; margin-top: 1rem;">
-                        <a href="#detailed-risk-analysis" style="color: var(--plp-green); text-decoration: none; font-size: 0.9rem;">
-                            View Detailed Analysis ↓
-                        </a>
-                    </div>
                 <?php else: ?>
                     <div class="empty-state">
                         <i class="fas fa-archive"></i>
