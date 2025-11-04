@@ -414,6 +414,48 @@ function calculateGWA($grade) {
             letter-spacing: 0.5px;
         }
 
+        /* Header Actions */
+        .header-actions {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .export-btn {
+            background: white;
+            color: var(--plp-green);
+            border: 2px solid var(--plp-green);
+            padding: 0.6rem 1.25rem;
+            border-radius: var(--border-radius);
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+
+        .export-btn:hover {
+            background: var(--plp-green);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: var(--box-shadow);
+        }
+
+        .export-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .export-btn:disabled:hover {
+            background: white;
+            color: var(--plp-green);
+            box-shadow: none;
+        }
+
         /* Semester Selector */
         .semester-selector {
             display: flex;
@@ -594,40 +636,7 @@ function calculateGWA($grade) {
             gap: 0.75rem;
         }
 
-        /* Responsive */
-        @media (max-width: 768px) {
-            body {
-                flex-direction: column;
-            }
-            
-            .sidebar {
-                width: 100%;
-                height: auto;
-                position: relative;
-            }
-            
-            .main-content {
-                padding: 1.5rem;
-            }
-            
-            .header {
-                flex-direction: column;
-                gap: 1rem;
-                text-align: center;
-            }
-            
-            .semester-selector {
-                justify-content: center;
-            }
-            
-            .grades-table-container {
-                overflow-x: auto;
-            }
-            
-            .grades-table {
-                min-width: 800px;
-            }
-        }
+        /* Modal */
         .modal {
             display: none;
             position: fixed;
@@ -699,6 +708,45 @@ function calculateGWA($grade) {
         .modal-btn-confirm:hover {
             transform: translateY(-2px);
         }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+            }
+            
+            .main-content {
+                padding: 1.5rem;
+            }
+            
+            .header {
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }
+            
+            .header-actions {
+                justify-content: center;
+            }
+            
+            .semester-selector {
+                justify-content: center;
+            }
+            
+            .grades-table-container {
+                overflow-x: auto;
+            }
+            
+            .grades-table {
+                min-width: 800px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -757,6 +805,20 @@ function calculateGWA($grade) {
     <div class="main-content">
         <div class="header">
             <div class="welcome">History Records</div>
+            <div class="header-actions">
+                <?php if (!empty($semester_grades)): ?>
+                    <a href="export-semester-grades.php?semester=<?php echo urlencode($selected_semester); ?>" 
+                       class="export-btn" id="exportExcelBtn">
+                        <i class="fas fa-file-excel"></i>
+                        Export to Excel
+                    </a>
+                <?php else: ?>
+                    <button class="export-btn" disabled>
+                        <i class="fas fa-file-excel"></i>
+                        Export to Excel
+                    </button>
+                <?php endif; ?>
+            </div>
         </div>
 
         <?php if ($error_message): ?>
@@ -781,7 +843,7 @@ function calculateGWA($grade) {
             <!-- Grades Table -->
             <div class="grades-table-container">
                 <?php if (!empty($semester_grades)): ?>
-                    <table class="grades-table">
+                    <table class="grades-table" id="gradesTable">
                         <thead>
                             <tr>
                                 <th>Subject Code</th>
@@ -844,7 +906,7 @@ function calculateGWA($grade) {
         <?php endif; ?>
     </div>
 
-        <!--  Logout Modal -->
+    <!-- Logout Modal -->
     <div class="modal" id="logoutModal">
         <div class="modal-content" style="max-width: 450px; text-align: center;">
             <h3 style="color: var(--plp-green); font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem;">
@@ -884,7 +946,7 @@ function calculateGWA($grade) {
         const cancelLogout = document.getElementById('cancelLogout');
         const confirmLogout = document.getElementById('confirmLogout');
 
-// Show modal when clicking logout button
+        // Show modal when clicking logout button
         logoutBtn.addEventListener('click', (e) => {
             e.preventDefault();
             logoutModal.classList.add('show');
@@ -900,14 +962,11 @@ function calculateGWA($grade) {
             window.location.href = 'logout.php';
         });
 
-// Hide modal when clicking outside the modal content
-        const modals = [addSubjectModal, editSubjectModal, archiveSubjectModal, logoutModal];
-        modals.forEach(modal => {
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    modal.classList.remove('show');
-                }
-            });
+        // Hide modal when clicking outside the modal content
+        logoutModal.addEventListener('click', (e) => {
+            if (e.target === logoutModal) {
+                logoutModal.classList.remove('show');
+            }
         });
     </script>
 </body>
