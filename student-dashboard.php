@@ -245,7 +245,7 @@ function calculateGWA($grade) {
 }
 
 /**
- * Get semester risk data for bar chart - UPDATED FOR BAR CHART BY SEMESTER
+ * Get semester risk data for bar chart - UPDATED FOR CONSISTENT RISK CALCULATION
  */
 function getSemesterRiskData($student_id) {
     $data = [
@@ -283,17 +283,28 @@ function getSemesterRiskData($student_id) {
                     
                     $is_high_risk = false;
                     $final_grade = 0;
+                    $risk_level = 'no-data';
                     
                     if ($performance_data && count($performance_data) > 0) {
                         $performance = $performance_data[0];
                         $final_grade = $performance['overall_grade'];
+                        $risk_level = $performance['risk_level'];
                         
-                        // Determine high risk based on FINAL GRADE (not GWA)
-                        // High risk: below 75% final grade
-                        if ($final_grade < 75 && $final_grade > 0) {
-                            $is_high_risk = true;
-                            $data['total_high_risk']++;
+                        // Use the same risk level definition as archived subjects page
+                        // High risk includes both 'high' and 'failed' risk levels
+                        $is_high_risk = ($risk_level === 'high' || $risk_level === 'failed');
+                    } else {
+                        // Calculate performance if not stored (same as archived subjects page)
+                        $calculated_performance = calculateArchivedSubjectPerformance($archived_subject['id']);
+                        if ($calculated_performance) {
+                            $final_grade = $calculated_performance['overall_grade'];
+                            $risk_level = $calculated_performance['risk_level'];
+                            $is_high_risk = ($risk_level === 'high' || $risk_level === 'failed');
                         }
+                    }
+                    
+                    if ($is_high_risk) {
+                        $data['total_high_risk']++;
                     }
                     
                     // Categorize by semester
@@ -306,6 +317,7 @@ function getSemesterRiskData($student_id) {
                             'subject_code' => $subject_info['subject_code'],
                             'subject_name' => $subject_info['subject_name'],
                             'final_grade' => $final_grade,
+                            'risk_level' => $risk_level,
                             'is_high_risk' => $is_high_risk
                         ];
                     } elseif (strpos($semester, 'second') !== false || strpos($semester, '2') !== false) {
@@ -317,6 +329,7 @@ function getSemesterRiskData($student_id) {
                             'subject_code' => $subject_info['subject_code'],
                             'subject_name' => $subject_info['subject_name'],
                             'final_grade' => $final_grade,
+                            'risk_level' => $risk_level,
                             'is_high_risk' => $is_high_risk
                         ];
                     }
@@ -330,8 +343,129 @@ function getSemesterRiskData($student_id) {
     
     return $data;
 }
-?>
 
+/**
+ * Calculate performance for archived subject (same as in student-archived-subject.php)
+ */
+function calculateArchivedSubjectPerformance($archived_subject_id) {
+    try {
+        // Get all categories for this archived subject
+        $categories = supabaseFetch('archived_class_standing_categories', ['archived_subject_id' => $archived_subject_id]);
+        
+        if (!$categories || !is_array($categories)) {
+            return null;
+        }
+        
+        $totalClassStanding = 0;
+        $midtermScore = 0;
+        $finalScore = 0;
+        $hasScores = false;
+        
+        // Calculate class standing from categories
+        foreach ($categories as $category) {
+            $scores = supabaseFetch('archived_subject_scores', [
+                'archived_category_id' => $category['id'], 
+                'score_type' => 'class_standing'
+            ]);
+            
+            if ($scores && is_array($scores) && count($scores) > 0) {
+                $hasScores = true;
+                $categoryTotal = 0;
+                $categoryMax = 0;
+                
+                foreach ($scores as $score) {
+                    $categoryTotal += floatval($score['score_value']);
+                    $categoryMax += floatval($score['max_score']);
+                }
+                
+                if ($categoryMax > 0) {
+                    $categoryPercentage = ($categoryTotal / $categoryMax) * 100;
+                    $weightedScore = ($categoryPercentage * floatval($category['category_percentage'])) / 100;
+                    $totalClassStanding += $weightedScore;
+                }
+            }
+        }
+        
+        // Ensure Class Standing doesn't exceed 60%
+        if ($totalClassStanding > 60) {
+            $totalClassStanding = 60;
+        }
+        
+        // Get exam scores from all categories for this archived subject
+        foreach ($categories as $category) {
+            $exam_scores = supabaseFetch('archived_subject_scores', ['archived_category_id' => $category['id']]);
+            
+            if ($exam_scores && is_array($exam_scores)) {
+                foreach ($exam_scores as $exam) {
+                    if (floatval($exam['max_score']) > 0) {
+                        $examPercentage = (floatval($exam['score_value']) / floatval($exam['max_score'])) * 100;
+                        if ($exam['score_type'] === 'midterm_exam') {
+                            $midtermScore = ($examPercentage * 20) / 100;
+                            $hasScores = true;
+                        } elseif ($exam['score_type'] === 'final_exam') {
+                            $finalScore = ($examPercentage * 20) / 100;
+                            $hasScores = true;
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (!$hasScores) {
+            return [
+                'overall_grade' => 0,
+                'gwa' => 0,
+                'class_standing' => 0,
+                'exams_score' => 0,
+                'risk_level' => 'no-data',
+                'risk_description' => 'No Data Inputted',
+                'has_scores' => false
+            ];
+        }
+        
+        // Calculate overall grade
+        $overallGrade = $totalClassStanding + $midtermScore + $finalScore;
+        if ($overallGrade > 100) {
+            $overallGrade = 100;
+        }
+        
+        // Calculate GWA (General Weighted Average) - Philippine system
+        $gwa = calculateGWA($overallGrade);
+        
+        // Calculate risk level based on GWA
+        $riskLevel = 'no-data';
+        $riskDescription = 'No Data Inputted';
+
+        if ($gwa <= 1.75) {
+            $riskLevel = 'low';
+            $riskDescription = 'Low Risk';
+        } elseif ($gwa <= 2.50) {
+            $riskLevel = 'medium';
+            $riskDescription = 'Medium Risk';
+        } elseif ($gwa <= 3.00) {
+            $riskLevel = 'high';
+            $riskDescription = 'High Risk';
+        } else {
+            $riskLevel = 'failed';
+            $riskDescription = 'Failed';
+        }
+        
+        return [
+            'overall_grade' => $overallGrade,
+            'gwa' => $gwa,
+            'class_standing' => $totalClassStanding,
+            'exams_score' => $midtermScore + $finalScore,
+            'risk_level' => $riskLevel,
+            'risk_description' => $riskDescription,
+            'has_scores' => true
+        ];
+        
+    } catch (Exception $e) {
+        error_log("Error calculating archived subject performance: " . $e->getMessage());
+        return null;
+    }
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1182,105 +1316,10 @@ function getSemesterRiskData($student_id) {
                 <div class="bar-chart-container">
                     <div class="bar-chart-title">
                         <i class="fas fa-exclamation-triangle"></i>
-                        High Risk Subjects Comparison (Based on Final Grade)
+                        High Risk Subjects Comparison
                     </div>
                     <div class="bar-chart-wrapper">
                         <canvas id="highRiskBarChart"></canvas>
-                    </div>
-                    
-                    <div class="bar-chart-stats">
-                        <div class="bar-stat-card">
-                            <div class="bar-stat-value"><?php echo $semester_risk_data['first_semester']['high_risk_count']; ?></div>
-                            <div class="bar-stat-label">First Semester High Risk</div>
-                        </div>
-                        <div class="bar-stat-card">
-                            <div class="bar-stat-value"><?php echo $semester_risk_data['second_semester']['high_risk_count']; ?></div>
-                            <div class="bar-stat-label">Second Semester High Risk</div>
-                        </div>
-                    </div>
-
-                    <!-- Semester Comparison Analysis -->
-                    <div class="semester-comparison">
-                        <div class="comparison-title">
-                            <i class="fas fa-chart-line"></i>
-                            Semester Performance Analysis
-                        </div>
-                        <div class="comparison-text">
-                            <?php
-                            $first_sem_high_risk = $semester_risk_data['first_semester']['high_risk_count'];
-                            $second_sem_high_risk = $semester_risk_data['second_semester']['high_risk_count'];
-                            $total_high_risk = $first_sem_high_risk + $second_sem_high_risk;
-                            
-                            if ($total_high_risk > 0) {
-                                if ($first_sem_high_risk > $second_sem_high_risk) {
-                                    echo "First semester has more high-risk subjects. Consider reviewing your study strategies from the beginning of the academic year.";
-                                } elseif ($second_sem_high_risk > $first_sem_high_risk) {
-                                    echo "Second semester shows more high-risk subjects. Focus on maintaining consistency throughout the entire academic year.";
-                                } else {
-                                    echo "Both semesters have equal high-risk subject counts. Maintain balanced study habits across all semesters.";
-                                }
-                            } else {
-                                echo "Excellent! No high-risk subjects found in either semester. Continue maintaining your strong academic performance.";
-                            }
-                            ?>
-                        </div>
-                    </div>
-
-                    <!-- Subject Details -->
-                    <div class="subject-details">
-                        <!-- First Semester Subjects -->
-                        <?php if (!empty($semester_risk_data['first_semester']['subjects'])): ?>
-                            <div class="semester-subjects">
-                                <div class="semester-subject-title">
-                                    <i class="fas fa-book"></i> First Semester Subjects
-                                </div>
-                                <?php foreach ($semester_risk_data['first_semester']['subjects'] as $subject): ?>
-                                    <div class="subject-detail-item">
-                                        <div class="subject-detail-info">
-                                            <div class="subject-detail-code"><?php echo htmlspecialchars($subject['subject_code']); ?></div>
-                                            <div class="subject-detail-name"><?php echo htmlspecialchars($subject['subject_name']); ?></div>
-                                        </div>
-                                        <div class="subject-detail-grade">
-                                            <div class="subject-final-grade <?php echo $subject['is_high_risk'] ? 'grade-high-risk' : 'grade-safe'; ?>">
-                                                <?php echo $subject['final_grade'] > 0 ? number_format($subject['final_grade'], 1) . '%' : 'No Data'; ?>
-                                            </div>
-                                            <?php if ($subject['is_high_risk']): ?>
-                                                <span class="risk-badge high">High Risk</span>
-                                            <?php else: ?>
-                                                <span class="risk-badge low">Safe</span>
-                                            <?php endif; ?>
-                                        </div>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                        <?php endif; ?>
-
-                        <!-- Second Semester Subjects -->
-                        <?php if (!empty($semester_risk_data['second_semester']['subjects'])): ?>
-                            <div class="semester-subjects">
-                                <div class="semester-subject-title">
-                                    <i class="fas fa-book"></i> Second Semester Subjects
-                                </div>
-                                <?php foreach ($semester_risk_data['second_semester']['subjects'] as $subject): ?>
-                                    <div class="subject-detail-item">
-                                        <div class="subject-detail-info">
-                                            <div class="subject-detail-code"><?php echo htmlspecialchars($subject['subject_code']); ?></div>
-                                            <div class="subject-detail-name"><?php echo htmlspecialchars($subject['subject_name']); ?></div>
-                                        </div>
-                                        <div class="subject-detail-grade">
-                                            <div class="subject-final-grade <?php echo $subject['is_high_risk'] ? 'grade-high-risk' : 'grade-safe'; ?>">
-                                                <?php echo $subject['final_grade'] > 0 ? number_format($subject['final_grade'], 1) . '%' : 'No Data'; ?>
-                                            </div>
-                                            <?php if ($subject['is_high_risk']): ?>
-                                                <span class="risk-badge high">High Risk</span>
-                                            <?php else: ?>
-                                                <span class="risk-badge low">Safe</span>
-                                            <?php endif; ?>
-                                        </div>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                        <?php endif; ?>
                     </div>
                 </div>
             <?php else: ?>
