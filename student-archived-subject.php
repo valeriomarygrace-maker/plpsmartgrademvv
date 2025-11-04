@@ -1292,6 +1292,10 @@ function calculateGWA($grade) {
     </style>
 </head>
 <body>
+    <button class="mobile-menu-toggle" id="mobileMenuToggle">
+        <i class="fas fa-bars"></i>
+    </button>
+
     <div class="sidebar">
         <div class="sidebar-header">
             <div class="logo-container">
@@ -1302,7 +1306,7 @@ function calculateGWA($grade) {
             <div class="portal-title">PLPSMARTGRADE</div>
             <div class="student-email"><?php echo htmlspecialchars($student['email']); ?></div>
         </div>
-
+        
         <ul class="nav-menu">
             <li class="nav-item">
                 <a href="student-dashboard.php" class="nav-link">
@@ -1329,7 +1333,7 @@ function calculateGWA($grade) {
                 </a>
             </li>
             <li class="nav-item">
-                <a href="student-semester-grades.php" class="nav-link ">
+                <a href="student-semester-grades.php" class="nav-link">
                     <i class="fas fa-history"></i>
                     History Records
                 </a>
@@ -1458,7 +1462,7 @@ function calculateGWA($grade) {
                 <div class="performance-overview">
                     <h4 style="color: var(--plp-green); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
                         <i class="fas fa-chart-line"></i>
-                        Final Performance Summary
+                        Performance Summary
                     </h4>
                     <div class="details-grid">
                         <div class="detail-item">
