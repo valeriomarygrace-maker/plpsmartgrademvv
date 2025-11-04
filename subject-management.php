@@ -108,22 +108,8 @@ $finalExam = array_filter($allScores, function($score) {
     return $score['score_type'] === 'final_exam';
 });
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['add_standing']) || isset($_POST['update_score']) || isset($_POST['add_exam']) || isset($_POST['add_attendance'])) {
-        InterventionSystem::logBehavior(
-            $student['id'], 
-            'grade_update', 
-            [
-                'subject_id' => $subject_id,
-                'subject_name' => $subject['subject_name'],
-                'action' => isset($_POST['add_standing']) ? 'add_score' : 'update_score'
-            ]
-        );
-    }
-}
-
+// Initialize ML insights variables
 $hasScores = !empty($classStandings) || !empty($midtermExam) || !empty($finalExam);
-
 $totalClassStanding = 0;
 $midtermScore = 0;
 $finalScore = 0;
@@ -136,13 +122,8 @@ $behavioralInsights = [];
 $interventions = [];
 $recommendations = [];
 
-if (!$hasScores) {
-    $overallGrade = 0;
-    $gwa = 0;
-    $totalClassStanding = 0;
-    $midtermScore = 0;
-    $finalScore = 0;
-} else {
+// Calculate grades and generate insights
+if ($hasScores) {
     // CLASS STANDING CALCULATION
     $categoryTotals = [];
     foreach ($categories as $category) {
@@ -258,13 +239,42 @@ if (!$hasScores) {
         $interventionNeeded = true;
     }
 
+    // ALWAYS GENERATE INSIGHTS WHEN SCORES EXIST
     $behavioralInsights = InterventionSystem::getBehavioralInsights($student['id'], $subject_id, $overallGrade, $riskLevel);
     $interventions = InterventionSystem::getInterventions($student['id'], $subject_id, $riskLevel);
     $recommendations = InterventionSystem::getRecommendations($student['id'], $subject_id, $overallGrade, $riskLevel);
+    
+} else {
+    // NO SCORES - SHOW ENCOURAGING MESSAGES
+    $overallGrade = 0;
+    $gwa = 0;
+    $totalClassStanding = 0;
+    $midtermScore = 0;
+    $finalScore = 0;
+    
+    // Provide basic insights even without scores
+    $behavioralInsights = [[
+        'message' => 'Start adding your scores to get personalized behavioral insights and recommendations.',
+        'priority' => 'low',
+        'source' => 'system'
+    ]];
+    
+    $interventions = [[
+        'message' => 'Begin by adding your class standing scores and exam results.',
+        'priority' => 'low'
+    ]];
+    
+    $recommendations = [[
+        'message' => 'Track all your assessments regularly to monitor your academic progress.',
+        'priority' => 'low',
+        'source' => 'system'
+    ]];
 }
 
 // FORM HANDLING
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $scoreUpdated = false;
+    
     // ADD CLASS STANDING CATEGORY
     if (isset($_POST['add_category'])) {
         $category_name = trim($_POST['category_name']);
@@ -287,9 +297,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 if ($result) {
                     $success_message = 'Category added successfully!';
-                    // Refresh page to show new category immediately
-                    echo "<script>window.location.href = 'subject-management.php?subject_id=$subject_id';</script>";
-                    exit;
+                    $scoreUpdated = true;
                 } else {
                     $error_message = 'Failed to add category.';
                 }
@@ -328,9 +336,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 if ($result) {
                     $success_message = 'Score added successfully!';
-                    // Refresh page to show score immediately
-                    echo "<script>window.location.href = 'subject-management.php?subject_id=$subject_id';</script>";
-                    exit;
+                    $scoreUpdated = true;
+                    InterventionSystem::logBehavior(
+                        $student['id'], 
+                        'grade_update', 
+                        [
+                            'subject_id' => $subject_id,
+                            'subject_name' => $subject['subject_name'],
+                            'action' => 'add_score',
+                            'score_type' => 'class_standing'
+                        ]
+                    );
                 } else {
                     $error_message = 'Failed to add score.';
                 }
@@ -376,9 +392,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     
                     if ($result) {
                         $success_message = 'Attendance recorded successfully!';
-                        // Refresh page to show attendance immediately
-                        echo "<script>window.location.href = 'subject-management.php?subject_id=$subject_id';</script>";
-                        exit;
+                        $scoreUpdated = true;
+                        InterventionSystem::logBehavior(
+                            $student['id'], 
+                            'attendance_update', 
+                            [
+                                'subject_id' => $subject_id,
+                                'subject_name' => $subject['subject_name'],
+                                'action' => 'add_attendance',
+                                'status' => $attendance_status
+                            ]
+                        );
                     } else {
                         $error_message = 'Failed to record attendance.';
                     }
@@ -423,9 +447,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 if ($result) {
                     $success_message = $exam_name . ' score added successfully!';
-                    // Refresh page to show exam score immediately
-                    echo "<script>window.location.href = 'subject-management.php?subject_id=$subject_id';</script>";
-                    exit;
+                    $scoreUpdated = true;
+                    InterventionSystem::logBehavior(
+                        $student['id'], 
+                        'exam_update', 
+                        [
+                            'subject_id' => $subject_id,
+                            'subject_name' => $subject['subject_name'],
+                            'action' => 'add_exam',
+                            'exam_type' => $exam_type
+                        ]
+                    );
                 } else {
                     $error_message = 'Failed to add exam score.';
                 }
@@ -453,9 +485,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     
                     if ($result) {
                         $success_message = 'Score updated successfully!';
-                        // Refresh page to show updated score immediately
-                        echo "<script>window.location.href = 'subject-management.php?subject_id=$subject_id';</script>";
-                        exit;
+                        $scoreUpdated = true;
+                        InterventionSystem::logBehavior(
+                            $student['id'], 
+                            'grade_update', 
+                            [
+                                'subject_id' => $subject_id,
+                                'subject_name' => $subject['subject_name'],
+                                'action' => 'update_score'
+                            ]
+                        );
                     } else {
                         $error_message = 'Failed to update score.';
                     }
@@ -477,9 +516,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             if ($result) {
                 $success_message = 'Score deleted successfully!';
-                // Refresh page to show deletion immediately
-                echo "<script>window.location.href = 'subject-management.php?subject_id=$subject_id';</script>";
-                exit;
+                $scoreUpdated = true;
             } else {
                 $error_message = 'Failed to delete score.';
             }
@@ -498,9 +535,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             if ($result) {
                 $success_message = 'Category deleted successfully!';
-                // Refresh page to show deletion immediately
-                echo "<script>window.location.href = 'subject-management.php?subject_id=$subject_id';</script>";
-                exit;
+                $scoreUpdated = true;
             } else {
                 $error_message = 'Failed to delete category.';
             }
@@ -508,9 +543,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error_message = 'Database error: ' . $e->getMessage();
         }
     }
+    
+    // If scores were updated, refresh the page to show new insights
+    if ($scoreUpdated) {
+        echo "<script>window.location.href = 'subject-management.php?subject_id=$subject_id&show_insights=true';</script>";
+        exit;
+    }
 }
-?>
 
+// Check if we should auto-show insights
+$autoShowInsights = isset($_GET['show_insights']) || $success_message;
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -520,6 +563,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        /* Your existing CSS styles remain exactly the same */
         :root {
             --plp-green: #006341;
             --plp-green-light: #008856;
@@ -1520,10 +1564,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <div class="performance-label">
                             <?php 
                             if ($gwa <= 1.00) echo 'Excellent';
-                            elseif ($gwa <= 1.25) echo 'Very Good';
+                            elseif ($gwa <= 1.25) echo 'Very Good ';
                             elseif ($gwa <= 1.50) echo 'Good';
                             elseif ($gwa <= 1.75) echo 'Satisfactory';
-                            elseif ($gwa <= 2.00) echo 'Fair';
+                            elseif ($gwa <= 2.00) echo 'Passing';
                             elseif ($gwa <= 2.25) echo 'Needs Improvement';
                             elseif ($gwa <= 2.50) echo 'Needs Improvement';
                             elseif ($gwa <= 2.75) echo 'Poor';
@@ -1709,12 +1753,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <?php 
                         $midterm = reset($midtermExam);
                         ?>
-                        <p style="color: var(--text-medium); margin-top: 0.5rem; font-size: 0.9rem;">
-                            Score: <?php echo $midterm['score_value']; ?>/<?php echo $midterm['max_score']; ?>
-                        </p>
-                        <p style="color: var(--text-light); font-size: 0.75rem; margin-top: 0.3rem;">
-                            Weighted: <?php echo number_format($midtermScore, 1); ?>%
-                        </p>
                     <?php else: ?>
                         <p style="color: var(--text-light); margin-top: 0.5rem; font-size: 0.9rem;">
                             Click to add score
@@ -1730,12 +1768,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <?php 
                         $final = reset($finalExam);
                         ?>
-                        <p style="color: var(--text-medium); margin-top: 0.5rem; font-size: 0.9rem;">
-                            Score: <?php echo $final['score_value']; ?>/<?php echo $final['max_score']; ?>
-                        </p>
-                        <p style="color: var(--text-light); font-size: 0.75rem; margin-top: 0.3rem;">
-                            Weighted: <?php echo number_format($finalScore, 1); ?>%
-                        </p>
                     <?php else: ?>
                         <p style="color: var(--text-light); margin-top: 0.5rem; font-size: 0.9rem;">
                             Click to add score
@@ -1868,7 +1900,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <label for="category_percentage" class="form-label">Percentage Weight</label>
                         <input type="number" id="category_percentage" name="category_percentage" class="form-input" min="1" max="<?php echo 60 - $totalClassStandingPercentage; ?>" required placeholder="Enter percentage">
                         <p style="text-align: left; margin-top: 0.5rem; color: var(--text-medium); font-size: 0.85rem;">
-                            Remaining allocation: <?php echo remainingAllocation; ?>%
+                            Remaining allocation: <?php echo 60 - $totalClassStandingPercentage; ?>%
                         </p>
                     </div>
                     
@@ -1984,7 +2016,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             <form id="deleteScoreForm" method="POST" style="margin-top: 1rem; border-top: 1px solid #eee; padding-top: 1rem;">
                 <input type="hidden" name="delete_score" value="1">
-                <input type="hidden" name="score_id" id="deleteScoreId">
+                <input type="hidden" name="score_id" value="<?php echo $score['id']; ?>">
                 <button type="submit" class="modal-btn" style="background: var(--danger); color: white; width: 100%;" onclick="return confirm('Are you sure you want to delete this score?')">
                     Delete Score
                 </button>
@@ -2074,15 +2106,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             });
         });
 
-        // Auto-show interventions tab if risk level is medium or high
-        const riskBadge = document.querySelector('.risk-badge');
-        if (riskBadge && (riskBadge.classList.contains('medium') || riskBadge.classList.contains('high'))) {
-            // Auto-select interventions tab for medium/high risk after a short delay
-            setTimeout(() => {
-                document.querySelector('.insight-tab[data-tab="interventions"]').click();
-            }, 500);
+        // Load existing exam scores into modal when opening
+        const examModal = document.getElementById('examModal');
+        if (examModal) {
+            examModal.addEventListener('show', function() {
+                const examType = document.getElementById('examType').value;
+                loadExistingExamScore(examType);
+            });
         }
     });
+
+    function loadExistingExamScore(examType) {
+        // This function would load existing exam scores if any
+        // For now, we'll just reset the form to ensure clean state
+        document.getElementById('exam_score').value = '';
+        document.getElementById('max_score').value = '';
+    }
 
     function openAddCategoryModal() {
         document.getElementById('addCategoryModal').classList.add('show');
@@ -2148,31 +2187,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         document.getElementById('examModalTitle').textContent = 
             examType === 'midterm_exam' ? 'Add Midterm Exam Score' : 'Add Final Exam Score';
         
-        // Reset form values first
+        // ALWAYS reset form values to empty to ensure clean state
         document.getElementById('examForm').reset();
         document.getElementById('exam_score').value = '';
         document.getElementById('max_score').value = '';
-        
-        // Load existing scores if available
-        <?php if (!empty($midtermExam)): ?>
-        if (examType === 'midterm_exam') {
-            const midterm = <?php echo json_encode(reset($midtermExam)); ?>;
-            if (midterm && midterm.score_value !== undefined) {
-                document.getElementById('exam_score').value = midterm.score_value;
-                document.getElementById('max_score').value = midterm.max_score;
-            }
-        }
-        <?php endif; ?>
-        
-        <?php if (!empty($finalExam)): ?>
-        if (examType === 'final_exam') {
-            const final = <?php echo json_encode(reset($finalExam)); ?>;
-            if (final && final.score_value !== undefined) {
-                document.getElementById('exam_score').value = final.score_value;
-                document.getElementById('max_score').value = final.max_score;
-            }
-        }
-        <?php endif; ?>
         
         document.getElementById('examModal').classList.add('show');
     }
@@ -2199,9 +2217,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if (e.target === document.getElementById('examModal')) {
             closeExamModal();
-        }
-        if (e.target === document.getElementById('logoutModal')) {
-            closeLogoutModal();
         }
     });
 
@@ -2276,10 +2291,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     const cancelLogout = document.getElementById('cancelLogout');
     const confirmLogout = document.getElementById('confirmLogout');
 
-    function closeLogoutModal() {
-        logoutModal.classList.remove('show');
-    }
-
     // Show modal when clicking logout button
     logoutBtn.addEventListener('click', (e) => {
         e.preventDefault();
@@ -2288,7 +2299,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Hide modal when clicking cancel
     cancelLogout.addEventListener('click', () => {
-        closeLogoutModal();
+        logoutModal.classList.remove('show');
     });
 
     // Handle logout confirmation
@@ -2299,7 +2310,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Hide modal when clicking outside the modal content
     logoutModal.addEventListener('click', (e) => {
         if (e.target === logoutModal) {
-            closeLogoutModal();
+            logoutModal.classList.remove('show');
         }
     });
 </script>
