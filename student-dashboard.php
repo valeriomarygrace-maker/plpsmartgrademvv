@@ -1204,32 +1204,6 @@ function calculateGWA($grade) {
                     </div>
                 </div>
                 <?php if (!empty($semester_risk_data)): ?>
-                    <div class="pie-chart-container">
-                        <!-- Overall Risk Pie Chart -->
-                        <div class="pie-chart-wrapper">
-                            <canvas id="overallRiskChart"></canvas>
-                        </div>
-                        <div class="pie-chart-legend">
-                            <div class="legend-item">
-                                <div class="legend-color" style="background-color: #dc3545;"></div>
-                                <span class="legend-text">High Risk</span>
-                            </div>
-                            <div class="legend-item">
-                                <div class="legend-color" style="background-color: #ffc107;"></div>
-                                <span class="legend-text">Medium Risk</span>
-                            </div>
-                            <div class="legend-item">
-                                <div class="legend-color" style="background-color: #28a745;"></div>
-                                <span class="legend-text">Low Risk</span>
-                            </div>
-                            <div class="legend-item">
-                                <div class="legend-color" style="background-color: #6c757d;"></div>
-                                <span class="legend-text">No Data</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Individual Semester Pie Charts -->
                     <div class="semester-pie-charts">
                         <?php foreach ($semester_risk_data as $semester): ?>
                             <div class="semester-pie-card">
