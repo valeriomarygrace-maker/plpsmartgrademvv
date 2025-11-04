@@ -1549,35 +1549,23 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
                 
                 <div class="performance-card">
                     <div class="performance-label">GWA</div>
-                        <?php if ($hasScores): ?>
-                        <div class="performance-overview">
-                            <div class="performance-grid">
-                                <div class="performance-card" style="text-align: center;">
-                                    <div class="performance-label">Predicted GWA Range</div>
-                                    <div class="performance-value" style="font-size: 1.4rem; color: var(--plp-green);">
-                                        <?php
-                                        if ($gwa <= 1.75) {
-                                            echo '1.00 - 1.75';
-                                            $predictionDesc = 'Excellent Performance';
-                                            $badgeClass = 'risk-badge low';
-                                        } elseif ($gwa <= 2.50) {
-                                            echo '1.76 - 2.50';
-                                            $predictionDesc = 'Good Performance';
-                                            $badgeClass = 'risk-badge medium';
-                                        } else {
-                                            echo '2.51 - 3.00+';
-                                            $predictionDesc = 'Needs Improvement';
-                                            $badgeClass = 'risk-badge high';
-                                        }
-                                        ?>
-                                    </div>
-                                    <div class="<?php echo $badgeClass; ?>" style="margin-top: 0.5rem;">
-                                        <?php echo $predictionDesc; ?>
-                                    </div>
-                                </div>
-                            </div>
+                    <?php if ($hasScores): ?>
+                        <div class="performance-value"><?php echo number_format($gwa, 2); ?></div>
+                        <div class="performance-label" style="margin-top: 0.5rem; font-size: 0.9rem; color: var(--text-medium);">
+                            <?php 
+                            if ($gwa <= 1.00) echo 'Excellent';
+                            elseif ($gwa <= 1.25) echo 'Very Good';
+                            elseif ($gwa <= 1.50) echo 'Good';
+                            elseif ($gwa <= 1.75) echo 'Satisfactory';
+                            elseif ($gwa <= 2.00) echo 'Passing';
+                            elseif ($gwa <= 2.25) echo 'Needs Improvement';
+                            elseif ($gwa <= 2.50) echo 'Needs Improvement';
+                            elseif ($gwa <= 2.75) echo 'Poor';
+                            elseif ($gwa <= 3.00) echo 'Very Poor';
+                            else echo 'Failed';
+                            ?>
                         </div>
-                        <?php endif; ?>
+                    <?php else: ?>
                         <div class="performance-value" style="color: var(--text-light);">--</div>
                         <div class="performance-label">No GWA calculated</div>
                     <?php endif; ?>
@@ -1607,6 +1595,41 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
             </div>
         </div>
 
+                <!-- GWA Prediction Section -->
+        <?php if ($hasScores): ?>
+        <div class="performance-overview">
+            <div class="section-title">
+                <i class="fas fa-chart-line"></i>
+                GWA Prediction
+            </div>
+            <div class="performance-grid">
+                <div class="performance-card" style="text-align: center;">
+                    <div class="performance-label">Predicted GWA Range</div>
+                    <div class="performance-value" style="font-size: 1.4rem; color: var(--plp-green);">
+                        <?php
+                        if ($gwa <= 1.75) {
+                            echo '1.00 - 1.75';
+                            $predictionDesc = 'Excellent Performance';
+                            $badgeClass = 'risk-badge low';
+                        } elseif ($gwa <= 2.50) {
+                            echo '1.76 - 2.50';
+                            $predictionDesc = 'Good Performance';
+                            $badgeClass = 'risk-badge medium';
+                        } else {
+                            echo '2.51 - 3.00+';
+                            $predictionDesc = 'Needs Improvement';
+                            $badgeClass = 'risk-badge high';
+                        }
+                        ?>
+                    </div>
+                    <div class="<?php echo $badgeClass; ?>" style="margin-top: 0.5rem;">
+                        <?php echo $predictionDesc; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+        
         <!-- Class Standing Categories Section -->
         <div class="category-section">
             <div class="section-header">
