@@ -224,25 +224,10 @@ if ($hasScores) {
         $gwa = 5.00;
     }
 
-    // RISK LEVEL CALCULATION - BASED ON GWA
-    if ($gwa <= 1.75) {
-        $riskLevel = 'low';
-        $riskDescription = 'Low Risk';
-        $interventionNeeded = false;
-    } elseif ($gwa <= 2.50) {
-        $riskLevel = 'medium';
-        $riskDescription = 'Medium Risk';
-        $interventionNeeded = false;
-    } else {
-        $riskLevel = 'high';
-        $riskDescription = 'High Risk';
-        $interventionNeeded = true;
-    }
-
-    // ALWAYS GENERATE INSIGHTS WHEN SCORES EXIST
-    $behavioralInsights = InterventionSystem::getBehavioralInsights($student['id'], $subject_id, $overallGrade, $riskLevel);
-    $interventions = InterventionSystem::getInterventions($student['id'], $subject_id, $riskLevel);
-    $recommendations = InterventionSystem::getRecommendations($student['id'], $subject_id, $overallGrade, $riskLevel);
+   // ALWAYS GENERATE INSIGHTS WHEN SCORES EXIST 
+$behavioralInsights = InterventionSystem::getBehavioralInsights($student['id'], $subject_id, $overallGrade, 'general');
+$interventions = InterventionSystem::getInterventions($student['id'], $subject_id, 'general');
+$recommendations = InterventionSystem::getRecommendations($student['id'], $subject_id, $overallGrade, 'general');
     
 } else {
     // NO SCORES - SHOW ENCOURAGING MESSAGES
@@ -1546,14 +1531,19 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
                     <div class="performance-label">Final Grade</div>
                     <?php if ($hasScores): ?>
                         <div class="performance-value"><?php echo number_format($overallGrade, 1); ?>%</div>
-                        <div class="risk-badge <?php echo $riskLevel; ?>">
-                            <?php echo $riskDescription; ?>
+                        <div class="performance-label" style="margin-top: 0.5rem; font-size: 0.9rem; color: var(--text-medium);">
+                            <?php
+                            if ($overallGrade >= 90) echo 'Excellent';
+                            elseif ($overallGrade >= 85) echo 'Very Good';
+                            elseif ($overallGrade >= 80) echo 'Good';
+                            elseif ($overallGrade >= 75) echo 'Satisfactory';
+                            elseif ($overallGrade >= 70) echo 'Passing';
+                            else echo 'Needs Improvement';
+                            ?>
                         </div>
                     <?php else: ?>
                         <div class="performance-value" style="color: var(--text-light);">--</div>
-                        <div class="risk-badge no-data">
-                            No Data
-                        </div>
+                        <div class="performance-label">No scores added</div>
                     <?php endif; ?>
                 </div>
                 
@@ -1561,10 +1551,10 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
                     <div class="performance-label">GWA</div>
                     <?php if ($hasScores): ?>
                         <div class="performance-value"><?php echo number_format($gwa, 2); ?></div>
-                        <div class="performance-label">
+                        <div class="performance-label" style="margin-top: 0.5rem; font-size: 0.9rem; color: var(--text-medium);">
                             <?php 
                             if ($gwa <= 1.00) echo 'Excellent';
-                            elseif ($gwa <= 1.25) echo 'Very Good ';
+                            elseif ($gwa <= 1.25) echo 'Very Good';
                             elseif ($gwa <= 1.50) echo 'Good';
                             elseif ($gwa <= 1.75) echo 'Satisfactory';
                             elseif ($gwa <= 2.00) echo 'Passing';

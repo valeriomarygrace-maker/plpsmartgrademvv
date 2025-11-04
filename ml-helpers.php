@@ -143,29 +143,61 @@ class InterventionSystem {
         }
     }
     
-    public static function getBehavioralInsights($studentId, $subjectId, $currentGrade = 0, $riskLevel = 'medium') {
-        $insights = [];
-        
-        // ALWAYS RETURN INSIGHTS - EVEN WITH NO SCORES
-        if ($currentGrade == 0) {
-            // No scores yet - encouraging messages
-            $insights[] = [
-                'message' => 'Welcome! Start adding your scores to get personalized behavioral insights and track your academic progress.',
-                'priority' => 'low',
-                'source' => 'system'
-            ];
-            $insights[] = [
-                'message' => 'Regular score tracking helps identify patterns in your learning behavior and study effectiveness.',
-                'priority' => 'low',
-                'source' => 'ml'
-            ];
-            $insights[] = [
-                'message' => 'Consistent score input enables the system to provide tailored recommendations for improvement.',
-                'priority' => 'low',
-                'source' => 'system'
-            ];
-            return $insights;
-        }
+    public static function getBehavioralInsights($studentId, $subjectId, $currentGrade = 0, $performanceLevel = 'general') {
+    $insights = [];
+    
+    // ALWAYS RETURN INSIGHTS - EVEN WITH NO SCORES
+    if ($currentGrade == 0) {
+        // No scores yet - encouraging messages
+        $insights[] = [
+            'message' => 'Welcome! Start adding your scores to get personalized behavioral insights and track your academic progress.',
+            'priority' => 'low',
+            'source' => 'system'
+        ];
+        $insights[] = [
+            'message' => 'Regular score tracking helps identify patterns in your learning behavior and study effectiveness.',
+            'priority' => 'low',
+            'source' => 'ml'
+        ];
+        return $insights;
+    }
+    
+    // Grade-based insights only (no risk level)
+    if ($currentGrade >= 90) {
+        $insights[] = [
+            'message' => 'Excellent academic performance! Your consistent study habits are paying off.',
+            'priority' => 'low',
+            'source' => 'system'
+        ];
+    } elseif ($currentGrade >= 80) {
+        $insights[] = [
+            'message' => 'Strong performance detected. Focus on maintaining consistency across all assessment types.',
+            'priority' => 'low',
+            'source' => 'system'
+        ];
+    } elseif ($currentGrade >= 75) {
+        $insights[] = [
+            'message' => 'Solid foundation established. Target specific weak areas for focused improvement.',
+            'priority' => 'medium',
+            'source' => 'system'
+        ];
+    } else {
+        $insights[] = [
+            'message' => 'Focus needed on core concepts. Seek additional academic support and resources.',
+            'priority' => 'high',
+            'source' => 'system'
+        ];
+    }
+    
+    // General behavioral insights
+    $insights[] = [
+        'message' => 'Regular practice and consistent study schedule significantly improve long-term knowledge retention.',
+        'priority' => 'medium',
+        'source' => 'system'
+    ];
+    
+    return $insights;
+}
         
         // Grade-based insights
         if ($currentGrade >= 90) {
@@ -260,103 +292,31 @@ class InterventionSystem {
         return $insights;
     }
     
-    public static function getInterventions($studentId, $subjectId, $riskLevel) {
+    public static function getInterventions($studentId, $subjectId, $performanceLevel = 'general') {
         $interventions = [];
         
         // ALWAYS RETURN INTERVENTIONS - EVEN WITH NO SCORES
-        if ($riskLevel === 'no-data') {
+        if ($performanceLevel === 'no-data') {
             $interventions[] = [
                 'message' => 'Begin by adding your class standing scores to enable personalized intervention planning.',
-                'priority' => 'low'
-            ];
-            $interventions[] = [
-                'message' => 'Input exam results as they become available to track comprehensive academic performance.',
-                'priority' => 'low'
-            ];
-            $interventions[] = [
-                'message' => 'Regular score updates allow the system to provide timely and relevant academic support.',
                 'priority' => 'low'
             ];
             return $interventions;
         }
         
-        switch ($riskLevel) {
-            case 'high':
-                $interventions[] = [
-                    'message' => 'Schedule immediate meeting with academic advisor for personalized support plan',
-                    'priority' => 'high'
-                ];
-                $interventions[] = [
-                    'message' => 'Create intensive study plan with daily, measurable learning objectives',
-                    'priority' => 'high'
-                ];
-                $interventions[] = [
-                    'message' => 'Request tutoring sessions specifically for challenging topics',
-                    'priority' => 'high'
-                ];
-                $interventions[] = [
-                    'message' => 'Implement daily review sessions of core concepts (30-45 minutes)',
-                    'priority' => 'high'
-                ];
-                $interventions[] = [
-                    'message' => 'Utilize academic support resources like writing center and math lab',
-                    'priority' => 'medium'
-                ];
-                break;
-                
-            case 'medium':
-                $interventions[] = [
-                    'message' => 'Join or form study group for collaborative learning and peer support',
-                    'priority' => 'medium'
-                ];
-                $interventions[] = [
-                    'message' => 'Increase dedicated study time by 30-45 minutes daily',
-                    'priority' => 'medium'
-                ];
-                $interventions[] = [
-                    'message' => 'Focus improvement efforts on identified weak areas from recent assessments',
-                    'priority' => 'medium'
-                ];
-                $interventions[] = [
-                    'message' => 'Schedule weekly review sessions for challenging topics',
-                    'priority' => 'medium'
-                ];
-                $interventions[] = [
-                    'message' => 'Practice with past exam papers and sample questions regularly',
-                    'priority' => 'medium'
-                ];
-                break;
-                
-            case 'low':
-                $interventions[] = [
-                    'message' => 'Maintain current effective study habits and time management strategies',
-                    'priority' => 'low'
-                ];
-                $interventions[] = [
-                    'message' => 'Consider exploring advanced topics or supplemental materials in the subject',
-                    'priority' => 'low'
-                ];
-                $interventions[] = [
-                    'message' => 'Support peers who may be struggling with course concepts',
-                    'priority' => 'low'
-                ];
-                $interventions[] = [
-                    'message' => 'Continue regular review to maintain high performance level',
-                    'priority' => 'low'
-                ];
-                break;
-                
-            default:
-                $interventions[] = [
-                    'message' => 'Continue tracking academic progress and maintain consistent study habits',
-                    'priority' => 'low'
-                ];
-                $interventions[] = [
-                    'message' => 'Regularly update scores to receive current intervention recommendations',
-                    'priority' => 'low'
-                ];
-                break;
-        }
+        // Performance-based interventions (not risk-based)
+        $interventions[] = [
+            'message' => 'Schedule regular study sessions with clear learning objectives for each topic',
+            'priority' => 'medium'
+        ];
+        $interventions[] = [
+            'message' => 'Practice with past examination papers under timed conditions',
+            'priority' => 'medium'
+        ];
+        $interventions[] = [
+            'message' => 'Join or form study group for collaborative learning and peer support',
+            'priority' => 'low'
+        ];
         
         return $interventions;
     }
