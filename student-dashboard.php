@@ -985,6 +985,99 @@ function calculateGWA($grade) {
                 grid-template-columns: 1fr;
             }
         }
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal.show {
+            display: flex;
+            opacity: 1;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 1.5rem;
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--box-shadow-lg);
+            max-width: 450px;
+            width: 90%;
+            transform: translateY(20px);
+            transition: transform 0.3s ease;
+            position: relative;
+        }
+
+        .modal.show .modal-content {
+            transform: translateY(0);
+        }
+
+        .close {
+            position: absolute;
+            top: 1rem;
+            right: 1.5rem;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-light);
+        }
+
+        .close:hover {
+            color: var(--text-dark);
+        }
+
+        .modal-title {
+            color: var(--plp-green);
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .modal-btn {
+            padding: 0.6rem 1.2rem;
+            border: none;
+            border-radius: 50px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            font-family: 'Poppins', sans-serif;
+            font-size: 0.9rem;
+        }
+
+        .modal-btn-cancel {
+            background: #f1f5f9;
+            color: var(--text-medium);
+        }
+
+        .modal-btn-cancel:hover {
+            background: #e2e8f0;
+        }
+
+        .modal-btn-confirm {
+            background: var(--plp-green-gradient);
+            color: white;
+        }
+
+        .modal-btn-confirm:hover {
+            transform: translateY(-2px);
+        }
+
     </style>
 </head>
 <body>
@@ -1180,7 +1273,6 @@ function calculateGWA($grade) {
                 </div>
                 <?php if (!empty($semester_risk_data)): ?>
                     <div class="pie-chart-container">
-                        <!-- Overall Risk Pie Chart -->
                         <div class="pie-chart-wrapper">
                             <canvas id="overallRiskChart"></canvas>
                         </div>
@@ -1202,39 +1294,6 @@ function calculateGWA($grade) {
                                 <span class="legend-text">No Data</span>
                             </div>
                         </div>
-                    </div>
-                    
-                    <!-- Individual Semester Pie Charts -->
-                    <div class="semester-pie-charts">
-                        <?php foreach ($semester_risk_data as $semester): ?>
-                            <div class="semester-pie-card">
-                                <div class="semester-pie-header">
-                                    <div class="semester-pie-title"><?php echo htmlspecialchars($semester['semester']); ?></div>
-                                    <div class="semester-pie-subtitle"><?php echo $semester['total_subjects']; ?> Subjects</div>
-                                </div>
-                                <div class="semester-pie-chart">
-                                    <canvas id="pieChart<?php echo str_replace(' ', '', $semester['semester']); ?>"></canvas>
-                                </div>
-                                <div class="semester-pie-stats">
-                                    <div class="pie-stat">
-                                        <span class="pie-stat-label">High Risk:</span>
-                                        <span class="pie-stat-value"><?php echo $semester['high_risk_count']; ?> (<?php echo $semester['high_risk_percentage']; ?>%)</span>
-                                    </div>
-                                    <div class="pie-stat">
-                                        <span class="pie-stat-label">Medium Risk:</span>
-                                        <span class="pie-stat-value"><?php echo $semester['medium_risk_count']; ?> (<?php echo $semester['medium_risk_percentage']; ?>%)</span>
-                                    </div>
-                                    <div class="pie-stat">
-                                        <span class="pie-stat-label">Low Risk:</span>
-                                        <span class="pie-stat-value"><?php echo $semester['low_risk_count']; ?> (<?php echo $semester['low_risk_percentage']; ?>%)</span>
-                                    </div>
-                                    <div class="pie-stat">
-                                        <span class="pie-stat-label">No Data:</span>
-                                        <span class="pie-stat-value"><?php echo $semester['no_data_count']; ?></span>
-                                    </div>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
                     </div>
                 <?php else: ?>
                     <div class="empty-state">
