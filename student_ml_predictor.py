@@ -86,33 +86,35 @@ class StudentGradePredictor:
     """Predict student performance level"""
     if self.rf_model is None:
         self.train_models()
-    
+
     features_df = pd.DataFrame([student_data], columns=self.feature_names)
-    
+
     rf_pred = self.rf_model.predict(features_df)[0]
     dt_pred = self.dt_model.predict(features_df)[0]
-    
+
     rf_risk = self.label_encoder.inverse_transform([rf_pred])[0]
     dt_risk = self.label_encoder.inverse_transform([dt_pred])[0]
-    
+
     rf_proba = self.rf_model.predict_proba(features_df)[0]
-    
-    # Convert risk levels to performance levels for display
+
+    # Convert risk to description
     performance_map = {
         'low': 'Excellent Performance',
-        'medium': 'Good Performance', 
+        'medium': 'Good Performance',
         'high': 'Needs Improvement'
     }
-    
+
     return {
+        'risk_level': rf_risk,          
         'performance_level': performance_map.get(rf_risk, 'Good Performance'),
-        'confidence': max(rf_proba),
+        'confidence': float(max(rf_proba)),
         'random_forest': performance_map.get(rf_risk, 'Good Performance'),
         'decision_tree': performance_map.get(dt_risk, 'Good Performance')
     }
 
+
 # =============================================================================
-# BEHAVIOR & RECOMMENDATION ENGINE
+# BEHAVIOR & RECOMMENDATION 
 # =============================================================================
 class BehaviorAnalyzer:
     def __init__(self):
