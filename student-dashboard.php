@@ -1227,7 +1227,7 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
         <?php endif; ?>
         
         <div class="header">
-            <div class="welcome">Welcome back, <?php echo htmlspecialchars(explode(' ', $student['fullname'])[0]); ?>!</div>
+            <div class="welcome">Welcome, <?php echo htmlspecialchars(explode(' ', $student['fullname'])[0]); ?>!</div>
         </div>
 
         <!-- Academic Statistics -->
@@ -1235,7 +1235,7 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
             <div class="metrics-grid">
                 <div class="metric-card">
                     <div class="metric-value"><?php echo $performance_metrics['total_subjects']; ?></div>
-                    <div class="metric-label">Current Subjects</div>
+                    <div class="metric-label">Subjects</div>
                 </div>
                 <div class="metric-card">
                     <div class="metric-value"><?php echo count(getUniqueProfessors($student['id'])); ?></div>
@@ -1283,10 +1283,6 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
                                             </span>
                                         </div>
                                     <?php else: ?>
-                                        <div class="grade-value grade-no-data">No Data</div>
-                                        <div class="gwa-value">
-                                            <span class="risk-badge no-data">No Data</span>
-                                        </div>
                                     <?php endif; ?>
                                 </div>
                             </li>
