@@ -1235,7 +1235,7 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
             <div class="metrics-grid">
                 <div class="metric-card">
                     <div class="metric-value"><?php echo $performance_metrics['total_subjects']; ?></div>
-                    <div class="metric-label">Total Subjects</div>
+                    <div class="metric-label">Current Subjects</div>
                 </div>
                 <div class="metric-card">
                     <div class="metric-value"><?php echo count(getUniqueProfessors($student['id'])); ?></div>
@@ -1244,7 +1244,6 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
             </div>
         </div>
 
-        <!-- Three Column Grid: Active Subjects, Recent Scores, High Risk by Semester -->
         <div class="three-column-grid">
             <!-- Active Subjects -->
             <div class="card">
@@ -1355,19 +1354,19 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
                     </div>
                     <div style="display: flex; justify-content: space-around; margin-top: 1rem;">
                         <div style="text-align: center;">
-                            <div style="font-size: 1.5rem; font-weight: 700; color: #dc3545;">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: var(--plp-green);">
                                 <?php echo $semester_risk_data['total_high_risk'] ?? 0; ?>
                             </div>
                             <div style="font-size: 0.8rem; color: var(--text-medium);">High Risk</div>
                         </div>
                         <div style="text-align: center;">
-                            <div style="font-size: 1.5rem; font-weight: 700; color: #28a745;">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: var(--plp-green);">
                                 <?php echo $semester_risk_data['total_low_risk'] ?? 0; ?>
                             </div>
                             <div style="font-size: 0.8rem; color: var(--text-medium);">Low Risk</div>
                         </div>
                         <div style="text-align: center;">
-                            <div style="font-size: 1.5rem; font-weight: 700; color: #e2e8f0;">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: var(--plp-green);">
                                 <?php 
                                 $totalArchived = $semester_risk_data['total_archived_subjects'] ?? 0;
                                 $totalWithRisk = ($semester_risk_data['total_high_risk'] ?? 0) + ($semester_risk_data['total_low_risk'] ?? 0);

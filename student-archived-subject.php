@@ -1455,13 +1455,12 @@ function calculateGWA($grade) {
                     <div class="detail-item">
                         <div class="detail-label">Overall Grade</div>
                         <div class="detail-value" id="view_overall_grade" style="font-size: 1.4rem; font-weight: 700; color: var(--plp-green); margin: 0.5rem 0;">--</div>
-                        <div class="risk-badge no-data" id="view_risk_badge" style="display: none; padding: 0.4rem 1rem; border-radius: 15px; font-size: 0.8rem; font-weight: 600;">No Data</div>
                     </div>
                     
                     <div class="detail-item">
                         <div class="detail-label">GWA</div>
                         <div class="detail-value" id="view_gwa" style="font-size: 1.4rem; font-weight: 700; color: var(--plp-green); margin: 0.5rem 0;">--</div>
-                        <div class="detail-label" id="view_risk_description" style="font-size: 0.85rem; color: var(--text-medium); margin-top: 0.5rem;">No Data Inputted</div>
+                        <div class="detail-label" id="view_risk_description" style="display: none; padding: 0.4rem 1rem; border-radius: 15px; font-size: 0.8rem; font-weight: 600; margin-top:0.5rem;">No Data Inputted</div>
                     </div>
                     
                     <div class="detail-item">

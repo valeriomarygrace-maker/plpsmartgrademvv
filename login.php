@@ -293,6 +293,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             opacity: 0.7;
         }
         
+        /* Password Toggle Styles */
+        .password-toggle {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--plp-green);
+            cursor: pointer;
+            font-size: 1.1rem;
+            z-index: 3;
+            transition: var(--transition);
+            padding: 5px;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .password-toggle:hover {
+            background-color: var(--plp-green-lighter);
+        }
+        
         .login-btn {
             background: var(--plp-green-gradient);
             color: white;
@@ -677,6 +703,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
                         <div class="input-group">
                             <i class="fas fa-lock input-icon"></i>
                             <input type="password" id="password" name="password" placeholder="Enter your password" required>
+                            <button type="button" class="password-toggle" id="passwordToggle">
+                                <i class="fas fa-eye"></i>
+                            </button>
                         </div>
 
                         <button type="submit" class="login-btn">
@@ -743,7 +772,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
                     <div class="form-group">
                         <div class="input-group">
                             <i class="fas fa-lock input-icon"></i>
-                            <input type="password" id="password" name="password" placeholder="Password" required>
+                            <input type="password" id="signup_password" name="password" placeholder="Password" required>
+                            <button type="button" class="password-toggle" id="signupPasswordToggle">
+                                <i class="fas fa-eye"></i>
+                            </button>
                         </div>
                     </div>
                     
@@ -751,6 +783,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
                         <div class="input-group">
                             <i class="fas fa-lock input-icon"></i>
                             <input type="password" id="confirm_password" name="confirm_password" placeholder="Confirm Password" required>
+                            <button type="button" class="password-toggle" id="confirmPasswordToggle">
+                                <i class="fas fa-eye"></i>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -804,6 +839,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
     </div>
 
     <script>
+        // Password toggle functionality
+        function setupPasswordToggle(toggleId, passwordId) {
+            const toggle = document.getElementById(toggleId);
+            const passwordInput = document.getElementById(passwordId);
+            
+            if (toggle && passwordInput) {
+                toggle.addEventListener('click', function() {
+                    const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                    passwordInput.setAttribute('type', type);
+                    
+                    // Toggle eye icon
+                    const icon = this.querySelector('i');
+                    if (type === 'text') {
+                        icon.classList.remove('fa-eye');
+                        icon.classList.add('fa-eye-slash');
+                    } else {
+                        icon.classList.remove('fa-eye-slash');
+                        icon.classList.add('fa-eye');
+                    }
+                });
+            }
+        }
+
+        // Initialize password toggles
+        setupPasswordToggle('passwordToggle', 'password');
+        setupPasswordToggle('signupPasswordToggle', 'signup_password');
+        setupPasswordToggle('confirmPasswordToggle', 'confirm_password');
+
         // Modal functionality
         const showSignupModalBtn = document.getElementById('showSignupModal');
         const signupModal = document.getElementById('signupModal');
