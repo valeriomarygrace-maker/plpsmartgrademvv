@@ -232,7 +232,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
         }
 
         .login-container {
-            max-width: 410px;
+            width: 410px;
             background-color: white;
             border-radius: var(--border-radius-lg);
             padding: 2rem 1.5rem;
@@ -268,7 +268,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
         
         .input-group {
             position: relative;
-            width: 120%;
+            width: 100%;
         }
         
         .input-icon {
