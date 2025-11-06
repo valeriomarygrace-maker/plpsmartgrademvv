@@ -179,8 +179,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             font-size: 2.5rem;
             font-weight: 700;
             color: var(--plp-green);
-            margin-bottom: 0.5rem;
-            margin-top: 0.1rem;
+            margin-bottom: 0.8rem;
+            margin-top: 0.5rem;
             letter-spacing: 0.5px;
         }
         
@@ -188,7 +188,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             font-size: 1.1rem;
             color: var(--text-medium);
             font-weight: 500;
-            margin-bottom: 0.75rem;
+            margin-bottom: 2rem;
         }
         
         .main-content-wrapper {
@@ -235,7 +235,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             max-width: 380px;
             background-color: white;
             border-radius: var(--border-radius-lg);
-            padding: 2rem 1.5rem;
+            padding: 2rem 3rem;
             box-shadow: var(--box-shadow-lg);
             border: 1px solid rgba(0, 99, 65, 0.1);
             transition: transform 0.3s ease, box-shadow 0.3s ease;
@@ -244,16 +244,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
         .login-form {
             display: flex;
             flex-direction: column;
-            gap: 1rem;
+            gap: 1.5rem;
         }
         
         .login-form h3 {
             text-align: center;
             color: var(--plp-green);
-            margin-bottom: 0.2rem;
-            font-size: 1rem;
+            margin-bottom: 1.5rem;
+            font-size: 1.5rem;
             font-weight: 700;
             position: relative;
+        }
+        
+        .login-form h3::after {
+            content: "";
+            display: block;
+            width: 60px;
+            height: 4px;
+            background: var(--plp-green-light);
+            margin: 0.8rem auto 0;
+            border-radius: 3px;
         }
         
         .input-group {
@@ -272,11 +282,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
         }
         
         .login-form input {
-            padding: 0.9rem 1rem 0.9rem 45px;
+            padding: 0.9rem 1rem 0.5rem 45px;
             border: 1px solid rgba(0, 99, 65, 0.2);
             border-radius: var(--border-radius);
             font-size: 1rem;
-            width: 100%;
+            width: 105%;
             transition: var(--transition);
             background-color: white;
             color: var(--text-dark);
@@ -293,6 +303,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             opacity: 0.7;
         }
         
+        .login-btn {
+            background: var(--plp-green-gradient);
+            color: white;
+            border: none;
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            box-shadow: 0 4px 6px rgba(0, 99, 65, 0.2);
+        }
+        
+        .login-btn:hover {
+            background: linear-gradient(135deg, var(--plp-green-light), var(--plp-green));
+            transform: translateY(-3px);
+            box-shadow: 0 6px 12px rgba(0, 99, 65, 0.3);
+        }
+
         /* Password Toggle Styles */
         .password-toggle {
             position: absolute;
@@ -318,37 +352,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
         .password-toggle:hover {
             background-color: var(--plp-green-lighter);
         }
-        
-        .login-btn {
-            background: var(--plp-green-gradient);
-            color: white;
-            border: none;
-            border-radius: var(--border-radius);
-            font-weight: 600;
-            cursor: pointer;
-            transition: var(--transition);
-            letter-spacing: 0.5px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            box-shadow: 0 4px 6px rgba(0, 99, 65, 0.2);
-        }
-        
-        .login-btn:hover {
-            background: linear-gradient(135deg, var(--plp-green-light), var(--plp-green));
-            transform: translateY(-3px);
-            box-shadow: 0 6px 12px rgba(0, 99, 65, 0.3);
-        }
 
         .signup-btn {
             background: transparent;
             color: var(--plp-green);
             border: 2px solid var(--plp-green);
-            padding: 0.75rem;
-            width:1rem;
+            padding: 0.50rem;
             border-radius: var(--border-radius);
-            font-size: 0.95rem;
+            font-size: 0.85rem;
             font-weight: 600;
             cursor: pointer;
             transition: var(--transition);
@@ -559,11 +570,275 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             text-align: center;
             background: transparent;
             border: 2px solid var(--plp-green);
-            padding: 0.50rem;
+            padding: 0.75rem;
             border-radius: var(--border-radius);
             cursor: pointer;
-            width: 50%;
-            font-size: 0.85rem;
+            width: 100%;
+            font-size: 1rem;
+        }
+
+        .back-to-login-btn:hover {
+            background: var(--plp-green);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 99, 65, 0.2);
+        }
+
+        .signup-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .form-group {
+            flex: 1;
+        }
+
+        .signup-modal .input-group {
+            width: 100%;
+        }
+
+        .signup-modal input, .signup-modal select {
+            padding: 0.9rem 1rem 0.9rem 45px;
+            border: 1px solid rgba(0, 99, 65, 0.2);
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+            width: 100%;
+            transition: var(--transition);
+            background-color: white;
+            color: var(--text-dark);
+        }
+
+        .signup-modal input:focus, .signup-modal select:focus {
+            outline: none;
+            border-color: var(--plp-green);
+            box-shadow: 0 0 0 3px rgba(0, 99, 65, 0.1);
+        }
+
+
+        @media (max-width: 768px) {
+            .main-content {
+                flex-direction: column;
+                gap: 2rem;
+            }
+            
+            .vertical-divider {
+                width: 80%;
+                height: 2px;
+                background: linear-gradient(to right, transparent, var(--plp-green-light), transparent);
+                margin: 1rem 0;
+            }
+            
+            .logo {
+                max-width: 220px;
+            }
+            
+            .login-container {
+                width: 100%;
+                max-width: 100%;
+                padding: 2rem 1.5rem;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .header p {
+                font-size: 1rem;
+                margin-bottom: 2rem;
+            }
+
+            .otp-modal, .signup-modal {
+                padding: 1.5rem;
+                margin: 1rem;
+            }
+            
+            .otp-input {
+                width: 40px;
+                height: 50px;
+                font-size: 1.2rem;
+            }
+
+            .form-row {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+        }
+        /* OTP Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: var(--transition);
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .otp-modal, .signup-modal {
+            background: white;
+            padding: 2.5rem;
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--box-shadow-lg);
+            width: 100%;
+            max-width: 450px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            transform: translateY(20px);
+            transition: transform 0.4s ease;
+        }
+
+        .signup-modal {
+            max-width: 500px;
+            text-align: left;
+        }
+
+        .modal-overlay.active .otp-modal,
+        .modal-overlay.active .signup-modal {
+            transform: translateY(0);
+        }
+
+        .otp-modal::before, .signup-modal::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: var(--plp-green-gradient);
+        }
+
+        .otp-modal h1, .signup-modal h1 {
+            color: var(--plp-green);
+            margin-bottom: 0.5rem;
+            font-size: 1.8rem;
+            font-weight: 700;
+            text-align: center;
+        }
+
+        .otp-subtitle {
+            color: var(--text-medium);
+            margin-bottom: 2rem;
+            font-size: 1rem;
+            line-height: 1.5;
+            text-align: center;
+        }
+
+        .email-display {
+            font-weight: 600;
+            color: var(--plp-green);
+            word-break: break-all;
+        }
+
+        .otp-inputs {
+            display: flex;
+            justify-content: center;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .otp-input {
+            width: 50px;
+            height: 60px;
+            text-align: center;
+            font-size: 1.5rem;
+            border: 2px solid var(--plp-green-lighter);
+            border-radius: var(--border-radius);
+            transition: var(--transition);
+        }
+
+        .otp-input:focus {
+            outline: none;
+            border-color: var(--plp-green);
+            box-shadow: 0 0 0 3px rgba(0, 99, 65, 0.1);
+        }
+
+        .verify-btn, .signup-submit-btn {
+            width: 100%;
+            padding: 1rem;
+            background: var(--plp-green-gradient);
+            color: white;
+            border: none;
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            margin-top: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .verify-btn:hover, .signup-submit-btn:hover {
+            background: linear-gradient(135deg, var(--plp-green-light), var(--plp-green));
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 99, 65, 0.2);
+        }
+
+        .modal-alert-error {
+            background: #fff5f5;
+            color: var(--danger);
+            border-left: 4px solid var(--danger);
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            margin-bottom: 1.5rem;
+            font-size: 0.9rem;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .close-modal {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: var(--text-light);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .close-modal:hover {
+            color: var(--plp-green);
+        }
+
+        .back-to-login-btn {
+            display: block;
+            margin-top: 1rem;
+            color: var(--plp-green);
+            text-decoration: none;
+            font-weight: 500;
+            transition: var(--transition);
+            text-align: center;
+            background: transparent;
+            border: 2px solid var(--plp-green);
+            padding: 0.75rem;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            width: 100%;
+            font-size: 1rem;
         }
 
         .back-to-login-btn:hover {
