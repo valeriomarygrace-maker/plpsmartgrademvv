@@ -5,8 +5,7 @@
  * ML Service Integration for Enhanced Predictions
  */
 class MLService {
-    private static $api_url = 'https://plpsmartgrademvv.onrender.com//predict';
-
+    private static $api_url = 'https://plpsmartgrademvv.onrender.com/predict';
     private static $timeout = 5;
     private static $enabled = true;
     

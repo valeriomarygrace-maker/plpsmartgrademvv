@@ -105,7 +105,7 @@ class StudentGradePredictor:
     }
 
     return {
-        'risk_level': rf_risk,          
+        'risk_level': rf_risk,               # <-- this was missing and breaks your system
         'performance_level': performance_map.get(rf_risk, 'Good Performance'),
         'confidence': float(max(rf_proba)),
         'random_forest': performance_map.get(rf_risk, 'Good Performance'),
@@ -114,7 +114,7 @@ class StudentGradePredictor:
 
 
 # =============================================================================
-# BEHAVIOR & RECOMMENDATION 
+# BEHAVIOR & RECOMMENDATION ENGINE
 # =============================================================================
 class BehaviorAnalyzer:
     def __init__(self):
