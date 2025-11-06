@@ -286,7 +286,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             border: 1px solid rgba(0, 99, 65, 0.2);
             border-radius: var(--border-radius);
             font-size: 1rem;
-            width: 120%;
+            width: 100%;
             transition: var(--transition);
             background-color: white;
             color: var(--text-dark);
