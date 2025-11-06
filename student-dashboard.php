@@ -1341,60 +1341,71 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
                 <?php endif; ?>
             </div>
 
-            <!-- High Risk Subjects by Semester -->
+            <!-- Risk Overview -->
             <div class="card">
                 <div class="card-header">
                     <div class="card-title">
-                        <i class="fas fa-chart-bar"></i>
+                        <i class="fas fa-chart-pie"></i>
                         Risk Overview
                     </div>
                 </div>
-                <?php if ($semester_risk_data['total_archived_subjects'] > 0): ?>
-                    <div style="text-align: center; padding: 1rem;">
-                        <div class="bar-chart-wrapper" style="height: 200px;">
-                            <canvas id="riskOverviewChart"></canvas>
+                <div style="text-align: center; padding: 1rem;">
+                    <div class="bar-chart-wrapper" style="height: 200px;">
+                        <canvas id="riskOverviewChart"></canvas>
+                    </div>
+                    <div style="display: flex; justify-content: space-around; margin-top: 1rem;">
+                        <div style="text-align: center;">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: #dc3545;">
+                                <?php echo $semester_risk_data['total_high_risk'] ?? 0; ?>
+                            </div>
+                            <div style="font-size: 0.8rem; color: var(--text-medium);">High Risk</div>
                         </div>
-                        <div style="display: flex; justify-content: space-around; margin-top: 1rem;">
-                            <div style="text-align: center;">
-                                <div style="font-size: 1.5rem; font-weight: 700; color: #dc3545;"><?php echo $semester_risk_data['total_high_risk']; ?></div>
-                                <div style="font-size: 0.8rem; color: var(--text-medium);">High Risk</div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: #28a745;">
+                                <?php echo $semester_risk_data['total_low_risk'] ?? 0; ?>
                             </div>
-                            <div style="text-align: center;">
-                                <div style="font-size: 1.5rem; font-weight: 700; color: #28a745;"><?php echo $semester_risk_data['total_low_risk']; ?></div>
-                                <div style="font-size: 0.8rem; color: var(--text-medium);">Low Risk</div>
+                            <div style="font-size: 0.8rem; color: var(--text-medium);">Low Risk</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: #e2e8f0;">
+                                <?php 
+                                $totalArchived = $semester_risk_data['total_archived_subjects'] ?? 0;
+                                $totalWithRisk = ($semester_risk_data['total_high_risk'] ?? 0) + ($semester_risk_data['total_low_risk'] ?? 0);
+                                echo $totalArchived - $totalWithRisk; 
+                                ?>
                             </div>
+                            <div style="font-size: 0.8rem; color: var(--text-medium);">No Data</div>
                         </div>
                     </div>
-                <?php else: ?>
-                    <div class="empty-state">
-                        <i class="fas fa-archive"></i>
-                        <p>No Archived Subjects</p>
-                        <small>Archive subjects to see risk analysis</small>
-                    </div>
-                <?php endif; ?>
+                </div>
             </div>
         </div>
     </div>
-
+    
     <script>
         // Initialize Charts
         function initializeCharts() {
             const semesterRiskData = <?php echo json_encode($semester_risk_data); ?>;
             
-            if (semesterRiskData.total_archived_subjects > 0) {
-                // Risk Overview Chart (for the 3-column grid)
-                const riskOverviewCtx = document.getElementById('riskOverviewChart')?.getContext('2d');
-                if (riskOverviewCtx) {
+            console.log('Risk Data:', semesterRiskData); // Debug log
+            
+            // Risk Overview Chart (for the 3-column grid)
+            const riskOverviewCtx = document.getElementById('riskOverviewChart')?.getContext('2d');
+            if (riskOverviewCtx) {
+                // Calculate data for the chart
+                const highRiskCount = semesterRiskData.total_high_risk || 0;
+                const lowRiskCount = semesterRiskData.total_low_risk || 0;
+                const noRiskCount = semesterRiskData.total_archived_subjects - highRiskCount - lowRiskCount;
+                
+                // Only show chart if there's data
+                if (semesterRiskData.total_archived_subjects > 0) {
                     new Chart(riskOverviewCtx, {
                         type: 'doughnut',
                         data: {
-                            labels: ['High Risk', 'Low Risk'],
+                            labels: ['High Risk', 'Low Risk', 'No Data'],
                             datasets: [{
-                                data: [
-                                    semesterRiskData.total_high_risk,
-                                    semesterRiskData.total_low_risk
-                                ],
-                                backgroundColor: ['#dc3545', '#28a745'],
+                                data: [highRiskCount, lowRiskCount, noRiskCount],
+                                backgroundColor: ['#dc3545', '#28a745', '#e2e8f0'],
                                 borderWidth: 2,
                                 borderColor: '#fff'
                             }]
@@ -1408,60 +1419,28 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
                                     position: 'bottom',
                                     labels: {
                                         padding: 15,
-                                        usePointStyle: true
+                                        usePointStyle: true,
+                                        boxWidth: 12
+                                    }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            const label = context.label || '';
+                                            const value = context.raw || 0;
+                                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                            const percentage = Math.round((value / total) * 100);
+                                            return `${label}: ${value} (${percentage}%)`;
+                                        }
                                     }
                                 }
                             }
                         }
                     });
-                }
-
-                // Detailed Bar Chart
-                const highRiskCtx = document.getElementById('highRiskBarChart')?.getContext('2d');
-                if (highRiskCtx) {
-                    new Chart(highRiskCtx, {
-                        type: 'bar',
-                        data: {
-                            labels: ['First Semester', 'Second Semester'],
-                            datasets: [
-                                {
-                                    label: 'High Risk',
-                                    data: [
-                                        semesterRiskData.first_semester.high_risk_count,
-                                        semesterRiskData.second_semester.high_risk_count
-                                    ],
-                                    backgroundColor: '#dc3545',
-                                    borderColor: '#c53030',
-                                    borderWidth: 2
-                                },
-                                {
-                                    label: 'Low Risk',
-                                    data: [
-                                        semesterRiskData.first_semester.low_risk_count,
-                                        semesterRiskData.second_semester.low_risk_count
-                                    ],
-                                    backgroundColor: '#28a745',
-                                    borderColor: '#2f855a',
-                                    borderWidth: 2
-                                }
-                            ]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            scales: {
-                                x: {
-                                    stacked: false,
-                                },
-                                y: {
-                                    beginAtZero: true,
-                                    ticks: {
-                                        stepSize: 1
-                                    }
-                                }
-                            }
-                        }
-                    });
+                } else {
+                    // Hide chart container if no data
+                    riskOverviewCtx.canvas.style.display = 'none';
+                    document.querySelector('.bar-chart-wrapper').innerHTML = '<p style="color: var(--text-light); text-align: center; padding: 2rem;">No risk data available</p>';
                 }
             }
         }
