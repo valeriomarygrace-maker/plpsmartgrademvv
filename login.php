@@ -232,10 +232,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
         }
 
         .login-container {
-            max-width: 390px;
+            max-width: 410px;
             background-color: white;
             border-radius: var(--border-radius-lg);
-            padding: 2rem 2rem;
+            padding: 2rem 1.5rem;
             box-shadow: var(--box-shadow-lg);
             border: 1px solid rgba(0, 99, 65, 0.1);
             transition: transform 0.3s ease, box-shadow 0.3s ease;
@@ -251,7 +251,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             text-align: center;
             color: var(--plp-green);
             margin-bottom: 0.5rem;
-            font-size: 1rem;
+            font-size: 1.3rem;
             font-weight: 700;
             position: relative;
         }
@@ -268,7 +268,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
         
         .input-group {
             position: relative;
-            width: 100%;
+            width: 120%;
         }
         
         .input-icon {
@@ -286,7 +286,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             border: 1px solid rgba(0, 99, 65, 0.2);
             border-radius: var(--border-radius);
             font-size: 1rem;
-            width: 105%;
+            width: 120%;
             transition: var(--transition);
             background-color: white;
             color: var(--text-dark);
