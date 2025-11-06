@@ -22,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && isset($_P
         if ($student) {
             // Check if student has a password set
             if (empty($student['password'])) {
-                $error = 'No password set for this account. Please sign up first or contact administrator.';
+                $error = 'No password set for this account.';
                 $showSignupModal = true;
             } elseif (verifyPassword($password, $student['password'])) {
                 // Regenerate session for security
@@ -65,7 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
         $error = 'All fields are required.';
         $showSignupModal = true;
     } elseif (!isValidPLPEmail($email)) {
-        $error = 'Please use your valid @plpasig.edu.ph email address.';
+        $error = 'Please input your email address.';
         $showSignupModal = true;
     } elseif ($password !== $confirm_password) {
         $error = 'Passwords do not match.';
@@ -77,7 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
         // Check if student already exists
         $existingStudent = getStudentByEmail($email);
         if ($existingStudent) {
-            $error = 'A student with this email already exists.';
+            $error = 'Email is already exists.';
             $showSignupModal = true;
         } else {
             // Insert new student with hashed password
@@ -95,7 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             $result = supabaseInsert('students', $studentData);
             
             if ($result !== false) {
-                $success = 'Registration successful! You can now login with your credentials.';
+                $success = 'Registration successful! ';
                 $showSignupModal = false;
             } else {
                 $error = 'Registration failed. Please try again.';
@@ -659,6 +659,248 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
                 gap: 0.5rem;
             }
         }
+        /* Signup Modal Responsive Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: var(--transition);
+            padding: 1rem;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .signup-modal {
+            background: white;
+            padding: 1.5rem;
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--box-shadow-lg);
+            width: 100%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+            transform: translateY(20px);
+            transition: transform 0.4s ease;
+        }
+
+        .modal-overlay.active .signup-modal {
+            transform: translateY(0);
+        }
+
+        .signup-modal::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: var(--plp-green-gradient);
+        }
+
+        .signup-modal h1 {
+            color: var(--plp-green);
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+            font-weight: 700;
+            text-align: center;
+        }
+
+        .signup-form {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 0.75rem;
+            width: 100%;
+        }
+
+        .form-group {
+            flex: 1;
+            min-width: 0; /* Prevents flex items from overflowing */
+        }
+
+        .signup-modal .input-group {
+            width: 100%;
+        }
+
+        .signup-modal input, 
+        .signup-modal select {
+            padding: 0.75rem 0.75rem 0.75rem 2.75rem;
+            border: 1px solid rgba(0, 99, 65, 0.2);
+            border-radius: var(--border-radius);
+            font-size: 0.9rem;
+            width: 100%;
+            transition: var(--transition);
+            background-color: white;
+            color: var(--text-dark);
+        }
+
+        .signup-modal input:focus, 
+        .signup-modal select:focus {
+            outline: none;
+            border-color: var(--plp-green);
+            box-shadow: 0 0 0 2px rgba(0, 99, 65, 0.1);
+        }
+
+        .signup-modal .input-icon {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--plp-green);
+            z-index: 2;
+            font-size: 1rem;
+        }
+
+        .signup-submit-btn {
+            width: 100%;
+            padding: 0.85rem;
+            background: var(--plp-green-gradient);
+            color: white;
+            border: none;
+            border-radius: var(--border-radius);
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            margin-top: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .signup-submit-btn:hover {
+            background: linear-gradient(135deg, var(--plp-green-light), var(--plp-green));
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 99, 65, 0.2);
+        }
+
+        .modal-alert-error {
+            background: #fff5f5;
+            color: var(--danger);
+            border-left: 3px solid var(--danger);
+            padding: 0.75rem;
+            border-radius: var(--border-radius);
+            margin-bottom: 1rem;
+            font-size: 0.85rem;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .close-modal {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: none;
+            border: none;
+            font-size: 1.25rem;
+            color: var(--text-light);
+            cursor: pointer;
+            transition: var(--transition);
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+        }
+
+        .close-modal:hover {
+            color: var(--plp-green);
+            background-color: var(--plp-green-lighter);
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .modal-overlay {
+                padding: 0.5rem;
+                align-items: flex-start;
+            }
+            
+            .signup-modal {
+                padding: 1.25rem;
+                max-height: 95vh;
+                margin-top: 1rem;
+            }
+            
+            .signup-modal h1 {
+                font-size: 1.35rem;
+                margin-bottom: 0.75rem;
+            }
+            
+            .form-row {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+            
+            .form-group {
+                width: 100%;
+            }
+            
+            .signup-modal input, 
+            .signup-modal select {
+                padding: 0.7rem 0.7rem 0.7rem 2.5rem;
+                font-size: 0.85rem;
+            }
+            
+            .signup-modal .input-icon {
+                left: 10px;
+                font-size: 0.9rem;
+            }
+            
+            .signup-submit-btn {
+                padding: 0.75rem;
+                font-size: 0.9rem;
+            }
+            
+            .modal-alert-error {
+                padding: 0.6rem;
+                font-size: 0.8rem;
+                margin-bottom: 0.75rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .signup-modal {
+                padding: 1rem;
+            }
+            
+            .signup-modal h1 {
+                font-size: 1.25rem;
+            }
+            
+            .signup-modal input, 
+            .signup-modal select {
+                padding: 0.65rem 0.65rem 0.65rem 2.25rem;
+            }
+            
+            .close-modal {
+                top: 8px;
+                right: 8px;
+                font-size: 1.1rem;
+                width: 28px;
+                height: 28px;
+            }
+        }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -832,7 +1074,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
                 </button>
             </form>
             
-            <p style="text-align: center; margin-top: 1rem; color: var(--text-medium); font-size: 0.9rem;">
+            <p style="text-align: center; margin-top: 0.75rem; color: var(--text-medium); font-size: 0.85rem;">
                 Already have an account? <a href="#" id="showLogin" style="color: var(--plp-green); text-decoration: none; font-weight: 500;">Login here</a>
             </p>
         </div>
