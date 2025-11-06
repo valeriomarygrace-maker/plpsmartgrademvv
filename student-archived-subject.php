@@ -1289,6 +1289,39 @@ function calculateGWA($grade) {
                 color: #e2e8f0;
             }
         }
+        .risk-badge {
+            display: inline-block;
+            padding: 0.3rem 0.8rem;
+            border-radius: 15px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-top: 0.5rem;
+        }
+
+        .risk-badge.low {
+            background: #c6f6d5;
+            color: #2f855a;
+        }
+
+        .risk-badge.medium {
+            background: #fef5e7;
+            color: #d69e2e;
+        }
+
+        .risk-badge.high {
+            background: #fed7d7;
+            color: #c53030;
+        }
+
+        .risk-badge.failed {
+            background: #7f1d1d;
+            color: #fecaca;
+        }
+
+        .risk-badge.no-data {
+            background: #e2e8f0;
+            color: #718096;
+        }
     </style>
 </head>
 <body>
@@ -1460,19 +1493,19 @@ function calculateGWA($grade) {
                     <div class="detail-item">
                         <div class="detail-label">GWA</div>
                         <div class="detail-value" id="view_gwa" style="font-size: 1.4rem; font-weight: 700; color: var(--plp-green); margin: 0.5rem 0;">--</div>
-                        <div class="detail-label" id="view_risk_description" style="display: none; padding: 0.4rem 1rem; border-radius: 15px; font-size: 0.8rem; font-weight: 600; margin-top:0.5rem;">No Data Inputted</div>
+                        <div class="risk-badge" id="view_risk_badge" style="display: none; margin-top: 0.5rem;">No Data</div>
                     </div>
                     
                     <div class="detail-item">
                         <div class="detail-label">Class Standing</div>
                         <div class="detail-value" id="view_class_standing" style="font-size: 1.4rem; font-weight: 700; color: var(--plp-green); margin: 0.5rem 0;">--</div>
-                        <div class="detail-label" style="font-size: 0.85rem; color: var(--text-medium;">of 60%</div>
+                        <div class="detail-label" style="font-size: 0.85rem; color: var(--text-medium);">of 60%</div>
                     </div>
                     
                     <div class="detail-item">
                         <div class="detail-label">Major Exams</div>
                         <div class="detail-value" id="view_exams_score" style="font-size: 1.4rem; font-weight: 700; color: var(--plp-green); margin: 0.5rem 0;">--</div>
-                        <div class="detail-label" style="font-size: 0.85rem; color: var(--text-medium;">of 40%</div>
+                        <div class="detail-label" style="font-size: 0.85rem; color: var(--text-medium);">of 40%</div>
                     </div>
                 </div>
             </div>
@@ -1603,6 +1636,56 @@ function calculateGWA($grade) {
                 }, 100);
             });
         }, 1000);
+
+        function openViewModal(
+            overallGrade = 0, gwa = 0, classStanding = 0, examsScore = 0, riskLevel = 'no-data', 
+            riskDescription = 'No Data Inputted', hasScores = false
+        ) {
+            console.log('Opening modal with data:', { overallGrade, gwa, classStanding, examsScore, riskLevel, riskDescription, hasScores });
+            
+            // Set performance data
+            const overallGradeNum = parseFloat(overallGrade) || 0;
+            const gwaNum = parseFloat(gwa) || 0;
+            const classStandingNum = parseFloat(classStanding) || 0;
+            const examsScoreNum = parseFloat(examsScore) || 0;
+            
+            document.getElementById('view_overall_grade').textContent = hasScores ? overallGradeNum.toFixed(1) + '%' : '--';
+            document.getElementById('view_gwa').textContent = hasScores ? gwaNum.toFixed(2) : '--';
+            document.getElementById('view_class_standing').textContent = hasScores ? classStandingNum.toFixed(1) + '%' : '--';
+            document.getElementById('view_exams_score').textContent = hasScores ? examsScoreNum.toFixed(1) + '%' : '--';
+            
+            // Set risk badge
+            const riskBadge = document.getElementById('view_risk_badge');
+            if (hasScores && riskLevel !== 'no-data') {
+                riskBadge.textContent = riskDescription;
+                riskBadge.className = 'risk-badge ' + riskLevel;
+                riskBadge.style.display = 'inline-block';
+            } else {
+                riskBadge.textContent = 'No Data Inputted';
+                riskBadge.className = 'risk-badge no-data';
+                riskBadge.style.display = 'inline-block';
+            }
+            
+            // Show modal
+            document.getElementById('viewModal').classList.add('show');
+        }
+
+        // Add event listener for closing the view modal
+        document.addEventListener('DOMContentLoaded', function() {
+            const closeViewModal = document.getElementById('closeViewModal');
+            if (closeViewModal) {
+                closeViewModal.addEventListener('click', function() {
+                    document.getElementById('viewModal').classList.remove('show');
+                });
+            }
+            
+            // Close modal when clicking outside
+            window.addEventListener('click', function(e) {
+                if (e.target === document.getElementById('viewModal')) {
+                    document.getElementById('viewModal').classList.remove('show');
+                }
+            });
+        });
 
         // Logout modal functionality
         const logoutBtn = document.querySelector('.logout-btn');
