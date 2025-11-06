@@ -323,9 +323,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             background: var(--plp-green-gradient);
             color: white;
             border: none;
-            padding: 1rem;
             border-radius: var(--border-radius);
-            font-size: 1rem;
             font-weight: 600;
             cursor: pointer;
             transition: var(--transition);
@@ -347,9 +345,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             background: transparent;
             color: var(--plp-green);
             border: 2px solid var(--plp-green);
-            padding: 0.85rem;
+            padding: 0.75rem;
+            width:1rem;
             border-radius: var(--border-radius);
-            font-size: 1rem;
+            font-size: 0.95rem;
             font-weight: 600;
             cursor: pointer;
             transition: var(--transition);
@@ -560,11 +559,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             text-align: center;
             background: transparent;
             border: 2px solid var(--plp-green);
-            padding: 0.75rem;
+            padding: 0.50rem;
             border-radius: var(--border-radius);
             cursor: pointer;
-            width: 100%;
-            font-size: 1rem;
+            width: 50%;
+            font-size: 0.85rem;
         }
 
         .back-to-login-btn:hover {
@@ -956,8 +955,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
                         </button>
                                                 
                         <button type="button" class="signup-btn" id="showSignupModal">
-                            <i class="fas fa-user-plus"></i>
-                            SIGN UP
+                            Register Account
                         </button>
                     </form>
                 </div>
