@@ -143,6 +143,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             box-sizing: border-box;
         }
 
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
+
         body {
             font-family: 'Poppins', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: var(--plp-green-pale);
@@ -150,12 +155,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             flex-direction: column;
             align-items: center;
             min-height: 100vh;
-            padding: 2rem 1rem;
+            padding: 1rem;
             color: var(--text-dark);
             line-height: 1.6;
             background-image: 
                 radial-gradient(circle at 10% 20%, rgba(0, 99, 65, 0.03) 0%, transparent 20%),
                 radial-gradient(circle at 90% 80%, rgba(0, 99, 65, 0.03) 0%, transparent 20%);
+            position: relative;
         }
 
         body::before {
@@ -173,41 +179,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             text-align: center;
             width: 100%;
             max-width: 1200px;
+            margin-bottom: 1rem;
+            flex-shrink: 0;
         }
 
         .header h1 {
-            font-size: 2.5rem;
+            font-size: clamp(1.8rem, 4vw, 2.5rem);
             font-weight: 700;
             color: var(--plp-green);
-            margin-bottom: 0.8rem;
+            margin-bottom: 0.5rem;
             margin-top: 0.5rem;
             letter-spacing: 0.5px;
+            line-height: 1.2;
         }
 
         .header p {
-            font-size: 1.1rem;
+            font-size: clamp(0.9rem, 2vw, 1.1rem);
             color: var(--text-medium);
             font-weight: 500;
-            margin-bottom: 2rem;
+            margin-bottom: 1rem;
+            line-height: 1.4;
         }
 
         .main-content-wrapper {
             display: flex;
             justify-content: center;
+            align-items: center;
             width: 100%;
+            flex: 1;
+            overflow: hidden;
         }
 
         .main-content {
             display: flex;
             justify-content: center;
             align-items: center;
-            gap: 5rem;
+            gap: clamp(2rem, 4vw, 5rem);
+            width: 100%;
+            max-width: 1200px;
             position: relative;
         }
 
         .vertical-divider {
             width: 5px;
-            height: 380px;
+            height: clamp(300px, 50vh, 380px);
             background: linear-gradient(to bottom, transparent, var(--plp-green-light), transparent);
             box-shadow: 0 0 15px rgba(0, 136, 86, 0.3);
             border-radius: 5px;
@@ -220,11 +235,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             display: flex;
             justify-content: center;
             align-items: center;
+            flex: 1;
         }
 
         .logo {
-            width: 150%;
-            max-width: 400px;
+            width: 100%;
+            max-width: min(400px, 40vw);
             height: auto;
             object-fit: contain;
             filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.15));
@@ -233,15 +249,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
 
         /* Updated Login Container Styles */
         .login-container {
-            width: 410px;
+            width: min(410px, 90vw);
             background-color: white;
             border-radius: var(--border-radius-lg);
-            padding: 2rem 1.8rem;
+            padding: clamp(1.5rem, 3vw, 2rem) clamp(1.2rem, 2vw, 1.8rem);
             box-shadow: var(--box-shadow-lg);
             border: 1px solid rgba(0, 99, 65, 0.1);
             transition: transform 0.3s ease, box-shadow 0.3s ease;
             position: relative;
             overflow: hidden;
+            flex-shrink: 0;
         }
 
         .login-container:hover {
@@ -261,14 +278,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
         .login-form {
             display: flex;
             flex-direction: column;
-            gap: 1.4rem;
+            gap: clamp(1rem, 2vh, 1.4rem);
         }
 
         .login-form h3 {
             text-align: center;
             color: var(--plp-green);
             margin-bottom: 0.5rem;
-            font-size: 1.4rem;
+            font-size: clamp(1.2rem, 3vw, 1.4rem);
             font-weight: 700;
             position: relative;
             padding-bottom: 0.8rem;
@@ -301,10 +318,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
         }
 
         .login-form input {
-            padding: 0.85rem 0.5rem 0.85rem 45px;
+            padding: clamp(0.7rem, 2vh, 0.85rem) 0.5rem clamp(0.7rem, 2vh, 0.85rem) 45px;
             border: 1px solid rgba(0, 99, 65, 0.2);
             border-radius: var(--border-radius);
-            font-size: 1rem;
+            font-size: clamp(0.9rem, 2vw, 1rem);
             width: 100%;
             transition: var(--transition);
             background-color: white;
@@ -332,9 +349,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             background: var(--plp-green-gradient);
             color: white;
             border: none;
-            padding: 0.9rem;
+            padding: clamp(0.8rem, 2vh, 0.9rem);
             border-radius: var(--border-radius);
-            font-size: 1rem;
+            font-size: clamp(0.9rem, 2vw, 1rem);
             font-weight: 600;
             cursor: pointer;
             transition: var(--transition);
@@ -373,9 +390,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             background: transparent;
             color: var(--plp-green);
             border: 2px solid var(--plp-green);
-            padding: 0.8rem;
+            padding: clamp(0.7rem, 2vh, 0.8rem);
             border-radius: var(--border-radius);
-            font-size: 0.9rem;
+            font-size: clamp(0.8rem, 2vw, 0.9rem);
             font-weight: 600;
             cursor: pointer;
             transition: var(--transition);
@@ -480,23 +497,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
 
         .otp-modal, .signup-modal {
             background: white;
-            padding: 2.5rem;
+            padding: clamp(1.5rem, 3vw, 2.5rem);
             border-radius: var(--border-radius-lg);
             box-shadow: var(--box-shadow-lg);
             width: 100%;
-            max-width: 450px;
+            max-width: min(500px, 90vw);
             text-align: center;
             position: relative;
             overflow: hidden;
             transform: translateY(20px);
             transition: transform 0.4s ease;
+            max-height: 90vh;
+            overflow-y: auto;
         }
 
         .signup-modal {
-            max-width: 500px;
             text-align: left;
-            max-height: 90vh;
-            overflow-y: auto;
         }
 
         .modal-overlay.active .otp-modal,
@@ -517,7 +533,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
         .otp-modal h1, .signup-modal h1 {
             color: var(--plp-green);
             margin-bottom: 0.5rem;
-            font-size: 1.8rem;
+            font-size: clamp(1.5rem, 3vw, 1.8rem);
             font-weight: 700;
             text-align: center;
         }
@@ -691,41 +707,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
         }
 
         /* Responsive Design */
-        @media (max-width: 768px) {
+        @media (max-width: 1024px) {
             .main-content {
-                flex-direction: column;
-                gap: 2rem;
+                gap: clamp(1.5rem, 3vw, 3rem);
             }
             
             .vertical-divider {
-                width: 83%;
-                height: 1.5px;
+                height: clamp(250px, 45vh, 350px);
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 0.5rem;
+            }
+            
+            .main-content {
+                flex-direction: column;
+                gap: 1.5rem;
+            }
+            
+            .vertical-divider {
+                width: 80%;
+                height: 2px;
                 background: linear-gradient(to right, transparent, var(--plp-green-light), transparent);
                 margin: 0.5rem 0;
             }
             
             .logo {
-                max-width: 150px;
+                max-width: min(220px, 60vw);
             }
             
             .login-container {
                 width: 100%;
-                max-width: 100%;
-                padding: 1.8rem 1.2rem;
+                max-width: 400px;
             }
             
             .header h1 {
-                font-size: 2rem;
+                margin-bottom: 0.5rem;
             }
             
             .header p {
-                font-size: 1rem;
-                margin-bottom: 0.5rem;
+                margin-bottom: 1rem;
             }
 
             .otp-modal, .signup-modal {
                 padding: 1.5rem;
-                margin: 1rem;
             }
             
             .otp-input {
@@ -738,52 +765,185 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
                 flex-direction: column;
                 gap: 0.5rem;
             }
-            
-            .login-form {
-                gap: 1.2rem;
-            }
-            
-            .login-form h3 {
-                font-size: 1.3rem;
-            }
-            
-            .login-form input {
-                padding: 0.8rem 0.5rem 0.8rem 45px;
-            }
         }
 
         @media (max-width: 480px) {
+            body {
+                padding: 0.25rem;
+            }
+            
+            .header {
+                margin-bottom: 0.5rem;
+            }
+            
+            .header h1 {
+                font-size: 1.6rem;
+            }
+            
+            .header p {
+                font-size: 0.85rem;
+                line-height: 1.3;
+            }
+            
+            .main-content {
+                gap: 1rem;
+            }
+            
+            .login-container {
+                padding: 1.2rem 1rem;
+            }
+            
+            .login-form {
+                gap: 1rem;
+            }
+            
+            .login-form h3 {
+                font-size: 1.2rem;
+            }
+            
             .signup-modal {
                 padding: 1rem;
             }
             
             .signup-modal h1 {
-                font-size: 1.25rem;
+                font-size: 1.4rem;
             }
             
             .signup-modal input, 
             .signup-modal select {
-                padding: 0.65rem 0.65rem 0.65rem 2.25rem;
+                padding: 0.8rem 0.8rem 0.8rem 2.5rem;
+                font-size: 0.9rem;
             }
             
             .close-modal {
-                top: 8px;
-                right: 8px;
-                font-size: 1.1rem;
+                top: 12px;
+                right: 12px;
+                font-size: 1.2rem;
                 width: 28px;
                 height: 28px;
             }
             
+            .otp-inputs {
+                gap: 0.5rem;
+            }
+            
+            .otp-input {
+                width: 35px;
+                height: 45px;
+                font-size: 1.1rem;
+            }
+        }
+
+        @media (max-width: 360px) {
             .header h1 {
-                font-size: 1.8rem;
+                font-size: 1.4rem;
+            }
+            
+            .header p {
+                font-size: 0.8rem;
+            }
+            
+            .login-container {
+                padding: 1rem 0.8rem;
+            }
+            
+            .login-form input {
+                padding: 0.7rem 0.5rem 0.7rem 40px;
+                font-size: 0.85rem;
+            }
+            
+            .input-icon {
+                left: 12px;
+                font-size: 0.9rem;
+            }
+            
+            .password-toggle {
+                right: 12px;
+                font-size: 1rem;
+                width: 26px;
+                height: 26px;
+            }
+        }
+
+        /* Portrait orientation for mobile */
+        @media (max-height: 700px) and (orientation: portrait) {
+            .header {
+                margin-bottom: 0.5rem;
+            }
+            
+            .header h1 {
+                margin-top: 0.2rem;
+                margin-bottom: 0.3rem;
+            }
+            
+            .header p {
+                margin-bottom: 0.5rem;
+            }
+            
+            .main-content {
+                gap: 1rem;
+            }
+            
+            .vertical-divider {
+                height: 1.5px;
+                margin: 0.2rem 0;
+            }
+            
+            .logo {
+                max-width: 120px;
+            }
+            
+            .login-form {
+                gap: 0.8rem;
+            }
+            
+            .login-form input {
+                padding: 0.6rem 0.5rem 0.6rem 40px;
+            }
+        }
+
+        /* Landscape orientation for mobile */
+        @media (max-height: 500px) and (orientation: landscape) {
+            body {
+                padding: 0.5rem;
+            }
+            
+            .header {
+                margin-bottom: 0.5rem;
+            }
+            
+            .header h1 {
+                font-size: 1.6rem;
+                margin-bottom: 0.2rem;
             }
             
             .header p {
                 font-size: 0.9rem;
+                margin-bottom: 0.5rem;
+            }
+            
+            .main-content {
+                gap: 1.5rem;
+            }
+            
+            .vertical-divider {
+                height: 180px;
+            }
+            
+            .logo {
+                max-width: 150px;
             }
             
             .login-container {
-                padding: 1.5rem 1rem;
+                padding: 1rem 1.2rem;
+            }
+            
+            .login-form {
+                gap: 0.8rem;
+            }
+            
+            .login-form input {
+                padding: 0.6rem 0.5rem 0.6rem 40px;
             }
         }
     </style>
@@ -794,7 +954,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
     <div class="header">
         <h1>PLP SMARTGRADE</h1>
         <p>An Intelligent System for Academic Performance Prediction and Risk Assessment<br>across Major Subjects of Second Year BSIT College Students</p>
-
         
         <div class="main-content-wrapper">
             <div class="main-content">
