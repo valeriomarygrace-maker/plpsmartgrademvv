@@ -1566,13 +1566,6 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
                             }
                             ?>
                         </div>
-                        <div class="<?php echo $riskBadgeClass; ?>" style="margin-top: 0.5rem;">
-                            <?php 
-                            if ($gwa <= 1.75) echo 'Excellent Performance';
-                            elseif ($gwa <= 2.50) echo 'Good Performance';
-                            else echo 'Needs Improvement';
-                            ?>
-                        </div>
                     <?php else: ?>
                         <div class="performance-value" style="color: var(--text-light);">--</div>
                         <div class="performance-label">No GWA calculated</div>
@@ -1779,13 +1772,13 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
             <div class="insights-section">
                 <div class="insights-tabs">
                     <button class="insight-tab active" data-tab="insights">
-                        <i class="fas fa-lightbulb"></i> Behavioral
+                         Behavioral
                     </button>
                     <button class="insight-tab" data-tab="interventions">
-                        <i class="fas fa-hands-helping"></i> Interventions
+                        Interventions
                     </button>
                     <button class="insight-tab" data-tab="recommendations">
-                        <i class="fas fa-graduation-cap"></i> Recommendations
+                        Recommendations
                     </button>
                 </div>
 
