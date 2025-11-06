@@ -232,10 +232,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
         }
 
         .login-container {
-            max-width: 380px;
+            max-width: 390px;
             background-color: white;
             border-radius: var(--border-radius-lg);
-            padding: 2rem 3rem;
+            padding: 2rem 2rem;
             box-shadow: var(--box-shadow-lg);
             border: 1px solid rgba(0, 99, 65, 0.1);
             transition: transform 0.3s ease, box-shadow 0.3s ease;
@@ -250,8 +250,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
         .login-form h3 {
             text-align: center;
             color: var(--plp-green);
-            margin-bottom: 1.5rem;
-            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+            font-size: 1rem;
             font-weight: 700;
             position: relative;
         }
@@ -262,7 +262,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             width: 60px;
             height: 4px;
             background: var(--plp-green-light);
-            margin: 0.8rem auto 0;
+            margin: 0.5rem auto 0;
             border-radius: 3px;
         }
         
@@ -278,11 +278,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             transform: translateY(-50%);
             color: var(--plp-green);
             z-index: 2;
-            font-size: 1.1rem;
+            font-size: 1rem;
         }
         
         .login-form input {
-            padding: 0.9rem 1rem 0.5rem 45px;
+            padding: 0.9rem 0.5rem 0.5rem 30px;
             border: 1px solid rgba(0, 99, 65, 0.2);
             border-radius: var(--border-radius);
             font-size: 1rem;
@@ -307,7 +307,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             background: var(--plp-green-gradient);
             color: white;
             border: none;
-            padding: 1rem;
+            padding: 0.95rem;
             border-radius: var(--border-radius);
             font-size: 1rem;
             font-weight: 600;
@@ -905,7 +905,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             .login-container {
                 width: 100%;
                 max-width: 100%;
-                padding: 2rem 1.5rem;
+                padding: 2rem 1rem;
             }
             
             .header h1 {
