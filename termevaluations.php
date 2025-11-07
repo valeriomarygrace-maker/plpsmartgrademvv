@@ -800,11 +800,6 @@ function getGradeDescription($grade) {
                             </div>
                         </div>
                     <?php else: ?>
-                        <div class="term-grade no-data">--</div>
-                        <div class="term-grade-description no-data">
-                            No midterm data available
-                        </div>
-                        
                         <div class="term-stats">
                             <div class="stat-item">
                                 <div class="stat-value">60%</div>
@@ -834,11 +829,6 @@ function getGradeDescription($grade) {
                             </div>
                         </div>
                     <?php else: ?>
-                        <div class="term-grade no-data">--</div>
-                        <div class="term-grade-description no-data">
-                            No final data available
-                        </div>
-                        
                         <div class="term-stats">
                             <div class="stat-item">
                                 <div class="stat-value">60%</div>
