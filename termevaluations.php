@@ -10,98 +10,67 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['user_type'] !== 'student') {
     exit;
 }
 
-$success_message = '';
-$error_message = '';
-$student = null;
+// Get subject ID from URL
 $subject_id = isset($_GET['subject_id']) ? intval($_GET['subject_id']) : 0;
 
-if ($subject_id <= 0) {
+if (!$subject_id) {
     header('Location: student-subjects.php');
     exit;
 }
 
+// Get student and subject information
+$student = null;
+$subject = null;
+
 try {
     $student = getStudentByEmail($_SESSION['user_email']);
-    if (!$student) {
-        $error_message = 'Student record not found.';
-    }
-} catch (Exception $e) {
-    $error_message = 'Database error: ' . $e->getMessage();
-}
-
-// Get subject information
-try {
-    $student_subjects = supabaseFetch('student_subjects', ['id' => $subject_id, 'student_id' => $student['id']]);
-    if (!$student_subjects || count($student_subjects) === 0) {
-        header('Location: student-subjects.php');
-        exit;
-    }
     
-    $student_subject = $student_subjects[0];
-    $subjects = supabaseFetch('subjects', ['id' => $student_subject['subject_id']]);
-    if (!$subjects || count($subjects) === 0) {
-        header('Location: student-subjects.php');
-        exit;
-    }
-    
-    $subject_info = $subjects[0];
-    $subject = array_merge($student_subject, [
-        'subject_code' => $subject_info['subject_code'],
-        'subject_name' => $subject_info['subject_name'],
-        'credits' => $subject_info['credits'],
-        'semester' => $subject_info['semester']
+    // Verify the subject belongs to the student
+    $subject_record = supabaseFetch('student_subjects', [
+        'id' => $subject_id, 
+        'student_id' => $student['id']
     ]);
     
+    if (!$subject_record || count($subject_record) === 0) {
+        header('Location: student-subjects.php');
+        exit;
+    }
+    
+    $subject_record = $subject_record[0];
+    $subject_info = supabaseFetch('subjects', ['id' => $subject_record['subject_id']]);
+    
+    if (!$subject_info || count($subject_info) === 0) {
+        header('Location: student-subjects.php');
+        exit;
+    }
+    
+    $subject = array_merge($subject_record, $subject_info[0]);
+    
 } catch (Exception $e) {
-    $error_message = 'Database error: ' . $e->getMessage();
+    header('Location: student-subjects.php');
+    exit;
 }
 
-// Handle form submissions
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['add_midterm']) || isset($_POST['add_final'])) {
-        $exam_type = isset($_POST['add_midterm']) ? 'midterm_exam' : 'final_exam';
-        $score_value = floatval($_POST['score_value']);
-        $max_score = floatval($_POST['max_score']);
-        
-        if ($score_value < 0 || $max_score <= 0) {
-            $error_message = 'Score value and maximum score must be positive numbers.';
-        } elseif ($score_value > $max_score) {
-            $error_message = 'Score value cannot exceed maximum score.';
-        } else {
-            $exam_name = $exam_type === 'midterm_exam' ? 'Midterm Exam' : 'Final Exam';
-            
-            try {
-                // Delete any existing exam score
-                supabaseDelete('student_subject_scores', [
-                    'student_subject_id' => $subject_id,
-                    'score_type' => $exam_type
-                ]);
-                
-                // Insert new exam score
-                $insert_data = [
-                    'student_subject_id' => $subject_id,
-                    'score_type' => $exam_type,
-                    'score_name' => $exam_name,
-                    'score_value' => $score_value,
-                    'max_score' => $max_score,
-                    'created_at' => date('Y-m-d H:i:s')
-                ];
-                
-                $result = supabaseInsert('student_subject_scores', $insert_data);
-                
-                if ($result) {
-                    $success_message = $exam_name . ' score added successfully!';
-                    // Redirect back to subject management
-                    header("Location: subject-management.php?subject_id=$subject_id&success=" . urlencode($success_message));
-                    exit;
-                } else {
-                    $error_message = 'Failed to add exam score.';
-                }
-            } catch (Exception $e) {
-                $error_message = 'Database error: ' . $e->getMessage();
+// Check if term evaluation already exists
+$midterm_evaluation = null;
+$final_evaluation = null;
+
+try {
+    $evaluations = supabaseFetch('term_evaluations', [
+        'student_subject_id' => $subject_id
+    ]);
+    
+    if ($evaluations) {
+        foreach ($evaluations as $evaluation) {
+            if ($evaluation['term_type'] === 'midterm') {
+                $midterm_evaluation = $evaluation;
+            } elseif ($evaluation['term_type'] === 'final') {
+                $final_evaluation = $evaluation;
             }
         }
     }
+} catch (Exception $e) {
+    // Continue without evaluations
 }
 ?>
 
@@ -110,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Term Evaluations - PLP SmartGrade</title>
+    <title>Term Evaluation - PLP SmartGrade</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -284,7 +253,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             max-width: 100%;
             margin: 0 auto;
             width: 100%;
-            overflow-y: auto;
         }
 
         .header {
@@ -300,10 +268,221 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             align-items: center;
         }
 
-        .welcome {
+        .back-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 50px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 500;
+            transition: var(--transition);
+        }
+
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateX(-3px);
+        }
+
+        .card {
+            background: white;
+            padding: 2rem;
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--box-shadow);
+            border-top: 4px solid var(--plp-green);
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 2rem;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: var(--plp-green-gradient);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--plp-green-lighter);
+        }
+
+        .card-title {
+            color: var(--plp-green);
+            font-size: 1.4rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin: 0;
+            padding: 0;
+            border: none;
+        }
+
+        .card-title i {
+            font-size: 1.2rem;
+            width: 32px;
+            height: 32px;
+            background: var(--plp-green-pale);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .subject-info {
+            background: var(--plp-green-pale);
+            padding: 1.5rem;
+            border-radius: var(--border-radius);
+            margin-bottom: 2rem;
+            border-left: 4px solid var(--plp-green);
+        }
+
+        .subject-code {
             font-size: 1.5rem;
             font-weight: 700;
-            letter-spacing: 0.5px;
+            color: var(--plp-green);
+            margin-bottom: 0.5rem;
+        }
+
+        .subject-name {
+            font-size: 1.1rem;
+            color: var(--text-dark);
+            margin-bottom: 0.5rem;
+        }
+
+        .subject-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .detail-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            color: var(--text-medium);
+        }
+
+        .detail-item i {
+            color: var(--plp-green);
+            width: 16px;
+        }
+
+        .terms-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 1.5rem;
+        }
+
+        .term-card {
+            background: white;
+            padding: 2rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            border: 2px solid var(--plp-green-lighter);
+            transition: var(--transition);
+            cursor: pointer;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .term-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--box-shadow-lg);
+            border-color: var(--plp-green);
+        }
+
+        .term-card.midterm {
+            border-top: 4px solid #3b82f6;
+        }
+
+        .term-card.final {
+            border-top: 4px solid #ef4444;
+        }
+
+        .term-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            color: var(--plp-green);
+        }
+
+        .term-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            color: var(--text-dark);
+        }
+
+        .term-description {
+            color: var(--text-medium);
+            margin-bottom: 1.5rem;
+            line-height: 1.5;
+        }
+
+        .term-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 0.75rem;
+            background: var(--plp-green-pale);
+            border-radius: var(--border-radius);
+        }
+
+        .stat-value {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--plp-green);
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: var(--text-medium);
+        }
+
+        .term-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .status-not-started {
+            background: #f1f5f9;
+            color: #64748b;
+        }
+
+        .status-in-progress {
+            background: #fef3c7;
+            color: #d97706;
+        }
+
+        .status-completed {
+            background: #d1fae5;
+            color: #065f46;
         }
 
         .btn {
@@ -331,223 +510,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             box-shadow: 0 6px 16px rgba(0, 99, 65, 0.4);
         }
 
-        .btn-secondary {
-            background: var(--plp-green-lighter);
-            color: var(--plp-green);
-        }
-
-        .btn-secondary:hover {
-            background: var(--plp-green-light);
+        .btn-midterm {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
             color: white;
-            transform: translateY(-2px);
         }
 
-        .container {
-            max-width: 800px;
-            margin: 2rem auto;
-            background: white;
-            border-radius: var(--border-radius-lg);
-            box-shadow: var(--box-shadow);
-            overflow: hidden;
-        }
-
-        .page {
-            display: none;
-            padding: 2.5rem;
-        }
-
-        .page.active {
-            display: block;
-        }
-
-        .page-title {
-            color: var(--plp-green);
-            font-size: 1.5rem;
-            font-weight: 600;
-            margin-bottom: 1.5rem;
-            text-align: center;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.75rem;
-        }
-
-        .menu-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1.5rem;
-            margin-top: 2rem;
-        }
-
-        .menu-card {
-            background: white;
-            padding: 2rem;
-            border-radius: var(--border-radius);
-            box-shadow: var(--box-shadow);
-            text-align: center;
-            cursor: pointer;
-            transition: var(--transition);
-            border: 2px solid transparent;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .menu-card:hover {
-            transform: translateY(-5px);
-            box-shadow: var(--box-shadow-lg);
-            border-color: var(--plp-green);
-        }
-
-        .menu-icon {
-            width: 80px;
-            height: 80px;
-            background: var(--plp-green-gradient);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+        .btn-final {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
             color: white;
-            font-size: 2rem;
-        }
-
-        .menu-card h3 {
-            color: var(--plp-green);
-            font-size: 1.2rem;
-            font-weight: 600;
-            margin: 0;
-        }
-
-        .menu-card p {
-            color: var(--text-medium);
-            font-size: 0.9rem;
-            margin: 0;
-        }
-
-        .exam-badge {
-            background: var(--plp-green);
-            color: white;
-            padding: 0.4rem 1rem;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            margin-top: 0.5rem;
-        }
-
-        .form-container {
-            background: var(--plp-green-pale);
-            padding: 2rem;
-            border-radius: var(--border-radius);
-            margin-top: 1.5rem;
-        }
-
-        .form-group {
-            margin-bottom: 1.5rem;
-        }
-
-        .form-label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-weight: 600;
-            color: var(--text-dark);
-            font-size: 0.95rem;
-        }
-
-        .form-input {
-            width: 100%;
-            padding: 0.75rem 1rem;
-            border: 2px solid var(--plp-green-lighter);
-            border-radius: var(--border-radius);
-            font-size: 1rem;
-            transition: var(--transition);
-            font-family: 'Poppins', sans-serif;
-            background: white;
-        }
-
-        .form-input:focus {
-            outline: none;
-            border-color: var(--plp-green);
-            box-shadow: 0 0 0 3px rgba(0, 99, 65, 0.1);
-        }
-
-        .form-actions {
-            display: flex;
-            gap: 1rem;
-            justify-content: flex-end;
-            margin-top: 2rem;
-        }
-
-        .alert-success {
-            background: #c6f6d5;
-            color: #2f855a;
-            padding: 1rem;
-            border-radius: var(--border-radius);
-            margin-bottom: 1.5rem;
-            border-left: 4px solid #38a169;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            animation: slideIn 0.3s ease;
-        }
-
-        .alert-error {
-            background: #fed7d7;
-            color: #c53030;
-            padding: 1rem;
-            border-radius: var(--border-radius);
-            margin-bottom: 1.5rem;
-            border-left: 4px solid #e53e3e;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            animation: slideIn 0.3s ease;
-        }
-
-        .subject-info {
-            background: var(--plp-green-lighter);
-            padding: 1.5rem;
-            border-radius: var(--border-radius);
-            margin-bottom: 2rem;
-            border-left: 4px solid var(--plp-green);
-        }
-
-        .subject-name {
-            font-size: 1.3rem;
-            font-weight: 600;
-            color: var(--plp-green);
-            margin-bottom: 0.5rem;
-        }
-
-        .subject-details {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-            margin-top: 1rem;
-        }
-
-        .detail-item {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            color: var(--text-medium);
-            font-size: 0.9rem;
-        }
-
-        .detail-item i {
-            color: var(--plp-green);
-            width: 16px;
-        }
-
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
         }
 
         @media (max-width: 768px) {
@@ -562,7 +532,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             
             .main-content {
-                padding: 1rem;
+                max-width: 100%;
+                padding: 1.5rem;
             }
             
             .header {
@@ -571,12 +542,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 text-align: center;
             }
             
-            .menu-grid {
+            .terms-container {
                 grid-template-columns: 1fr;
-            }
-            
-            .form-actions {
-                flex-direction: column;
             }
             
             .subject-details {
@@ -639,133 +606,170 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
 
     <div class="main-content">
-        <?php if ($success_message): ?>
-            <div class="alert-success">
-                <i class="fas fa-check-circle"></i>
-                <?php echo $success_message; ?>
-            </div>
-        <?php endif; ?>
-        
-        <?php if ($error_message): ?>
-            <div class="alert-error">
-                <i class="fas fa-exclamation-circle"></i>
-                <?php echo $error_message; ?>
-            </div>
-        <?php endif; ?>
-        
         <div class="header">
-            <div class="welcome">Term Evaluations</div>
-            <div class="header-actions">
-                <a href="subject-management.php?subject_id=<?php echo $subject_id; ?>" class="btn btn-secondary">
-                    <i class="fas fa-arrow-left"></i> Back to Subject
-                </a>
-            </div>
+            <a href="student-subjects.php" class="back-btn">
+                <i class="fas fa-arrow-left"></i>
+                Back to Subjects
+            </a>
+            <div class="welcome">Term Evaluation</div>
         </div>
 
         <div class="subject-info">
-            <div class="subject-name">
-                <?php echo htmlspecialchars($subject['subject_code'] . ' - ' . $subject['subject_name']); ?>
-            </div>
+            <div class="subject-code"><?php echo htmlspecialchars($subject['subject_code']); ?></div>
+            <div class="subject-name"><?php echo htmlspecialchars($subject['subject_name']); ?></div>
             <div class="subject-details">
                 <div class="detail-item">
                     <i class="fas fa-user-tie"></i>
-                    <span>Professor: <?php echo htmlspecialchars($subject['professor_name']); ?></span>
+                    <span><strong>Professor:</strong> <?php echo htmlspecialchars($subject['professor_name']); ?></span>
                 </div>
                 <div class="detail-item">
                     <i class="fas fa-calendar-alt"></i>
-                    <span>Schedule: <?php echo htmlspecialchars($subject['schedule']); ?></span>
+                    <span><strong>Schedule:</strong> <?php echo htmlspecialchars($subject['schedule']); ?></span>
                 </div>
                 <div class="detail-item">
                     <i class="fas fa-graduation-cap"></i>
-                    <span>Credits: <?php echo htmlspecialchars($subject['credits']); ?></span>
+                    <span><strong>Credits:</strong> <?php echo htmlspecialchars($subject['credits']); ?></span>
+                </div>
+                <div class="detail-item">
+                    <i class="fas fa-calendar"></i>
+                    <span><strong>Semester:</strong> <?php echo htmlspecialchars($subject['semester']); ?></span>
                 </div>
             </div>
         </div>
 
-        <div class="container">
-            <!-- Menu Page -->
-            <div id="menuPage" class="page active">
-                <h2 class="page-title">
-                    <i class="fas fa-tasks"></i>
-                    Select Term Evaluation
-                </h2>
-                <p style="text-align: center; color: var(--text-medium); margin-bottom: 2rem;">
-                    Choose which term evaluation you want to input scores for:
-                </p>
-                
-                <div class="menu-grid">
-                    <div class="menu-card" onclick="showPage('midtermPage')">
-                        <div class="menu-icon">
-                            <i class="fas fa-file-alt"></i>
-                        </div>
-                        <h3>Midterm Evaluation</h3>
-                        <p>Input your midterm exam score and related assessments</p>
-                        <div class="exam-badge">40% of Midterm Grade</div>
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <i class="fas fa-calendar-alt"></i>
+                    Select Term for Evaluation
+                </div>
+            </div>
+
+            <div class="terms-container">
+                <!-- Midterm Card -->
+                <div class="term-card midterm" onclick="window.location.href='subject-management.php?subject_id=<?php echo $subject_id; ?>&term=midterm'">
+                    <div class="term-icon">
+                        <i class="fas fa-balance-scale"></i>
+                    </div>
+                    <div class="term-title">MIDTERM</div>
+                    <div class="term-description">
+                        Evaluate your performance for the midterm period. 
+                        Set up class standing categories (60%) and midterm exam (40%).
                     </div>
                     
-                    <div class="menu-card" onclick="showPage('finalPage')">
-                        <div class="menu-icon">
-                            <i class="fas fa-file-contract"></i>
+                    <div class="term-stats">
+                        <div class="stat-item">
+                            <div class="stat-value">60%</div>
+                            <div class="stat-label">Class Standing</div>
                         </div>
-                        <h3>Final Evaluation</h3>
-                        <div class="exam-badge">40% of Final Grade</div>
+                        <div class="stat-item">
+                            <div class="stat-value">40%</div>
+                            <div class="stat-label">Midterm Exam</div>
+                        </div>
                     </div>
+
+                    <?php if ($midterm_evaluation): ?>
+                        <div class="term-status status-completed">
+                            <i class="fas fa-check-circle"></i>
+                            Evaluation Started
+                        </div>
+                    <?php else: ?>
+                        <div class="term-status status-not-started">
+                            <i class="fas fa-clock"></i>
+                            Not Started
+                        </div>
+                    <?php endif; ?>
+
+                    <button class="btn btn-primary btn-midterm" style="margin-top: 1rem; width: 100%;">
+                        <i class="fas fa-edit"></i>
+                        <?php echo $midterm_evaluation ? 'Manage Midterm' : 'Start Midterm Evaluation'; ?>
+                    </button>
+                </div>
+
+                <!-- Final Card -->
+                <div class="term-card final" onclick="window.location.href='subject-management.php?subject_id=<?php echo $subject_id; ?>&term=final'">
+                    <div class="term-icon">
+                        <i class="fas fa-graduation-cap"></i>
+                    </div>
+                    <div class="term-title">FINAL</div>
+                    <div class="term-description">
+                        Evaluate your performance for the final period. 
+                        Set up class standing categories (60%) and final exam (40%).
+                    </div>
+                    
+                    <div class="term-stats">
+                        <div class="stat-item">
+                            <div class="stat-value">60%</div>
+                            <div class="stat-label">Class Standing</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">40%</div>
+                            <div class="stat-label">Final Exam</div>
+                        </div>
+                    </div>
+
+                    <?php if ($final_evaluation): ?>
+                        <div class="term-status status-completed">
+                            <i class="fas fa-check-circle"></i>
+                            Evaluation Started
+                        </div>
+                    <?php else: ?>
+                        <div class="term-status status-not-started">
+                            <i class="fas fa-clock"></i>
+                            Not Started
+                        </div>
+                    <?php endif; ?>
+
+                    <button class="btn btn-primary btn-final" style="margin-top: 1rem; width: 100%;">
+                        <i class="fas fa-edit"></i>
+                        <?php echo $final_evaluation ? 'Manage Final' : 'Start Final Evaluation'; ?>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <i class="fas fa-info-circle"></i>
+                    Grading System Information
+                </div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem;">
+                <div style="text-align: center; padding: 1.5rem; background: var(--plp-green-pale); border-radius: var(--border-radius);">
+                    <div style="font-size: 2rem; color: var(--plp-green); margin-bottom: 0.5rem;">
+                        <i class="fas fa-calculator"></i>
+                    </div>
+                    <h3 style="color: var(--plp-green); margin-bottom: 0.5rem;">Overall Grade</h3>
+                    <p style="color: var(--text-medium); font-size: 0.9rem;">
+                        (Midterm Grade + Final Grade) ÷ 2
+                    </p>
+                </div>
+                
+                <div style="text-align: center; padding: 1.5rem; background: var(--plp-green-pale); border-radius: var(--border-radius);">
+                    <div style="font-size: 2rem; color: #3b82f6; margin-bottom: 0.5rem;">
+                        <i class="fas fa-balance-scale"></i>
+                    </div>
+                    <h3 style="color: #3b82f6; margin-bottom: 0.5rem;">Midterm Structure</h3>
+                    <p style="color: var(--text-medium); font-size: 0.9rem;">
+                        60% Class Standing<br>
+                        40% Midterm Exam
+                    </p>
+                </div>
+                
+                <div style="text-align: center; padding: 1.5rem; background: var(--plp-green-pale); border-radius: var(--border-radius);">
+                    <div style="font-size: 2rem; color: #ef4444; margin-bottom: 0.5rem;">
+                        <i class="fas fa-graduation-cap"></i>
+                    </div>
+                    <h3 style="color: #ef4444; margin-bottom: 0.5rem;">Final Structure</h3>
+                    <p style="color: var(--text-medium); font-size: 0.9rem;">
+                        60% Class Standing<br>
+                        40% Final Exam
+                    </p>
                 </div>
             </div>
         </div>
     </div>
-
-    <script>
-        function showPage(pageId) {
-            // Hide all pages
-            document.querySelectorAll('.page').forEach(page => {
-                page.classList.remove('active');
-            });
-            
-            // Show selected page
-            document.getElementById(pageId).classList.add('active');
-            
-            // Scroll to top
-            window.scrollTo(0, 0);
-        }
-
-        // Auto-hide messages after 5 seconds
-        setTimeout(() => {
-            const alerts = document.querySelectorAll('.alert-success, .alert-error');
-            alerts.forEach(alert => {
-                alert.style.transition = 'opacity 0.3s ease';
-                alert.style.opacity = '0';
-                setTimeout(() => {
-                    alert.remove();
-                }, 300);
-            });
-        }, 5000);
-
-        // Form validation
-        document.addEventListener('DOMContentLoaded', function() {
-            const forms = document.querySelectorAll('form');
-            forms.forEach(form => {
-                form.addEventListener('submit', function(e) {
-                    const scoreInput = this.querySelector('input[name="score_value"]');
-                    const maxScoreInput = this.querySelector('input[name="max_score"]');
-                    
-                    const scoreValue = parseFloat(scoreInput.value);
-                    const maxScore = parseFloat(maxScoreInput.value);
-                    
-                    if (scoreValue < 0 || maxScore <= 0) {
-                        e.preventDefault();
-                        alert('Score value and maximum score must be positive numbers.');
-                        return;
-                    }
-                    
-                    if (scoreValue > maxScore) {
-                        e.preventDefault();
-                        alert('Score value cannot exceed maximum score.');
-                        return;
-                    }
-                });
-            });
-        });
-    </script>
 </body>
 </html>

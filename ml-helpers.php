@@ -463,7 +463,9 @@ class InterventionSystem {
     }
 }
 
-
+/**
+ * Helper function to ensure insights are always available
+ */
 function ensureInsightsAvailable($studentId, $subjectId, $overallGrade = 0, $gwaPrediction = null) {
     return [
         'behavioral' => InterventionSystem::getBehavioralInsights($studentId, $subjectId, $overallGrade, $gwaPrediction),
