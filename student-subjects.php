@@ -1255,18 +1255,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
                     </button>
                 </div>
             </div>
-            
-            <?php if (empty($subjects)): ?>
-                <div class="empty-state">
-                    <i class="fas fa-book"></i>
-                    <p>No subjects enrolled yet</p>
-                    <small>Click "Add New Subject" to enroll in your first subject</small>
+                
+    <?php if (empty($subjects)): ?>
+        <div class="empty-state">
+            <i class="fas fa-book"></i>
+            <p>No subjects enrolled yet</p>
+            <small>Click "Add New Subject" to enroll in your first subject</small>
+        </div>
+    <?php else: ?>
+    <div class="subjects-grid">
+        <?php foreach ($subjects as $subject): ?>
+            <!-- ITO ANG BAGONG LINE NA NAGPAPUNTA SA TERMEVALUATION.PHP -->
+            <div class="subject-card" onclick="window.location.href='termevaluation.php?subject_id=<?php echo $subject['id']; ?>'">
+                <div class="subject-header">
+                    <div style="flex: 1;">
+                        <div class="subject-code"><?php echo htmlspecialchars($subject['subject_code']); ?></div>
+                        <div class="subject-name"><?php echo htmlspecialchars($subject['subject_name']); ?></div>
+                    </div>
+                    <div class="credits">
+                        <?php echo htmlspecialchars($subject['credits']); ?> CRDTS
+                    </div>
                 </div>
-            <?php else: ?>
+                
+                <div class="subject-info">
+                    <div class="info-item">
+                        <i class="fas fa-user-tie"></i>
+                        <span><strong>Professor:</strong> <?php echo htmlspecialchars($subject['professor_name']); ?></span>
+                    </div>
+                    <div class="info-item">
+                        <i class="fas fa-calendar-alt"></i>
+                        <span><strong>Schedule:</strong> <?php echo htmlspecialchars($subject['schedule']); ?></span>
+                    </div>
+                    <div class="info-item">
+                        <i class="fas fa-calendar"></i>
+                        <span><strong>Semester:</strong> <?php echo htmlspecialchars($subject['semester']); ?></span>
+                    </div>
+                    <div class="info-item">
+                        <i class="fas fa-clock"></i>
+                        <span><strong>Added:</strong> <?php echo date('M j, Y', strtotime($subject['created_at'])); ?></span>
+                    </div>
+                </div>
+                
+                <div class="subject-actions">
+                    <button type="button" class="btn-edit" onclick="openEditModal(<?php echo $subject['id']; ?>, '<?php echo htmlspecialchars($subject['subject_code']); ?> - <?php echo htmlspecialchars($subject['subject_name']); ?>', '<?php echo htmlspecialchars($subject['professor_name']); ?>', '<?php echo htmlspecialchars($subject['schedule']); ?>')">
+                        <i class="fas fa-edit"></i> Edit
+                    </button>
+                    <button type="button" class="btn-archive" onclick="openArchiveModal(<?php echo $subject['id']; ?>, '<?php echo htmlspecialchars($subject['subject_code']); ?> - <?php echo htmlspecialchars($subject['subject_name']); ?>')">
+                        <i class="fas fa-archive"></i> Archive
+                    </button>
+                </div>
+            </div>
+        <?php endforeach; ?>
+    </div>
+<?php endif; ?>
                 <div class="subjects-grid">
                     <?php foreach ($subjects as $subject): ?>
-                        <div class="subject-card" onclick="window.location.href='subject-management.php?subject_id=<?php echo $subject['id']; ?>'">
-                            <div class="subject-header">
+                            <div class="subject-card" onclick="window.location.href='termevaluation.php?subject_id=<?php echo $subject['id']; ?>'">                            <div class="subject-header">
                                 <div style="flex: 1;">
                                     <div class="subject-code"><?php echo htmlspecialchars($subject['subject_code']); ?></div>
                                     <div class="subject-name"><?php echo htmlspecialchars($subject['subject_name']); ?></div>
