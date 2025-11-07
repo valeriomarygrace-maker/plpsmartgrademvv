@@ -1,9 +1,4 @@
 <?php
-// ml-helpers.php - ENHANCED VERSION FOR GWA
-
-/**
- * ML Service Integration for Enhanced Predictions
- */
 class MLService {
     private static $api_url = 'https://plpsmartgrademvv.onrender.com/predict';
     private static $timeout = 5;

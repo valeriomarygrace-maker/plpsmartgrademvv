@@ -1553,14 +1553,10 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
         <div class="header">
             <div class="class-title">
                 <?php echo htmlspecialchars($subject['subject_code'] . ' - ' . $subject['subject_name']); ?>
-                <span class="term-indicator">
-                    <i class="fas <?php echo $term === 'midterm' ? 'fa-balance-scale' : 'fa-graduation-cap'; ?>"></i>
-                    <?php echo strtoupper($term); ?> TERM
-                </span>
             </div>
             <div class="header-actions">
-                <a href="termevaluation.php?subject_id=<?php echo $subject_id; ?>" class="btn btn-secondary">
-                    <i class="fas fa-arrow-left"></i> Back
+                <a href="termevaluations.php?subject_id=<?php echo $subject_id; ?>" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i><?php echo $term === 'midterm' ? ; ?>
                 </a>
             </div>
         </div>

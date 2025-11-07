@@ -279,25 +279,11 @@ try {
         }
 
         .card {
-            background: white;
             padding: 2rem;
-            border-radius: var(--border-radius-lg);
-            box-shadow: var(--box-shadow);
-            border-top: 4px solid var(--plp-green);
             transition: var(--transition);
             position: relative;
             overflow: hidden;
             margin-bottom: 2rem;
-        }
-
-        .card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 4px;
-            background: var(--plp-green-gradient);
         }
 
         .terms-container {
@@ -327,11 +313,11 @@ try {
         }
 
         .term-card.midterm {
-            border-top: 4px solid #3b82f6;
+            border-top: 4px solid var(--plp-green);
         }
 
         .term-card.final {
-            border-top: 4px solid #ef4444;
+            border-top: 4px solid var(--plp-green);
         }
 
         .term-icon {
@@ -456,13 +442,12 @@ try {
     <div class="main-content">
         <div class="header">
             <div class="header-content">
-                <a href="student-subjects.php" class="back-btn">
-                    <i class="fas fa-arrow-left"></i>
-                    Back to Subjects
-                </a>
                 <div class="subject-name"><?php echo htmlspecialchars($subject['subject_name']); ?></div>
-                <div style="width: 120px;"></div> <!-- Spacer for balance -->
+                <div style="width: 120px;"></div> 
             </div>
+            <a href="student-subjects.php" class="back-btn">
+                Back
+            </a>
         </div>
 
         <div class="card">
