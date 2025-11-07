@@ -241,9 +241,13 @@ try {
             margin-bottom: 1rem;
             background: var(--plp-green-gradient);
             color: white;
+        }
+
+        .header-content {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            width: 100%;
         }
 
         .back-btn {
@@ -259,11 +263,19 @@ try {
             gap: 0.5rem;
             font-weight: 500;
             transition: var(--transition);
+            white-space: nowrap;
         }
 
         .back-btn:hover {
             background: rgba(255, 255, 255, 0.3);
             transform: translateX(-3px);
+        }
+
+        .subject-name {
+            font-size: 1.5rem;
+            font-weight: 700;
+            flex: 1;
+            text-align: center;
         }
 
         .card {
@@ -286,78 +298,6 @@ try {
             width: 100%;
             height: 4px;
             background: var(--plp-green-gradient);
-        }
-
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1.5rem;
-            padding-bottom: 0.75rem;
-            border-bottom: 1px solid var(--plp-green-lighter);
-        }
-
-        .card-title {
-            color: var(--plp-green);
-            font-size: 1.4rem;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            margin: 0;
-            padding: 0;
-            border: none;
-        }
-
-        .card-title i {
-            font-size: 1.2rem;
-            width: 32px;
-            height: 32px;
-            background: var(--plp-green-pale);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .subject-info {
-            background: var(--plp-green-pale);
-            padding: 1.5rem;
-            border-radius: var(--border-radius);
-            margin-bottom: 2rem;
-            border-left: 4px solid var(--plp-green);
-        }
-
-        .subject-code {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--plp-green);
-            margin-bottom: 0.5rem;
-        }
-
-        .subject-name {
-            font-size: 1.1rem;
-            color: var(--text-dark);
-            margin-bottom: 0.5rem;
-        }
-
-        .subject-details {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-            margin-top: 1rem;
-        }
-
-        .detail-item {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            color: var(--text-medium);
-        }
-
-        .detail-item i {
-            color: var(--plp-green);
-            width: 16px;
         }
 
         .terms-container {
@@ -407,12 +347,6 @@ try {
             color: var(--text-dark);
         }
 
-        .term-description {
-            color: var(--text-medium);
-            margin-bottom: 1.5rem;
-            line-height: 1.5;
-        }
-
         .term-stats {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -438,66 +372,6 @@ try {
             color: var(--text-medium);
         }
 
-        .term-status {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            font-weight: 600;
-            font-size: 0.9rem;
-        }
-
-        .status-not-started {
-            background: #f1f5f9;
-            color: #64748b;
-        }
-
-        .status-in-progress {
-            background: #fef3c7;
-            color: #d97706;
-        }
-
-        .status-completed {
-            background: #d1fae5;
-            color: #065f46;
-        }
-
-        .btn {
-            padding: 0.75rem 1.5rem;
-            border: none;
-            border-radius: 50px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: var(--transition);
-            font-family: 'Poppins', sans-serif;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            text-decoration: none;
-        }
-
-        .btn-primary {
-            background: var(--plp-green-gradient);
-            color: white;
-            box-shadow: 0 4px 12px rgba(0, 99, 65, 0.3);
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 16px rgba(0, 99, 65, 0.4);
-        }
-
-        .btn-midterm {
-            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-            color: white;
-        }
-
-        .btn-final {
-            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-            color: white;
-        }
-
         @media (max-width: 768px) {
             body {
                 flex-direction: column;
@@ -514,17 +388,13 @@ try {
                 padding: 1.5rem;
             }
             
-            .header {
+            .header-content {
                 flex-direction: column;
                 gap: 1rem;
                 text-align: center;
             }
             
             .terms-container {
-                grid-template-columns: 1fr;
-            }
-            
-            .subject-details {
                 grid-template-columns: 1fr;
             }
         }
@@ -556,7 +426,7 @@ try {
                 </a>
             </li>
             <li class="nav-item">
-                <a href="student-subjects.php" class="nav-link">
+                <a href="student-subjects.php" class="nav-link active">
                     <i class="fas fa-book"></i>
                     Subjects
                 </a>
@@ -585,11 +455,14 @@ try {
 
     <div class="main-content">
         <div class="header">
-            <div class="subject-name"><?php echo htmlspecialchars($subject['subject_name']); ?></div>
-            <a href="student-subjects.php" class="back-btn">
-                <i class="fas fa-arrow-left"></i>
-                Back
-            </a>
+            <div class="header-content">
+                <a href="student-subjects.php" class="back-btn">
+                    <i class="fas fa-arrow-left"></i>
+                    Back to Subjects
+                </a>
+                <div class="subject-name"><?php echo htmlspecialchars($subject['subject_name']); ?></div>
+                <div style="width: 120px;"></div> <!-- Spacer for balance -->
+            </div>
         </div>
 
         <div class="card">
@@ -610,11 +483,6 @@ try {
                             <div class="stat-label">Midterm Exam</div>
                         </div>
                     </div>
-
-                    <button class="btn btn-primary btn-midterm" style="margin-top: 1rem; width: 100%;">
-                        <i class="fas fa-edit"></i>
-                        <?php echo $midterm_evaluation ? 'Manage Midterm' : 'Start Midterm Evaluation'; ?>
-                    </button>
                 </div>
 
                 <!-- Final Card -->
