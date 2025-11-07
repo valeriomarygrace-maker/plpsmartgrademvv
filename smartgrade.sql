@@ -174,3 +174,23 @@ CREATE TABLE public.subjects (
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT subjects_pkey PRIMARY KEY (id)
 );
+
+
+--NEW DATABASE---------------
+
+-- Add term_type column to student_class_standing_categories table
+ALTER TABLE student_class_standing_categories 
+ADD COLUMN term_type VARCHAR NOT NULL DEFAULT 'midterm' 
+CHECK (term_type IN ('midterm', 'final'));
+
+-- Add term_type column to archived_class_standing_categories table
+ALTER TABLE archived_class_standing_categories 
+ADD COLUMN term_type VARCHAR NOT NULL DEFAULT 'midterm' 
+CHECK (term_type IN ('midterm', 'final'));
+
+-- Update archived_subject_scores to preserve term information
+-- The term_type will be inherited from the category it belongs to
+
+-- Optional: Add indexes for better query performance
+CREATE INDEX idx_categories_term_type ON student_class_standing_categories(student_subject_id, term_type);
+CREATE INDEX idx_archived_categories_term_type ON archived_class_standing_categories(archived_subject_id, term_type);

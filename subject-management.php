@@ -72,7 +72,7 @@ $totalClassStandingPercentage = 0;
 foreach ($categories as $category) {
     $totalClassStandingPercentage += floatval($category['category_percentage']);
 }
-$remainingAllocation = 60 - $totalClassStandingPercentage;
+$remainingAllocation = 60 - $totalClassStandingPercentage; // Changed from 60 to 60
 $canAddCategory = ($remainingAllocation > 0);
 
 try {
@@ -124,7 +124,17 @@ $recommendations = [];
 
 // Calculate grades and generate insights
 if ($hasScores) {
-    // CLASS STANDING CALCULATION
+    // MIDTERM CALCULATION
+    $midtermAttendance = 0;
+    $midtermClassStanding = 0;
+    $midtermExamScore = 0;
+    
+    // FINAL CALCULATION  
+    $finalAttendance = 0;
+    $finalClassStanding = 0;
+    $finalExamScore = 0;
+
+    // CLASS STANDING CALCULATION (for both midterm and final)
     $categoryTotals = [];
     foreach ($categories as $category) {
         $categoryTotals[$category['id']] = [
@@ -166,40 +176,45 @@ if ($hasScores) {
         }
     }
 
-    if ($totalClassStanding > 60) {
-        $totalClassStanding = 60;
+    // Separate attendance from class standing
+    $attendanceScore = 0;
+    $pureClassStanding = 0;
+    foreach ($categoryTotals as $categoryId => $category) {
+        if (strtolower($category['name']) === 'attendance') {
+            $attendanceScore = $category['weighted_score'];
+        } else {
+            $pureClassStanding += $category['weighted_score'];
+        }
     }
 
-    // MAJOR EXAM CALCULATION
-    $midtermScore = 0;
-    $finalScore = 0;
-
+    // MIDTERM EXAM CALCULATION
     if (!empty($midtermExam)) {
         $midterm = reset($midtermExam);
         if ($midterm['max_score'] > 0) {
-            $midtermPercentage = ($midterm['score_value'] / $midterm['max_score']) * 100;
-            $midtermScore = ($midtermPercentage * 20) / 100;
+            $midtermExamPercentage = ($midterm['score_value'] / $midterm['max_score']) * 100;
+            $midtermExamScore = ($midtermExamPercentage * 40) / 100; // 40% of midterm
         }
     }
 
+    // FINAL EXAM CALCULATION
     if (!empty($finalExam)) {
         $final = reset($finalExam);
         if ($final['max_score'] > 0) {
-            $finalPercentage = ($final['score_value'] / $final['max_score']) * 100;
-            $finalScore = ($finalPercentage * 20) / 100;
+            $finalExamPercentage = ($final['score_value'] / $final['max_score']) * 100;
+            $finalExamScore = ($finalExamPercentage * 40) / 100; // 40% of final
         }
     }
 
-    $totalExamScore = $midtermScore + $finalScore;
-    if ($totalExamScore > 40) {
-        $totalExamScore = 40;
-    }
+    // Calculate Midterm Grade (100%)
+    $midtermGrade = $attendanceScore + $pureClassStanding + $midtermExamScore;
+    if ($midtermGrade > 100) $midtermGrade = 100;
 
-    $overallGrade = $totalClassStanding + $totalExamScore;
+    // Calculate Final Grade (100%)  
+    $finalGrade = $attendanceScore + $pureClassStanding + $finalExamScore;
+    if ($finalGrade > 100) $finalGrade = 100;
 
-    if ($overallGrade > 100) {
-        $overallGrade = 100;
-    }
+    // Calculate Overall Subject Grade
+    $overallGrade = ($midtermGrade + $finalGrade) / 2;
 
     // GWA CALCULATION
     if ($overallGrade >= 90) {
@@ -224,18 +239,36 @@ if ($hasScores) {
         $gwa = 5.00;
     }
 
+    // Store breakdown for display
+    $gradeBreakdown = [
+        'midterm' => [
+            'attendance' => $attendanceScore,
+            'class_standing' => $pureClassStanding,
+            'exam' => $midtermExamScore,
+            'total' => $midtermGrade
+        ],
+        'final' => [
+            'attendance' => $attendanceScore,
+            'class_standing' => $pureClassStanding,
+            'exam' => $finalExamScore,
+            'total' => $finalGrade
+        ]
+    ];
 
-$behavioralInsights = InterventionSystem::getBehavioralInsights($student['id'], $subject_id, $overallGrade, 'general');
-$interventions = InterventionSystem::getInterventions($student['id'], $subject_id, 'general');
-$recommendations = InterventionSystem::getRecommendations($student['id'], $subject_id, $overallGrade, 'general');    
+    $behavioralInsights = InterventionSystem::getBehavioralInsights($student['id'], $subject_id, $overallGrade, 'general');
+    $interventions = InterventionSystem::getInterventions($student['id'], $subject_id, 'general');
+    $recommendations = InterventionSystem::getRecommendations($student['id'], $subject_id, $overallGrade, 'general');    
 
 } else {
     // NO SCORES - SHOW ENCOURAGING MESSAGES
     $overallGrade = 0;
     $gwa = 0;
-    $totalClassStanding = 0;
-    $midtermScore = 0;
-    $finalScore = 0;
+    $midtermGrade = 0;
+    $finalGrade = 0;
+    $gradeBreakdown = [
+        'midterm' => ['attendance' => 0, 'class_standing' => 0, 'exam' => 0, 'total' => 0],
+        'final' => ['attendance' => 0, 'class_standing' => 0, 'exam' => 0, 'total' => 0]
+    ];
     
     // Provide basic insights even without scores
     $behavioralInsights = [[
@@ -1524,7 +1557,6 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
             </div>
         </div>
 
-        <!-- Simplified Performance Overview -->
         <div class="performance-overview">
             <div class="performance-grid">
                 <div class="performance-card">
@@ -1553,7 +1585,6 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
                         <div class="performance-value"><?php echo number_format($gwa, 2); ?></div>
                         <div class="performance-label" style="margin-top: 0.5rem; font-size: 0.9rem; color: var(--text-medium);">
                             <?php 
-                            // Risk level based on GWA
                             if ($gwa <= 1.75) {
                                 echo 'Low Risk';
                                 $riskBadgeClass = 'risk-badge low';
@@ -1573,30 +1604,37 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
                 </div>
                 
                 <div class="performance-card">
-                    <div class="performance-label">Class Standing</div>
+                    <div class="performance-label">Midterm Grade</div>
                     <?php if ($hasScores): ?>
-                        <div class="performance-value"><?php echo number_format($totalClassStanding, 1); ?>%</div>
-                        <div class="performance-label">of <?php echo $totalClassStandingPercentage; ?>%</div>
+                        <div class="performance-value"><?php echo number_format($gradeBreakdown['midterm']['total'], 1); ?>%</div>
+                        <div class="performance-label" style="margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-medium);">
+                            A:<?php echo number_format($gradeBreakdown['midterm']['attendance'], 1); ?>% + 
+                            CS:<?php echo number_format($gradeBreakdown['midterm']['class_standing'], 1); ?>% + 
+                            E:<?php echo number_format($gradeBreakdown['midterm']['exam'], 1); ?>%
+                        </div>
                     <?php else: ?>
                         <div class="performance-value" style="color: var(--text-light);">--</div>
-                        <div class="performance-label">No scores added</div>
+                        <div class="performance-label">No midterm scores</div>
                     <?php endif; ?>
                 </div>
                 
                 <div class="performance-card">
-                    <div class="performance-label">Exams</div>
+                    <div class="performance-label">Final Grade</div>
                     <?php if ($hasScores): ?>
-                        <div class="performance-value"><?php echo number_format($midtermScore + $finalScore, 1); ?>%</div>
-                        <div class="performance-label">of 40%</div>
+                        <div class="performance-value"><?php echo number_format($gradeBreakdown['final']['total'], 1); ?>%</div>
+                        <div class="performance-label" style="margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-medium);">
+                            A:<?php echo number_format($gradeBreakdown['final']['attendance'], 1); ?>% + 
+                            CS:<?php echo number_format($gradeBreakdown['final']['class_standing'], 1); ?>% + 
+                            E:<?php echo number_format($gradeBreakdown['final']['exam'], 1); ?>%
+                        </div>
                     <?php else: ?>
                         <div class="performance-value" style="color: var(--text-light);">--</div>
-                        <div class="performance-label">No exam scores</div>
+                        <div class="performance-label">No final scores</div>
                     <?php endif; ?>
                 </div>
             </div>
         </div>
 
-        <!-- Class Standing Categories Section -->
         <div class="category-section">
             <div class="section-header">
                 <div class="section-title">
@@ -1732,18 +1770,25 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
         <div class="standings-section">
             <div class="section-title">
                 <i class="fas fa-layer-group"></i>
-                Major Exams
+                Major Exams (40% each)
             </div>
             <br>
             <div class="management-grid">
                 <!-- Midterm Exam -->
                 <div class="management-card major-exam-card" onclick="openExamModal('midterm_exam')">
                     <h3>MIDTERM EXAM</h3>
-                    <div class="major-exam-badge">20%</div>
+                    <div class="major-exam-badge">40%</div>
                     <?php if (!empty($midtermExam)): ?>
                         <?php 
                         $midterm = reset($midtermExam);
+                        $midtermPercentage = $midterm['max_score'] > 0 ? ($midterm['score_value'] / $midterm['max_score']) * 100 : 0;
                         ?>
+                        <div class="performance-value" style="font-size: 1.2rem; margin: 0.5rem 0;">
+                            <?php echo number_format($midtermPercentage, 1); ?>%
+                        </div>
+                        <div style="font-size: 0.8rem; color: var(--text-medium);">
+                            <?php echo $midterm['score_value']; ?>/<?php echo $midterm['max_score']; ?>
+                        </div>
                     <?php else: ?>
                         <p style="color: var(--text-light); margin-top: 0.5rem; font-size: 0.9rem;">
                             Click to add score
@@ -1754,11 +1799,18 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
                 <!-- Final Exam -->
                 <div class="management-card major-exam-card" onclick="openExamModal('final_exam')">
                     <h3>FINAL EXAM</h3>
-                    <div class="major-exam-badge">20%</div>
+                    <div class="major-exam-badge">40%</div>
                     <?php if (!empty($finalExam)): ?>
                         <?php 
                         $final = reset($finalExam);
+                        $finalPercentage = $final['max_score'] > 0 ? ($final['score_value'] / $final['max_score']) * 100 : 0;
                         ?>
+                        <div class="performance-value" style="font-size: 1.2rem; margin: 0.5rem 0;">
+                            <?php echo number_format($finalPercentage, 1); ?>%
+                        </div>
+                        <div style="font-size: 0.8rem; color: var(--text-medium);">
+                            <?php echo $final['score_value']; ?>/<?php echo $final['max_score']; ?>
+                        </div>
                     <?php else: ?>
                         <p style="color: var(--text-light); margin-top: 0.5rem; font-size: 0.9rem;">
                             Click to add score

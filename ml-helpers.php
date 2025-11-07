@@ -117,18 +117,16 @@ class EnhancedInterventionSystem {
             return 0;
         }
         
+        // New calculation: (Midterm 100% + Final 100%) / 2
+        // For ML purposes, we'll simulate this with available data
         $classAvg = !empty($classStandings) ? array_sum($classStandings) / count($classStandings) : 0;
         $examAvg = !empty($examScores) ? array_sum($examScores) / count($examScores) : 0;
         
-        // If only one type of score exists, use it directly
-        if (empty($classStandings)) {
-            return round($examAvg, 1);
-        }
-        if (empty($examScores)) {
-            return round($classAvg, 1);
-        }
+        // Simulate midterm and final grades
+        $midtermGrade = ($classAvg * 0.6) + ($examAvg * 0.4); // 60% class standing + 40% exam
+        $finalGrade = ($classAvg * 0.6) + ($examAvg * 0.4);   // Same calculation for final
         
-        $overallGrade = ($classAvg * 0.6) + ($examAvg * 0.4);
+        $overallGrade = ($midtermGrade + $finalGrade) / 2;
         return round(max(0, min(100, $overallGrade)), 1);
     }
     
