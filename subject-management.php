@@ -72,7 +72,7 @@ $totalClassStandingPercentage = 0;
 foreach ($categories as $category) {
     $totalClassStandingPercentage += floatval($category['category_percentage']);
 }
-$remainingAllocation = 60 - $totalClassStandingPercentage; // Changed from 60 to 60
+$remainingAllocation = 60 - $totalClassStandingPercentage;
 $canAddCategory = ($remainingAllocation > 0);
 
 try {
@@ -108,33 +108,19 @@ $finalExam = array_filter($allScores, function($score) {
     return $score['score_type'] === 'final_exam';
 });
 
-// Initialize ML insights variables
+// Initialize variables for grade calculation
 $hasScores = !empty($classStandings) || !empty($midtermExam) || !empty($finalExam);
-$totalClassStanding = 0;
-$midtermScore = 0;
-$finalScore = 0;
 $overallGrade = 0;
 $gwa = 0;
-$riskLevel = 'no-data';
-$riskDescription = 'No Data Inputted';
-$interventionNeeded = false;
+$midtermGrade = 0;
+$finalGrade = 0;
 $behavioralInsights = [];
 $interventions = [];
 $recommendations = [];
 
-// Calculate grades and generate insights
+// CORRECTED GRADE CALCULATION
 if ($hasScores) {
-    // MIDTERM CALCULATION
-    $midtermAttendance = 0;
-    $midtermClassStanding = 0;
-    $midtermExamScore = 0;
-    
-    // FINAL CALCULATION  
-    $finalAttendance = 0;
-    $finalClassStanding = 0;
-    $finalExamScore = 0;
-
-    // CLASS STANDING CALCULATION (for both midterm and final)
+    // CLASS STANDING CALCULATION (60% for both midterm and final)
     $categoryTotals = [];
     foreach ($categories as $category) {
         $categoryTotals[$category['id']] = [
@@ -187,33 +173,33 @@ if ($hasScores) {
         }
     }
 
-    // MIDTERM EXAM CALCULATION
+    // MIDTERM EXAM CALCULATION (raw percentage)
+    $midtermExamScore = 0;
     if (!empty($midtermExam)) {
         $midterm = reset($midtermExam);
         if ($midterm['max_score'] > 0) {
-            $midtermExamPercentage = ($midterm['score_value'] / $midterm['max_score']) * 100;
-            $midtermExamScore = ($midtermExamPercentage * 40) / 100; // 40% of midterm
+            $midtermExamScore = ($midterm['score_value'] / $midterm['max_score']) * 100;
         }
     }
 
-    // FINAL EXAM CALCULATION
+    // FINAL EXAM CALCULATION (raw percentage)
+    $finalExamScore = 0;
     if (!empty($finalExam)) {
         $final = reset($finalExam);
         if ($final['max_score'] > 0) {
-            $finalExamPercentage = ($final['score_value'] / $final['max_score']) * 100;
-            $finalExamScore = ($finalExamPercentage * 40) / 100; // 40% of final
+            $finalExamScore = ($final['score_value'] / $final['max_score']) * 100;
         }
     }
 
-    // Calculate Midterm Grade (100%)
-    $midtermGrade = $attendanceScore + $pureClassStanding + $midtermExamScore;
+    // CORRECTED: Calculate Midterm Grade (60% class standing + 40% midterm exam)
+    $midtermGrade = ($pureClassStanding * 0.6) + ($midtermExamScore * 0.4);
     if ($midtermGrade > 100) $midtermGrade = 100;
 
-    // Calculate Final Grade (100%)  
-    $finalGrade = $attendanceScore + $pureClassStanding + $finalExamScore;
+    // CORRECTED: Calculate Final Grade (60% class standing + 40% final exam)
+    $finalGrade = ($pureClassStanding * 0.6) + ($finalExamScore * 0.4);
     if ($finalGrade > 100) $finalGrade = 100;
 
-    // Calculate Overall Subject Grade
+    // CORRECTED: Calculate Overall Subject Grade (Midterm + Final) / 2
     $overallGrade = ($midtermGrade + $finalGrade) / 2;
 
     // GWA CALCULATION
@@ -242,19 +228,18 @@ if ($hasScores) {
     // Store breakdown for display
     $gradeBreakdown = [
         'midterm' => [
-            'attendance' => $attendanceScore,
-            'class_standing' => $pureClassStanding,
-            'exam' => $midtermExamScore,
+            'class_standing' => $pureClassStanding * 0.6,
+            'exam' => $midtermExamScore * 0.4,
             'total' => $midtermGrade
         ],
         'final' => [
-            'attendance' => $attendanceScore,
-            'class_standing' => $pureClassStanding,
-            'exam' => $finalExamScore,
+            'class_standing' => $pureClassStanding * 0.6,
+            'exam' => $finalExamScore * 0.4,
             'total' => $finalGrade
         ]
     ];
 
+    // Generate insights
     $behavioralInsights = InterventionSystem::getBehavioralInsights($student['id'], $subject_id, $overallGrade, 'general');
     $interventions = InterventionSystem::getInterventions($student['id'], $subject_id, 'general');
     $recommendations = InterventionSystem::getRecommendations($student['id'], $subject_id, $overallGrade, 'general');    
@@ -266,11 +251,10 @@ if ($hasScores) {
     $midtermGrade = 0;
     $finalGrade = 0;
     $gradeBreakdown = [
-        'midterm' => ['attendance' => 0, 'class_standing' => 0, 'exam' => 0, 'total' => 0],
-        'final' => ['attendance' => 0, 'class_standing' => 0, 'exam' => 0, 'total' => 0]
+        'midterm' => ['class_standing' => 0, 'exam' => 0, 'total' => 0],
+        'final' => ['class_standing' => 0, 'exam' => 0, 'total' => 0]
     ];
     
-    // Provide basic insights even without scores
     $behavioralInsights = [[
         'message' => 'Start adding your scores to get personalized behavioral insights and recommendations.',
         'priority' => 'low',
@@ -568,9 +552,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 }
-
-// Check if we should auto-show insights
-$autoShowInsights = isset($_GET['show_insights']) || $success_message;
 ?>
 <!DOCTYPE html>
 <html lang="en">

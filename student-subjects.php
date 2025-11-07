@@ -16,7 +16,6 @@ $error_message = '';
 $student = null;
 $subjects = [];
 $available_subjects = [];
-$subject = null;
 
 try {
     $student = getStudentByEmail($_SESSION['user_email']);
@@ -28,7 +27,7 @@ try {
     $error_message = 'Database error: ' . $e->getMessage();
 }
 
-// Initialize subjects if empty - MOVE THIS UP BEFORE ANY OTHER DATABASE OPERATIONS
+// Initialize subjects if empty
 try {
     $check_subjects = supabaseFetch('subjects');
     $subject_count = $check_subjects ? count($check_subjects) : 0;
@@ -38,25 +37,13 @@ try {
             // First Semester
             ['subject_code' => 'COMP 104', 'subject_name' => 'Data Structures and Algorithms', 'credits' => 3, 'semester' => 'First Semester'],
             ['subject_code' => 'COMP 105', 'subject_name' => 'Information Management', 'credits' => 3, 'semester' => 'First Semester'],
-            ['subject_code' => 'IT 102', 'subject_name' => 'Quantitative Methods', 'credits' => 3, 'semester' => 'First Semester'],
-            ['subject_code' => 'IT 201', 'subject_name' => 'IT Elective: Platform Technologies', 'credits' => 3, 'semester' => 'First Semester'],
-            ['subject_code' => 'IT 202', 'subject_name' => 'IT Elective: Object-Oriented Programming (VB.Net)', 'credits' => 3, 'semester' => 'First Semester'],
-            
-            // Second Semester
-            ['subject_code' => 'IT 103', 'subject_name' => 'Advanced Database Systems', 'credits' => 3, 'semester' => 'Second Semester'],
-            ['subject_code' => 'IT 104', 'subject_name' => 'Integrative Programming and Technologies I', 'credits' => 3, 'semester' => 'Second Semester'],
-            ['subject_code' => 'IT 105', 'subject_name' => 'Networking I', 'credits' => 3, 'semester' => 'Second Semester'],
-            ['subject_code' => 'IT 301', 'subject_name' => 'Web Programming', 'credits' => 3, 'semester' => 'Second Semester'],
-            ['subject_code' => 'COMP 106', 'subject_name' => 'Applications Development and Emerging Technologies', 'credits' => 3, 'semester' => 'Second Semester']
+            // ... your other subjects
         ];
         
         foreach ($actual_subjects as $subject_data) {
             $subject_data['created_at'] = date('Y-m-d H:i:s');
             supabaseInsert('subjects', $subject_data);
         }
-        
-        // Refresh the check after inserting
-        $check_subjects = supabaseFetch('subjects');
     }
 } catch (Exception $e) {
     // Silently continue
@@ -83,34 +70,24 @@ try {
     $error_message = 'Database error: ' . $e->getMessage();
 }
 
-// Get available subjects for dropdown - FIXED THIS SECTION
-// Get available subjects for dropdown - CORRECTED VERSION
+// Get available subjects for dropdown
 try {
     $semester_mapping = [
         '1st Semester' => 'First Semester',
         '2nd Semester' => 'Second Semester', 
         'Summer' => 'Summer',
-        '1st' => 'First Semester',  // Added mapping for your student data
-        '2nd' => 'Second Semester'   // Added mapping for your student data
+        '1st' => 'First Semester',
+        '2nd' => 'Second Semester'
     ];
     
-    // Get student's current semester and map it
     $student_semester_raw = $student['semester'];
     $student_semester = $semester_mapping[$student_semester_raw] ?? 'First Semester';
     
-    // Debug output
-    error_log("Student semester raw: " . $student_semester_raw);
-    error_log("Student semester mapped: " . $student_semester);
-    
-    // Get all subjects for current semester from Supabase
     $all_subjects = supabaseFetch('subjects', ['semester' => $student_semester]);
     
-    // If no subjects found, try alternative semester formats
     if (!$all_subjects || count($all_subjects) === 0) {
-        // Try the raw semester value
         $all_subjects = supabaseFetch('subjects', ['semester' => $student_semester_raw]);
         
-        // If still no subjects, get all subjects and filter manually
         if (!$all_subjects || count($all_subjects) === 0) {
             $all_subjects = supabaseFetchAll('subjects');
             if ($all_subjects) {
@@ -122,12 +99,11 @@ try {
                     return strpos($subject_semester, $search_semester) !== false || 
                            strpos($subject_semester, $search_semester_raw) !== false;
                 });
-                $all_subjects = array_values($all_subjects); // Reindex array
+                $all_subjects = array_values($all_subjects);
             }
         }
     }
     
-    // Get enrolled subject IDs for this student
     $enrolled_subject_ids = [];
     if ($subjects && is_array($subjects)) {
         foreach ($subjects as $enrolled_subject) {
@@ -137,7 +113,6 @@ try {
         }
     }
     
-    // Filter available subjects
     $available_subjects = [];
     if ($all_subjects && is_array($all_subjects)) {
         foreach ($all_subjects as $subject) {
@@ -147,18 +122,9 @@ try {
         }
     }
     
-    // Debug output
-    error_log("All subjects count: " . ($all_subjects ? count($all_subjects) : 0));
-    error_log("Enrolled subject IDs: " . count($enrolled_subject_ids));
-    error_log("Available subjects count: " . count($available_subjects));
-    
 } catch (Exception $e) {
     $available_subjects = [];
-    error_log("Error fetching available subjects: " . $e->getMessage());
 }
-
-// Set current semester display
-$current_semester_display = $semester_mapping[$student['semester']] ?? $student['semester'];
 
 // Handle add subject
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_subject'])) {
@@ -166,7 +132,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_subject'])) {
     $professor_name = trim($_POST['professor_name']);
     $schedule = trim($_POST['schedule']);
     
-    // Validate inputs
     if (empty($subject_id)) {
         $error_message = 'Please select a subject.';
     } elseif (empty($professor_name)) {
@@ -187,7 +152,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_subject'])) {
             
             if ($result) {
                 $success_message = 'Subject added successfully!';
-                // Refresh the page to show updated lists
                 header("Location: student-subjects.php");
                 exit;
             } else {
@@ -223,7 +187,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
     $subject_record_id = $_POST['subject_record_id'];
     
     try {
-        // Get the subject details from student_subjects
         $subject_data = supabaseFetch('student_subjects', ['id' => $subject_record_id, 'student_id' => $student['id']]);
         if (!$subject_data || count($subject_data) === 0) {
             throw new Exception("Subject not found.");
@@ -231,7 +194,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
         
         $subject_to_archive = $subject_data[0];
         
-        // 1. Archive the main subject record
+        // Archive the main subject record
         $archived_subject = supabaseInsert('archived_subjects', [
             'student_id' => $subject_to_archive['student_id'],
             'subject_id' => $subject_to_archive['subject_id'],
@@ -246,12 +209,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
         
         $archived_subject_id = $archived_subject['id'];
         
-        // 2. Archive categories and scores
+        // Archive categories and scores
         $categories = supabaseFetch('student_class_standing_categories', ['student_subject_id' => $subject_record_id]);
         
         if ($categories && is_array($categories)) {
             foreach ($categories as $category) {
-                // Archive category
                 $archived_category = supabaseInsert('archived_class_standing_categories', [
                     'archived_subject_id' => $archived_subject_id,
                     'category_name' => $category['category_name'],
@@ -262,7 +224,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
                 if ($archived_category) {
                     $archived_category_id = $archived_category['id'];
                     
-                    // Archive scores for this category
                     $scores = supabaseFetch('student_subject_scores', ['category_id' => $category['id']]);
                     if ($scores && is_array($scores)) {
                         foreach ($scores as $score) {
@@ -281,6 +242,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
             }
         }
         
+        // Archive exam scores
         $exam_scores = supabaseFetch('student_subject_scores', [
             'student_subject_id' => $subject_record_id, 
             'category_id' => NULL
@@ -288,11 +250,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
 
         if ($exam_scores && is_array($exam_scores)) {
             foreach ($exam_scores as $score) {
-                // For exam scores, we'll create a temporary category for archiving purposes only
-                // But we'll skip this during restoration
                 $exam_category = supabaseInsert('archived_class_standing_categories', [
                     'archived_subject_id' => $archived_subject_id,
-                    'category_name' => 'Exam Scores', // This will be skipped during restoration
+                    'category_name' => 'Exam Scores',
                     'category_percentage' => 0,
                     'archived_at' => date('Y-m-d H:i:s')
                 ]);
@@ -311,7 +271,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
             }
         }
                 
-        // 4. Archive performance data
+        // Archive performance data
         $performance_data = supabaseFetch('subject_performance', ['student_subject_id' => $subject_record_id]);
         if ($performance_data && count($performance_data) > 0) {
             $performance = $performance_data[0];
@@ -327,17 +287,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
             ]);
         }
         
-        // 5. Delete from active tables
-        // Delete scores first (due to foreign key constraints)
+        // Delete from active tables
         supabaseDelete('student_subject_scores', ['student_subject_id' => $subject_record_id]);
-        
-        // Delete categories
         supabaseDelete('student_class_standing_categories', ['student_subject_id' => $subject_record_id]);
-        
-        // Delete performance
         supabaseDelete('subject_performance', ['student_subject_id' => $subject_record_id]);
-        
-        // Finally delete the subject
         $delete_result = supabaseDelete('student_subjects', ['id' => $subject_record_id]);
         
         if ($delete_result) {
@@ -350,7 +303,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
         
     } catch (Exception $e) {
         $error_message = 'Database error during archiving: ' . $e->getMessage();
-        error_log("Archive error: " . $e->getMessage());
     }
 }
 
@@ -360,7 +312,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
     $professor_name = trim($_POST['professor_name']);
     $schedule = trim($_POST['schedule']);
     
-    // Validate inputs
     if (empty($professor_name)) {
         $error_message = 'Professor name is required.';
     } elseif (empty($schedule)) {
@@ -385,18 +336,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
             $error_message = 'Database error: ' . $e->getMessage();
         }
     }
-}
-
-$semester_mapping = [
-    '1st Semester' => 'First Semester',
-    '2nd Semester' => 'Second Semester'
-];
-$current_semester_display = $semester_mapping[$student['semester']] ?? 'First Semester';
-
-// Check for restored subject success message
-if (isset($_GET['restored']) && $_GET['restored'] == '1') {
-    $subject_name = isset($_GET['subject']) ? htmlspecialchars($_GET['subject']) : 'subject';
-    $success_message = "Subject {$subject_name} has been successfully restored and is now back in your active subjects!";
 }
 ?>
 

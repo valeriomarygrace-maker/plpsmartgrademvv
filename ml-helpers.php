@@ -89,84 +89,6 @@ class MLService {
 }
 
 /**
- * Enhanced Intervention System with ML Support
- */
-class EnhancedInterventionSystem {
-    
-    public static function getEnhancedInsights($studentId, $subjectId, $classStandings, $examScores, $attendanceRecords, $subjectName) {
-        // Always use PHP fallback for now to ensure data displays
-        $calculatedGrade = self::calculateOverallGrade($classStandings, $examScores);
-        $gwa = self::calculateGWA($calculatedGrade);
-        $gwaPrediction = self::calculateGWAPrediction($gwa);
-        
-        $baseInsights = [
-            'behavioral_insights' => InterventionSystem::getBehavioralInsights($studentId, $subjectId, $calculatedGrade, $gwaPrediction),
-            'interventions' => InterventionSystem::getInterventions($studentId, $subjectId, $gwaPrediction),
-            'recommendations' => InterventionSystem::getRecommendations($studentId, $subjectId, $calculatedGrade, $gwaPrediction),
-            'gwa_prediction' => $gwaPrediction,
-            'current_gwa' => $gwa,
-            'overall_grade' => $calculatedGrade,
-            'source' => 'php_fallback'
-        ];
-        
-        return $baseInsights;
-    }
-    
-    private static function calculateOverallGrade($classStandings, $examScores) {
-        if (empty($classStandings) && empty($examScores)) {
-            return 0;
-        }
-        
-        // New calculation: (Midterm 100% + Final 100%) / 2
-        // For ML purposes, we'll simulate this with available data
-        $classAvg = !empty($classStandings) ? array_sum($classStandings) / count($classStandings) : 0;
-        $examAvg = !empty($examScores) ? array_sum($examScores) / count($examScores) : 0;
-        
-        // Simulate midterm and final grades
-        $midtermGrade = ($classAvg * 0.6) + ($examAvg * 0.4); // 60% class standing + 40% exam
-        $finalGrade = ($classAvg * 0.6) + ($examAvg * 0.4);   // Same calculation for final
-        
-        $overallGrade = ($midtermGrade + $finalGrade) / 2;
-        return round(max(0, min(100, $overallGrade)), 1);
-    }
-    
-    private static function calculateGWA($grade) {
-        if ($grade >= 90) return 1.00;
-        elseif ($grade >= 85) return 1.25;
-        elseif ($grade >= 80) return 1.50;
-        elseif ($grade >= 75) return 1.75;
-        elseif ($grade >= 70) return 2.00;
-        elseif ($grade >= 65) return 2.25;
-        elseif ($grade >= 60) return 2.50;
-        elseif ($grade >= 55) return 2.75;
-        elseif ($grade >= 50) return 3.00;
-        else return 5.00;
-    }
-    
-    private static function calculateGWAPrediction($gwa) {
-        if ($gwa <= 1.75) {
-            return [
-                'range' => '1.00 - 1.75',
-                'description' => 'Excellent Performance',
-                'level' => 'excellent'
-            ];
-        } elseif ($gwa <= 2.50) {
-            return [
-                'range' => '1.76 - 2.50',
-                'description' => 'Good Performance',
-                'level' => 'good'
-            ];
-        } else {
-            return [
-                'range' => '2.51 - 3.00+',
-                'description' => 'Needs Improvement',
-                'level' => 'needs_improvement'
-            ];
-        }
-    }
-}
-
-/**
  * Intervention System - ENHANCED FOR GWA
  */
 class InterventionSystem {
@@ -193,7 +115,6 @@ class InterventionSystem {
         
         // ALWAYS RETURN INSIGHTS - EVEN WITH NO SCORES
         if ($currentGrade == 0) {
-            // No scores yet - encouraging messages
             $insights[] = [
                 'message' => 'Welcome! Start adding your scores to get personalized behavioral insights and track your academic progress.',
                 'priority' => 'low',
