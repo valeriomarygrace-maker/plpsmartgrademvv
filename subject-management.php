@@ -192,7 +192,7 @@ if ($hasScores) {
         $totalClassStanding = 60;
     }
 
-    // MAJOR EXAM CALCULATION
+    // MAJOR EXAM CALCULATION - CORRECTED FOR TERM-BASED CALCULATION
     $midtermScore = 0;
     $finalScore = 0;
 
@@ -200,7 +200,7 @@ if ($hasScores) {
         $midterm = reset($midtermExam);
         if ($midterm['max_score'] > 0) {
             $midtermPercentage = ($midterm['score_value'] / $midterm['max_score']) * 100;
-            $midtermScore = ($midtermPercentage * 20) / 100;
+            $midtermScore = ($midtermPercentage * 40) / 100; // CHANGED FROM 20% TO 40%
         }
     }
 
@@ -208,16 +208,27 @@ if ($hasScores) {
         $final = reset($finalExam);
         if ($final['max_score'] > 0) {
             $finalPercentage = ($final['score_value'] / $final['max_score']) * 100;
-            $finalScore = ($finalPercentage * 20) / 100;
+            $finalScore = ($finalPercentage * 40) / 100; // CHANGED FROM 20% TO 40%
         }
     }
 
-    $totalExamScore = $midtermScore + $finalScore;
+    // Calculate total based on current term
+    if ($term === 'midterm') {
+        $totalExamScore = $midtermScore;
+    } else {
+        $totalExamScore = $finalScore;
+    }
+
     if ($totalExamScore > 40) {
         $totalExamScore = 40;
     }
 
-    $overallGrade = $totalClassStanding + $totalExamScore;
+    // Calculate overall grade based on term
+    if ($term === 'midterm') {
+        $overallGrade = $totalClassStanding + $midtermScore;
+    } else {
+        $overallGrade = $totalClassStanding + $finalScore;
+    }
 
     if ($overallGrade > 100) {
         $overallGrade = 100;
@@ -1622,9 +1633,19 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
                 </div>
                 
                 <div class="performance-card">
-                    <div class="performance-label">Exams</div>
+                    <div class="performance-label">
+                        <?php echo ucfirst($term); ?> Exam
+                    </div>
                     <?php if ($hasScores): ?>
-                        <div class="performance-value"><?php echo number_format($midtermScore + $finalScore, 1); ?>%</div>
+                        <div class="performance-value">
+                            <?php 
+                            if ($term === 'midterm') {
+                                echo number_format($midtermScore, 1);
+                            } else {
+                                echo number_format($finalScore, 1);
+                            }
+                            ?>%
+                        </div>
                         <div class="performance-label">of 40%</div>
                     <?php else: ?>
                         <div class="performance-value" style="color: var(--text-light);">--</div>
@@ -1777,7 +1798,7 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
                 <!-- Midterm Exam -->
                 <div class="management-card major-exam-card" onclick="openExamModal('midterm_exam')">
                     <h3>MIDTERM EXAM</h3>
-                    <div class="major-exam-badge">20%</div>
+                    <div class="major-exam-badge">40%</div>
                     <?php if (!empty($midtermExam)): ?>
                         <?php 
                         $midterm = reset($midtermExam);
@@ -1792,7 +1813,7 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
                 <!-- Final Exam -->
                 <div class="management-card major-exam-card" onclick="openExamModal('final_exam')">
                     <h3>FINAL EXAM</h3>
-                    <div class="major-exam-badge">20%</div>
+                    <div class="major-exam-badge">40%</div>
                     <?php if (!empty($finalExam)): ?>
                         <?php 
                         $final = reset($finalExam);
