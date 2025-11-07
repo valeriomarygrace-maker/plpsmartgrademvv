@@ -50,6 +50,201 @@ try {
     header('Location: student-subjects.php');
     exit;
 }
+
+// Calculate grades for both terms
+$midtermGrade = 0;
+$finalGrade = 0;
+$subjectGrade = 0;
+
+try {
+    // Get all scores for this subject
+    $allScores = supabaseFetch('student_subject_scores', ['student_subject_id' => $subject_id]);
+    if (!$allScores) $allScores = [];
+    
+    // Get midterm categories and scores
+    $midtermCategories = supabaseFetch('student_class_standing_categories', [
+        'student_subject_id' => $subject_id,
+        'term_type' => 'midterm'
+    ]);
+    
+    // Get final categories and scores
+    $finalCategories = supabaseFetch('student_class_standing_categories', [
+        'student_subject_id' => $subject_id,
+        'term_type' => 'final'
+    ]);
+    
+    // Calculate Midterm Grade
+    if ($midtermCategories) {
+        $midtermClassStandings = array_filter($allScores, function($score) {
+            if ($score['score_type'] !== 'class_standing') return false;
+            if (!$score['category_id']) return false;
+            
+            $category_data = supabaseFetch('student_class_standing_categories', ['id' => $score['category_id']]);
+            if ($category_data && count($category_data) > 0) {
+                return $category_data[0]['term_type'] === 'midterm';
+            }
+            return false;
+        });
+        
+        // Calculate midterm class standing
+        $midtermClassStandingTotal = 0;
+        $midtermCategoryTotals = [];
+        
+        foreach ($midtermCategories as $category) {
+            $midtermCategoryTotals[$category['id']] = [
+                'percentage' => $category['category_percentage'],
+                'total_score' => 0,
+                'max_possible' => 0
+            ];
+        }
+        
+        foreach ($midtermClassStandings as $standing) {
+            if ($standing['category_id'] && isset($midtermCategoryTotals[$standing['category_id']])) {
+                $categoryId = $standing['category_id'];
+                $categoryName = $midtermCategories[array_search($categoryId, array_column($midtermCategories, 'id'))]['category_name'];
+                
+                if (strtolower($categoryName) === 'attendance') {
+                    $scoreValue = ($standing['score_name'] === 'Present') ? 1 : 0;
+                    $midtermCategoryTotals[$categoryId]['total_score'] += $scoreValue;
+                    $midtermCategoryTotals[$categoryId]['max_possible'] += 1;
+                } else {
+                    $midtermCategoryTotals[$categoryId]['total_score'] += $standing['score_value'];
+                    $midtermCategoryTotals[$categoryId]['max_possible'] += $standing['max_score'];
+                }
+            }
+        }
+        
+        foreach ($midtermCategoryTotals as $categoryId => $category) {
+            if ($category['max_possible'] > 0) {
+                $percentageScore = ($category['total_score'] / $category['max_possible']) * 100;
+                $weightedScore = ($percentageScore * $category['percentage']) / 100;
+                $midtermClassStandingTotal += $weightedScore;
+            }
+        }
+        
+        if ($midtermClassStandingTotal > 60) {
+            $midtermClassStandingTotal = 60;
+        }
+        
+        // Calculate midterm exam score
+        $midtermExam = array_filter($allScores, function($score) {
+            return $score['score_type'] === 'midterm_exam';
+        });
+        
+        $midtermExamScore = 0;
+        if (!empty($midtermExam)) {
+            $midterm = reset($midtermExam);
+            if ($midterm['max_score'] > 0) {
+                $midtermPercentage = ($midterm['score_value'] / $midterm['max_score']) * 100;
+                $midtermExamScore = ($midtermPercentage * 40) / 100;
+            }
+        }
+        
+        $midtermGrade = $midtermClassStandingTotal + $midtermExamScore;
+        if ($midtermGrade > 100) {
+            $midtermGrade = 100;
+        }
+    }
+    
+    // Calculate Final Grade
+    if ($finalCategories) {
+        $finalClassStandings = array_filter($allScores, function($score) {
+            if ($score['score_type'] !== 'class_standing') return false;
+            if (!$score['category_id']) return false;
+            
+            $category_data = supabaseFetch('student_class_standing_categories', ['id' => $score['category_id']]);
+            if ($category_data && count($category_data) > 0) {
+                return $category_data[0]['term_type'] === 'final';
+            }
+            return false;
+        });
+        
+        // Calculate final class standing
+        $finalClassStandingTotal = 0;
+        $finalCategoryTotals = [];
+        
+        foreach ($finalCategories as $category) {
+            $finalCategoryTotals[$category['id']] = [
+                'percentage' => $category['category_percentage'],
+                'total_score' => 0,
+                'max_possible' => 0
+            ];
+        }
+        
+        foreach ($finalClassStandings as $standing) {
+            if ($standing['category_id'] && isset($finalCategoryTotals[$standing['category_id']])) {
+                $categoryId = $standing['category_id'];
+                $categoryName = $finalCategories[array_search($categoryId, array_column($finalCategories, 'id'))]['category_name'];
+                
+                if (strtolower($categoryName) === 'attendance') {
+                    $scoreValue = ($standing['score_name'] === 'Present') ? 1 : 0;
+                    $finalCategoryTotals[$categoryId]['total_score'] += $scoreValue;
+                    $finalCategoryTotals[$categoryId]['max_possible'] += 1;
+                } else {
+                    $finalCategoryTotals[$categoryId]['total_score'] += $standing['score_value'];
+                    $finalCategoryTotals[$categoryId]['max_possible'] += $standing['max_score'];
+                }
+            }
+        }
+        
+        foreach ($finalCategoryTotals as $categoryId => $category) {
+            if ($category['max_possible'] > 0) {
+                $percentageScore = ($category['total_score'] / $category['max_possible']) * 100;
+                $weightedScore = ($percentageScore * $category['percentage']) / 100;
+                $finalClassStandingTotal += $weightedScore;
+            }
+        }
+        
+        if ($finalClassStandingTotal > 60) {
+            $finalClassStandingTotal = 60;
+        }
+        
+        // Calculate final exam score
+        $finalExam = array_filter($allScores, function($score) {
+            return $score['score_type'] === 'final_exam';
+        });
+        
+        $finalExamScore = 0;
+        if (!empty($finalExam)) {
+            $final = reset($finalExam);
+            if ($final['max_score'] > 0) {
+                $finalPercentage = ($final['score_value'] / $final['max_score']) * 100;
+                $finalExamScore = ($finalPercentage * 40) / 100;
+            }
+        }
+        
+        $finalGrade = $finalClassStandingTotal + $finalExamScore;
+        if ($finalGrade > 100) {
+            $finalGrade = 100;
+        }
+    }
+    
+    // Calculate Subject Grade (average of midterm and final)
+    if ($midtermGrade > 0 && $finalGrade > 0) {
+        $subjectGrade = ($midtermGrade + $finalGrade) / 2;
+    } elseif ($midtermGrade > 0) {
+        $subjectGrade = $midtermGrade;
+    } elseif ($finalGrade > 0) {
+        $subjectGrade = $finalGrade;
+    }
+    
+    if ($subjectGrade > 100) {
+        $subjectGrade = 100;
+    }
+    
+} catch (Exception $e) {
+    // If there's an error calculating grades, they will remain 0
+}
+
+// Get grade description
+function getGradeDescription($grade) {
+    if ($grade >= 90) return 'Excellent';
+    elseif ($grade >= 85) return 'Very Good';
+    elseif ($grade >= 80) return 'Good';
+    elseif ($grade >= 75) return 'Satisfactory';
+    elseif ($grade >= 70) return 'Passing';
+    else return 'Needs Improvement';
+}
 ?>
 
 <!DOCTYPE html>
@@ -286,6 +481,58 @@ try {
             margin-bottom: 2rem;
         }
 
+        .overview-section {
+            margin-bottom: 2rem;
+        }
+
+        .overview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .overview-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            text-align: center;
+            border-left: 4px solid var(--plp-green);
+        }
+
+        .overview-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--plp-green);
+            margin-bottom: 0.5rem;
+        }
+
+        .overview-label {
+            font-size: 0.9rem;
+            color: var(--text-medium);
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+        }
+
+        .overview-description {
+            font-size: 0.8rem;
+            color: var(--text-light);
+            margin-top: 0.5rem;
+        }
+
+        .subject-grade-card {
+            background: var(--plp-green-gradient);
+            color: white;
+            border-left: 4px solid var(--plp-gold);
+        }
+
+        .subject-grade-card .overview-value,
+        .subject-grade-card .overview-label,
+        .subject-grade-card .overview-description {
+            color: white;
+        }
+
         .terms-container {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -313,11 +560,11 @@ try {
         }
 
         .term-card.midterm {
-            border-top: 4px solid var(--plp-green);
+            border-top: 4px solid #3b82f6;
         }
 
         .term-card.final {
-            border-top: 4px solid var(--plp-green);
+            border-top: 4px solid #ef4444;
         }
 
         .term-icon {
@@ -331,6 +578,19 @@ try {
             font-weight: 700;
             margin-bottom: 0.5rem;
             color: var(--text-dark);
+        }
+
+        .term-grade {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin: 1rem 0;
+            color: var(--plp-green);
+        }
+
+        .term-grade-description {
+            font-size: 0.9rem;
+            color: var(--text-medium);
+            margin-bottom: 1.5rem;
         }
 
         .term-stats {
@@ -358,6 +618,32 @@ try {
             color: var(--text-medium);
         }
 
+        .manage-btn {
+            background: var(--plp-green-gradient);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 50px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            font-family: 'Poppins', sans-serif;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+        }
+
+        .manage-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 99, 65, 0.4);
+        }
+
+        .no-data {
+            color: var(--text-light);
+            font-style: italic;
+        }
+
         @media (max-width: 768px) {
             body {
                 flex-direction: column;
@@ -381,6 +667,10 @@ try {
             }
             
             .terms-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .overview-grid {
                 grid-template-columns: 1fr;
             }
         }
@@ -445,12 +735,54 @@ try {
                 <div class="subject-name"><?php echo htmlspecialchars($subject['subject_code'] . ' - ' . $subject['subject_name']); ?></div>
                 <div style="width: 100px;"></div> 
                 <a href="student-subjects.php" class="back-btn">
-                Back
+                    <i class="fas fa-arrow-left"></i>
+                    Back to Subjects
                 </a>
             </div>
         </div>
 
         <div class="card">
+            <!-- Overview Section -->
+            <div class="overview-section">
+                <div class="overview-grid">
+                    <div class="overview-card subject-grade-card">
+                        <div class="overview-label">SUBJECT GRADE</div>
+                        <div class="overview-value">
+                            <?php echo $subjectGrade > 0 ? number_format($subjectGrade, 1) . '%' : '--'; ?>
+                        </div>
+                        <div class="overview-description">
+                            <?php echo $subjectGrade > 0 ? getGradeDescription($subjectGrade) : 'No grades calculated'; ?>
+                        </div>
+                        <?php if ($subjectGrade > 0): ?>
+                            <div class="overview-description">
+                                (Midterm + Final) / 2
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                    
+                    <div class="overview-card">
+                        <div class="overview-label">MIDTERM GRADE</div>
+                        <div class="overview-value">
+                            <?php echo $midtermGrade > 0 ? number_format($midtermGrade, 1) . '%' : '--'; ?>
+                        </div>
+                        <div class="overview-description">
+                            <?php echo $midtermGrade > 0 ? getGradeDescription($midtermGrade) : 'No midterm data'; ?>
+                        </div>
+                    </div>
+                    
+                    <div class="overview-card">
+                        <div class="overview-label">FINAL GRADE</div>
+                        <div class="overview-value">
+                            <?php echo $finalGrade > 0 ? number_format($finalGrade, 1) . '%' : '--'; ?>
+                        </div>
+                        <div class="overview-description">
+                            <?php echo $finalGrade > 0 ? getGradeDescription($finalGrade) : 'No final data'; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Terms Section -->
             <div class="terms-container">
                 <!-- Midterm Card -->
                 <div class="term-card midterm" onclick="window.location.href='subject-management.php?subject_id=<?php echo $subject_id; ?>&term=midterm'">
@@ -458,16 +790,44 @@ try {
                         <i class="fas fa-balance-scale"></i>
                     </div>
                     <div class="term-title">MIDTERM</div>
-                    <div class="term-stats">
-                        <div class="stat-item">
-                            <div class="stat-value">60%</div>
-                            <div class="stat-label">Class Standing</div>
+                    
+                    <?php if ($midtermGrade > 0): ?>
+                        <div class="term-grade"><?php echo number_format($midtermGrade, 1); ?>%</div>
+                        <div class="term-grade-description">
+                            <?php echo getGradeDescription($midtermGrade); ?>
                         </div>
-                        <div class="stat-item">
-                            <div class="stat-value">40%</div>
-                            <div class="stat-label">Midterm Exam</div>
+                        
+                        <div class="term-stats">
+                            <div class="stat-item">
+                                <div class="stat-value">60%</div>
+                                <div class="stat-label">Class Standing</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">40%</div>
+                                <div class="stat-label">Midterm Exam</div>
+                            </div>
                         </div>
-                    </div>
+                    <?php else: ?>
+                        <div class="term-grade no-data">--</div>
+                        <div class="term-grade-description no-data">
+                            No midterm data available
+                        </div>
+                        
+                        <div class="term-stats">
+                            <div class="stat-item">
+                                <div class="stat-value">60%</div>
+                                <div class="stat-label">Class Standing</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">40%</div>
+                                <div class="stat-label">Midterm Exam</div>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+                    
+                    <button class="manage-btn" onclick="event.stopPropagation(); window.location.href='subject-management.php?subject_id=<?php echo $subject_id; ?>&term=midterm'">
+                        <i class="fas fa-cog"></i> Manage Midterm
+                    </button>
                 </div>
 
                 <!-- Final Card -->
@@ -475,17 +835,45 @@ try {
                     <div class="term-icon">
                         <i class="fas fa-graduation-cap"></i>
                     </div>
-                    <div class="term-title">FINAL</div>   
-                    <div class="term-stats">
-                        <div class="stat-item">
-                            <div class="stat-value">60%</div>
-                            <div class="stat-label">Class Standing</div>
+                    <div class="term-title">FINAL</div>
+                    
+                    <?php if ($finalGrade > 0): ?>
+                        <div class="term-grade"><?php echo number_format($finalGrade, 1); ?>%</div>
+                        <div class="term-grade-description">
+                            <?php echo getGradeDescription($finalGrade); ?>
                         </div>
-                        <div class="stat-item">
-                            <div class="stat-value">40%</div>
-                            <div class="stat-label">Final Exam</div>
+                        
+                        <div class="term-stats">
+                            <div class="stat-item">
+                                <div class="stat-value">60%</div>
+                                <div class="stat-label">Class Standing</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">40%</div>
+                                <div class="stat-label">Final Exam</div>
+                            </div>
                         </div>
-                    </div>
+                    <?php else: ?>
+                        <div class="term-grade no-data">--</div>
+                        <div class="term-grade-description no-data">
+                            No final data available
+                        </div>
+                        
+                        <div class="term-stats">
+                            <div class="stat-item">
+                                <div class="stat-value">60%</div>
+                                <div class="stat-label">Class Standing</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">40%</div>
+                                <div class="stat-label">Final Exam</div>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+                    
+                    <button class="manage-btn" onclick="event.stopPropagation(); window.location.href='subject-management.php?subject_id=<?php echo $subject_id; ?>&term=final'">
+                        <i class="fas fa-cog"></i> Manage Final
+                    </button>
                 </div>
             </div>
         </div>

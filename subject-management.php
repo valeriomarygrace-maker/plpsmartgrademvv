@@ -136,8 +136,6 @@ $totalClassStanding = 0;
 $midtermScore = 0;
 $finalScore = 0;
 $termGrade = 0;
-$overallGrade = 0;
-$gwa = 0;
 $riskLevel = 'no-data';
 $riskDescription = 'No Data Inputted';
 $interventionNeeded = false;
@@ -216,51 +214,21 @@ if ($hasScores) {
     // CALCULATE TERM GRADE FOR CURRENT TERM ONLY
     if ($term === 'midterm') {
         $termGrade = $totalClassStanding + $midtermScore;
-        $overallGrade = $termGrade; // For midterm, overall grade is just the midterm grade
     } else {
         $termGrade = $totalClassStanding + $finalScore;
-        $overallGrade = $termGrade; // For final, overall grade is just the final grade
     }
 
     if ($termGrade > 100) {
         $termGrade = 100;
     }
-    if ($overallGrade > 100) {
-        $overallGrade = 100;
-    }
 
-    // GWA CALCULATION based on current term grade
-    if ($overallGrade >= 90) {
-        $gwa = 1.00;
-    } elseif ($overallGrade >= 85) {
-        $gwa = 1.25;
-    } elseif ($overallGrade >= 80) {
-        $gwa = 1.50;
-    } elseif ($overallGrade >= 75) {
-        $gwa = 1.75;
-    } elseif ($overallGrade >= 70) {
-        $gwa = 2.00;
-    } elseif ($overallGrade >= 65) {
-        $gwa = 2.25;
-    } elseif ($overallGrade >= 60) {
-        $gwa = 2.50;
-    } elseif ($overallGrade >= 55) {
-        $gwa = 2.75;
-    } elseif ($overallGrade >= 50) {
-        $gwa = 3.00;
-    } else {
-        $gwa = 5.00;
-    }
-
-    $behavioralInsights = InterventionSystem::getBehavioralInsights($student['id'], $subject_id, $overallGrade, 'general');
+    $behavioralInsights = InterventionSystem::getBehavioralInsights($student['id'], $subject_id, $termGrade, 'general');
     $interventions = InterventionSystem::getInterventions($student['id'], $subject_id, 'general');
-    $recommendations = InterventionSystem::getRecommendations($student['id'], $subject_id, $overallGrade, 'general');    
+    $recommendations = InterventionSystem::getRecommendations($student['id'], $subject_id, $termGrade, 'general');    
 
 } else {
     // NO SCORES - SHOW ENCOURAGING MESSAGES
     $termGrade = 0;
-    $overallGrade = 0;
-    $gwa = 0;
     $totalClassStanding = 0;
     $midtermScore = 0;
     $finalScore = 0;
@@ -1616,7 +1584,7 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
             </div>
         </div>
 
-        <!-- Simplified Performance Overview -->
+        <!-- Simplified Performance Overview - REMOVED GWA -->
         <div class="performance-overview">
             <div class="performance-grid">
                 <div class="performance-card">
@@ -1638,30 +1606,6 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
                     <?php else: ?>
                         <div class="performance-value" style="color: var(--text-light);">--</div>
                         <div class="performance-label">No scores added</div>
-                    <?php endif; ?>
-                </div>
-                
-                <div class="performance-card">
-                    <div class="performance-label">GWA</div>
-                    <?php if ($hasScores): ?>
-                        <div class="performance-value"><?php echo number_format($gwa, 2); ?></div>
-                        <div class="performance-label" style="margin-top: 0.5rem; font-size: 0.9rem; color: var(--text-medium);">
-                            <?php 
-                            if ($gwa <= 1.75) {
-                                echo 'Low Risk';
-                                $riskBadgeClass = 'risk-badge low';
-                            } elseif ($gwa <= 2.50) {
-                                echo 'Medium Risk';
-                                $riskBadgeClass = 'risk-badge medium';
-                            } else {
-                                echo 'High Risk';
-                                $riskBadgeClass = 'risk-badge high';
-                            }
-                            ?>
-                        </div>
-                    <?php else: ?>
-                        <div class="performance-value" style="color: var(--text-light);">--</div>
-                        <div class="performance-label">No GWA calculated</div>
                     <?php endif; ?>
                 </div>
                 
