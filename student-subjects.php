@@ -889,6 +889,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
             display: flex;
             flex-direction: column;
             height: 100%;
+            cursor: pointer;
         }
 
         .subject-card:hover {
@@ -1255,62 +1256,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
                     </button>
                 </div>
             </div>
-                
-    <?php if (empty($subjects)): ?>
-        <div class="empty-state">
-            <i class="fas fa-book"></i>
-            <p>No subjects enrolled yet</p>
-            <small>Click "Add New Subject" to enroll in your first subject</small>
-        </div>
-    <?php else: ?>
-    <div class="subjects-grid">
-        <?php foreach ($subjects as $subject): ?>
-            <!-- ITO ANG BAGONG LINE NA NAGPAPUNTA SA TERMEVALUATION.PHP -->
-            <div class="subject-card" onclick="window.location.href='termevaluation.php?subject_id=<?php echo $subject['id']; ?>'">
-                <div class="subject-header">
-                    <div style="flex: 1;">
-                        <div class="subject-code"><?php echo htmlspecialchars($subject['subject_code']); ?></div>
-                        <div class="subject-name"><?php echo htmlspecialchars($subject['subject_name']); ?></div>
-                    </div>
-                    <div class="credits">
-                        <?php echo htmlspecialchars($subject['credits']); ?> CRDTS
-                    </div>
+            
+            <?php if (empty($subjects)): ?>
+                <div class="empty-state">
+                    <i class="fas fa-book"></i>
+                    <p>No subjects enrolled yet</p>
+                    <small>Click "Add New Subject" to enroll in your first subject</small>
                 </div>
-                
-                <div class="subject-info">
-                    <div class="info-item">
-                        <i class="fas fa-user-tie"></i>
-                        <span><strong>Professor:</strong> <?php echo htmlspecialchars($subject['professor_name']); ?></span>
-                    </div>
-                    <div class="info-item">
-                        <i class="fas fa-calendar-alt"></i>
-                        <span><strong>Schedule:</strong> <?php echo htmlspecialchars($subject['schedule']); ?></span>
-                    </div>
-                    <div class="info-item">
-                        <i class="fas fa-calendar"></i>
-                        <span><strong>Semester:</strong> <?php echo htmlspecialchars($subject['semester']); ?></span>
-                    </div>
-                    <div class="info-item">
-                        <i class="fas fa-clock"></i>
-                        <span><strong>Added:</strong> <?php echo date('M j, Y', strtotime($subject['created_at'])); ?></span>
-                    </div>
-                </div>
-                
-                <div class="subject-actions">
-                    <button type="button" class="btn-edit" onclick="openEditModal(<?php echo $subject['id']; ?>, '<?php echo htmlspecialchars($subject['subject_code']); ?> - <?php echo htmlspecialchars($subject['subject_name']); ?>', '<?php echo htmlspecialchars($subject['professor_name']); ?>', '<?php echo htmlspecialchars($subject['schedule']); ?>')">
-                        <i class="fas fa-edit"></i> Edit
-                    </button>
-                    <button type="button" class="btn-archive" onclick="openArchiveModal(<?php echo $subject['id']; ?>, '<?php echo htmlspecialchars($subject['subject_code']); ?> - <?php echo htmlspecialchars($subject['subject_name']); ?>')">
-                        <i class="fas fa-archive"></i> Archive
-                    </button>
-                </div>
-            </div>
-        <?php endforeach; ?>
-    </div>
-<?php endif; ?>
+            <?php else: ?>
                 <div class="subjects-grid">
                     <?php foreach ($subjects as $subject): ?>
-                            <div class="subject-card" onclick="window.location.href='termevaluation.php?subject_id=<?php echo $subject['id']; ?>'">                            <div class="subject-header">
+                        <!-- BAGONG LINE: PUMUPUNTA SA TERMEVALUATION.PHP -->
+                        <div class="subject-card" onclick="window.location.href='termevaluation.php?subject_id=<?php echo $subject['id']; ?>'">
+                            <div class="subject-header">
                                 <div style="flex: 1;">
                                     <div class="subject-code"><?php echo htmlspecialchars($subject['subject_code']); ?></div>
                                     <div class="subject-name"><?php echo htmlspecialchars($subject['subject_name']); ?></div>
@@ -1435,11 +1393,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
                         <select name="subject_id" id="subject_id" class="form-select" required>
                             <option value="">Select a subject</option>
                             <?php 
-                            // Debug: Check what's in available_subjects
-                            // echo "<!-- Available subjects count: " . count($available_subjects) . " -->";
-                            // echo "<!-- Student semester: " . $student['semester'] . " -->";
-                            // echo "<!-- Current semester display: " . $current_semester_display . " -->";
-                            
                             if (!empty($available_subjects) && is_array($available_subjects)): 
                                 foreach ($available_subjects as $available_subject): 
                                     if (is_array($available_subject) && isset($available_subject['id'])): 
@@ -1465,7 +1418,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
                         <?php if (empty($available_subjects) || !is_array($available_subjects)): ?>
                             <p style="color: var(--text-light); font-size: 0.85rem; margin-top: 0.5rem;">
                                 <?php if (empty($available_subjects)): ?>
-                                    All subjects for <?php echo htmlspecialchars($current_semester_display); ?> have been enrolled.
+                                    All subjects for <?php echo htmlspecialchars($student['semester']); ?> have been enrolled.
                                 <?php else: ?>
                                     No subjects found for your current semester.
                                 <?php endif; ?>
@@ -1499,7 +1452,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
         </div>
     </div>
 
-    <!--  Logout Modal -->
+    <!-- Logout Modal -->
     <div class="modal" id="logoutModal">
         <div class="modal-content" style="max-width: 450px; text-align: center;">
             <h3 style="color: var(--plp-green); font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem;">
