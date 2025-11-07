@@ -24,9 +24,8 @@ try {
 }
 
 $subject_id = isset($_GET['subject_id']) ? intval($_GET['subject_id']) : 0;
-$term = isset($_GET['term']) ? $_GET['term'] : 'midterm'; // Default to midterm if not specified
+$term = isset($_GET['term']) ? $_GET['term'] : 'midterm';
 
-// Validate term parameter
 if (!in_array($term, ['midterm', 'final'])) {
     $term = 'midterm';
 }
@@ -135,6 +134,7 @@ $hasScores = !empty($classStandings) || !empty($midtermExam) || !empty($finalExa
 $totalClassStanding = 0;
 $midtermScore = 0;
 $finalScore = 0;
+$termGrade = 0;
 $overallGrade = 0;
 $gwa = 0;
 $riskLevel = 'no-data';
@@ -146,7 +146,7 @@ $recommendations = [];
 
 // Calculate grades and generate insights
 if ($hasScores) {
-    // CLASS STANDING CALCULATION
+    // CLASS STANDING CALCULATION (60% - includes attendance)
     $categoryTotals = [];
     foreach ($categories as $category) {
         $categoryTotals[$category['id']] = [
@@ -192,7 +192,7 @@ if ($hasScores) {
         $totalClassStanding = 60;
     }
 
-    // MAJOR EXAM CALCULATION - CORRECTED FOR TERM-BASED CALCULATION
+    // MAJOR EXAM CALCULATION (40%)
     $midtermScore = 0;
     $finalScore = 0;
 
@@ -200,7 +200,7 @@ if ($hasScores) {
         $midterm = reset($midtermExam);
         if ($midterm['max_score'] > 0) {
             $midtermPercentage = ($midterm['score_value'] / $midterm['max_score']) * 100;
-            $midtermScore = ($midtermPercentage * 40) / 100; // CHANGED FROM 20% TO 40%
+            $midtermScore = ($midtermPercentage * 40) / 100;
         }
     }
 
@@ -208,33 +208,102 @@ if ($hasScores) {
         $final = reset($finalExam);
         if ($final['max_score'] > 0) {
             $finalPercentage = ($final['score_value'] / $final['max_score']) * 100;
-            $finalScore = ($finalPercentage * 40) / 100; // CHANGED FROM 20% TO 40%
+            $finalScore = ($finalPercentage * 40) / 100;
         }
     }
 
-    // Calculate total based on current term
+    // CALCULATE TERM GRADE AND OVERALL GRADE
     if ($term === 'midterm') {
-        $totalExamScore = $midtermScore;
+        $termGrade = $totalClassStanding + $midtermScore;
+        // For midterm view, we only show midterm grade
+        $overallGrade = $termGrade;
     } else {
-        $totalExamScore = $finalScore;
+        $termGrade = $totalClassStanding + $finalScore;
+        // For final view, calculate overall subject grade: (midterm + final) / 2
+        $midtermTotal = 0;
+        $finalTotal = 0;
+        
+        // Calculate midterm total if available
+        $midtermCategories = supabaseFetch('student_class_standing_categories', [
+            'student_subject_id' => $subject_id,
+            'term_type' => 'midterm'
+        ]);
+        
+        if ($midtermCategories) {
+            $midtermClassStandings = array_filter($allScores, function($score) {
+                if ($score['score_type'] !== 'class_standing') return false;
+                if (!$score['category_id']) return false;
+                
+                $category_data = supabaseFetch('student_class_standing_categories', ['id' => $score['category_id']]);
+                if ($category_data && count($category_data) > 0) {
+                    return $category_data[0]['term_type'] === 'midterm';
+                }
+                return false;
+            });
+            
+            // Calculate midterm class standing
+            $midtermClassStandingTotal = 0;
+            $midtermCategoryTotals = [];
+            
+            foreach ($midtermCategories as $category) {
+                $midtermCategoryTotals[$category['id']] = [
+                    'percentage' => $category['category_percentage'],
+                    'total_score' => 0,
+                    'max_possible' => 0
+                ];
+            }
+            
+            foreach ($midtermClassStandings as $standing) {
+                if ($standing['category_id'] && isset($midtermCategoryTotals[$standing['category_id']])) {
+                    $categoryId = $standing['category_id'];
+                    if (strtolower($midtermCategories[array_search($categoryId, array_column($midtermCategories, 'id'))]['category_name']) === 'attendance') {
+                        $scoreValue = ($standing['score_name'] === 'Present') ? 1 : 0;
+                        $midtermCategoryTotals[$categoryId]['total_score'] += $scoreValue;
+                        $midtermCategoryTotals[$categoryId]['max_possible'] += 1;
+                    } else {
+                        $midtermCategoryTotals[$categoryId]['total_score'] += $standing['score_value'];
+                        $midtermCategoryTotals[$categoryId]['max_possible'] += $standing['max_score'];
+                    }
+                }
+            }
+            
+            foreach ($midtermCategoryTotals as $categoryId => $category) {
+                if ($category['max_possible'] > 0) {
+                    $percentageScore = ($category['total_score'] / $category['max_possible']) * 100;
+                    $weightedScore = ($percentageScore * $category['percentage']) / 100;
+                    $midtermClassStandingTotal += $weightedScore;
+                }
+            }
+            
+            if ($midtermClassStandingTotal > 60) {
+                $midtermClassStandingTotal = 60;
+            }
+            
+            // Calculate midterm exam score
+            $midtermExamScore = 0;
+            if (!empty($midtermExam)) {
+                $midterm = reset($midtermExam);
+                if ($midterm['max_score'] > 0) {
+                    $midtermPercentage = ($midterm['score_value'] / $midterm['max_score']) * 100;
+                    $midtermExamScore = ($midtermPercentage * 40) / 100;
+                }
+            }
+            
+            $midtermTotal = $midtermClassStandingTotal + $midtermExamScore;
+        }
+        
+        $finalTotal = $termGrade;
+        $overallGrade = ($midtermTotal + $finalTotal) / 2;
     }
 
-    if ($totalExamScore > 40) {
-        $totalExamScore = 40;
+    if ($termGrade > 100) {
+        $termGrade = 100;
     }
-
-    // Calculate overall grade based on term
-    if ($term === 'midterm') {
-        $overallGrade = $totalClassStanding + $midtermScore;
-    } else {
-        $overallGrade = $totalClassStanding + $finalScore;
-    }
-
     if ($overallGrade > 100) {
         $overallGrade = 100;
     }
 
-    // GWA CALCULATION
+    // GWA CALCULATION based on overall grade
     if ($overallGrade >= 90) {
         $gwa = 1.00;
     } elseif ($overallGrade >= 85) {
@@ -263,6 +332,7 @@ if ($hasScores) {
 
 } else {
     // NO SCORES - SHOW ENCOURAGING MESSAGES
+    $termGrade = 0;
     $overallGrade = 0;
     $gwa = 0;
     $totalClassStanding = 0;
@@ -288,7 +358,7 @@ if ($hasScores) {
     ]];
 }
 
-// FORM HANDLING
+// FORM HANDLING (same as before)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $scoreUpdated = false;
     
@@ -307,7 +377,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'student_subject_id' => $subject_id,
                     'category_name' => $category_name,
                     'category_percentage' => $category_percentage,
-                    'term_type' => $term, // Add term_type here
+                    'term_type' => $term,
                     'created_at' => date('Y-m-d H:i:s')
                 ];
                 
@@ -585,6 +655,7 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        /* Your existing CSS styles remain the same */
         :root {
             --plp-green: #006341;
             --plp-green-light: #008856;
@@ -771,7 +842,6 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
             align-items: center;
         }
 
-        /* Additional styles for the subject management page */
         .class-title {
             font-size: 1.5rem;
             font-weight: 700;
@@ -820,7 +890,6 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
             transform: translateY(-2px);
         }
 
-        /* NEW: Simplified Performance Overview */
         .performance-overview {
             margin-bottom: 2rem;
         }
@@ -853,7 +922,6 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
             font-weight: 500;
         }
 
-        /* Risk badges */
         .risk-badge {
             display: inline-block;
             padding: 0.3rem 0.8rem;
@@ -884,7 +952,6 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
             color: #718096;
         }
 
-        /* NEW: Combined Insights Section */
         .insights-section {
             margin-bottom: 2rem;
         }
@@ -985,7 +1052,6 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
             color: #2f855a;
         }
 
-        /* NEW: Simplified Category Section */
         .category-section {
             margin-bottom: 2rem;
         }
@@ -1036,7 +1102,6 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
             gap: 0.5rem;
         }
 
-        /* NEW: Compact category grid layout */
         .category-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -1170,7 +1235,6 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
             text-align: center;
         }
 
-        /* Empty states */
         .empty-state {
             text-align: center;
             padding: 2rem;
@@ -1186,7 +1250,6 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
             color: var(--text-light);
         }
 
-        /* Standings Section */
         .standings-section {
             margin-bottom: 2rem;
         }
@@ -1231,7 +1294,6 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
             margin-bottom: 0.5rem;
         }
 
-        /* Modal styles */
         .modal {
             display: none;
             position: fixed;
@@ -1353,7 +1415,6 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
             transform: translateY(-2px);
         }
 
-        /* Alert styles */
         .alert-success {
             background: #c6f6d5;
             color: #2f855a;
@@ -1380,7 +1441,6 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
             font-size: 0.9rem;
         }
 
-        /* NEW: Attendance-specific styles */
         .attendance-status {
             display: flex;
             gap: 1rem;
@@ -1423,7 +1483,6 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
             color: #c53030;
         }
 
-        /* Responsive styles */
         @media (max-width: 768px) {
             body {
                 flex-direction: column;
@@ -1577,18 +1636,33 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
         <div class="performance-overview">
             <div class="performance-grid">
                 <div class="performance-card">
-                    <div class="performance-label">Final Grade</div>
+                    <div class="performance-label">
+                        <?php echo $term === 'midterm' ? 'Midterm Grade' : 'Final Grade'; ?>
+                    </div>
+                    <?php if ($hasScores): ?>
+                        <div class="performance-value"><?php echo number_format($termGrade, 1); ?>%</div>
+                        <div class="performance-label" style="margin-top: 0.5rem; font-size: 0.9rem; color: var(--text-medium);">
+                            <?php
+                            if ($termGrade >= 90) echo 'Excellent';
+                            elseif ($termGrade >= 85) echo 'Very Good';
+                            elseif ($termGrade >= 80) echo 'Good';
+                            elseif ($termGrade >= 75) echo 'Satisfactory';
+                            elseif ($termGrade >= 70) echo 'Passing';
+                            else echo 'Needs Improvement';
+                            ?>
+                        </div>
+                    <?php else: ?>
+                        <div class="performance-value" style="color: var(--text-light);">--</div>
+                        <div class="performance-label">No scores added</div>
+                    <?php endif; ?>
+                </div>
+                
+                <div class="performance-card">
+                    <div class="performance-label">Overall Subject Grade</div>
                     <?php if ($hasScores): ?>
                         <div class="performance-value"><?php echo number_format($overallGrade, 1); ?>%</div>
                         <div class="performance-label" style="margin-top: 0.5rem; font-size: 0.9rem; color: var(--text-medium);">
-                            <?php
-                            if ($overallGrade >= 90) echo 'Excellent';
-                            elseif ($overallGrade >= 85) echo 'Very Good';
-                            elseif ($overallGrade >= 80) echo 'Good';
-                            elseif ($overallGrade >= 75) echo 'Satisfactory';
-                            elseif ($overallGrade >= 70) echo 'Passing';
-                            else echo 'Needs Improvement';
-                            ?>
+                            (Midterm + Final) / 2
                         </div>
                     <?php else: ?>
                         <div class="performance-value" style="color: var(--text-light);">--</div>
@@ -1602,7 +1676,6 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
                         <div class="performance-value"><?php echo number_format($gwa, 2); ?></div>
                         <div class="performance-label" style="margin-top: 0.5rem; font-size: 0.9rem; color: var(--text-medium);">
                             <?php 
-                            // Risk level based on GWA
                             if ($gwa <= 1.75) {
                                 echo 'Low Risk';
                                 $riskBadgeClass = 'risk-badge low';
@@ -1660,7 +1733,7 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
             <div class="section-header">
                 <div class="section-title">
                     <i class="fas fa-layer-group"></i>
-                    Class Standing Categories
+                    Class Standing Categories (60%)
                 </div>
                 <?php if ($canAddCategory): ?>
                     <div class="allocation-info">
@@ -1791,7 +1864,7 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
         <div class="standings-section">
             <div class="section-title">
                 <i class="fas fa-layer-group"></i>
-                Major Exams
+                Major Exams (40%)
             </div>
             <br>
             <div class="management-grid">
