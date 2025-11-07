@@ -1556,7 +1556,8 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
             </div>
             <div class="header-actions">
                 <a href="termevaluations.php?subject_id=<?php echo $subject_id; ?>" class="btn btn-secondary">
-                    <i class="fas fa-arrow-left"></i><?php echo $term === 'midterm'?>
+                    <i class="fas <?php echo $term === 'midterm' ? 'fa-balance-scale' : 'fa-arrow-left'; ?>"></i>
+                    <?php echo strtoupper($term); ?> 
                 </a>
             </div>
         </div>

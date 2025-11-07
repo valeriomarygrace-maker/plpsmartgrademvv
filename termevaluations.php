@@ -442,12 +442,12 @@ try {
     <div class="main-content">
         <div class="header">
             <div class="header-content">
-                <div class="subject-name"><?php echo htmlspecialchars($subject['subject_name']); ?></div>
-                <div style="width: 120px;"></div> 
-            </div>
-            <a href="student-subjects.php" class="back-btn">
+                <div class="subject-name"><?php echo htmlspecialchars($subject['subject_code'] . ' - ' . $subject['subject_name']); ?></div>
+                <div style="width: 100px;"></div> 
+                <a href="student-subjects.php" class="back-btn">
                 Back
-            </a>
+                </a>
+            </div>
         </div>
 
         <div class="card">
