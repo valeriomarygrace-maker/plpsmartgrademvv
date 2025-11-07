@@ -50,28 +50,6 @@ try {
     header('Location: student-subjects.php');
     exit;
 }
-
-// Check if term evaluation already exists
-$midterm_evaluation = null;
-$final_evaluation = null;
-
-try {
-    $evaluations = supabaseFetch('term_evaluations', [
-        'student_subject_id' => $subject_id
-    ]);
-    
-    if ($evaluations) {
-        foreach ($evaluations as $evaluation) {
-            if ($evaluation['term_type'] === 'midterm') {
-                $midterm_evaluation = $evaluation;
-            } elseif ($evaluation['term_type'] === 'final') {
-                $final_evaluation = $evaluation;
-            }
-        }
-    }
-} catch (Exception $e) {
-    // Continue without evaluations
-}
 ?>
 
 <!DOCTYPE html>
@@ -607,44 +585,14 @@ try {
 
     <div class="main-content">
         <div class="header">
+            <div class="subject-name"><?php echo htmlspecialchars($subject['subject_name']); ?></div>
             <a href="student-subjects.php" class="back-btn">
                 <i class="fas fa-arrow-left"></i>
-                Back to Subjects
+                Back
             </a>
-            <div class="welcome">Term Evaluation</div>
-        </div>
-
-        <div class="subject-info">
-            <div class="subject-code"><?php echo htmlspecialchars($subject['subject_code']); ?></div>
-            <div class="subject-name"><?php echo htmlspecialchars($subject['subject_name']); ?></div>
-            <div class="subject-details">
-                <div class="detail-item">
-                    <i class="fas fa-user-tie"></i>
-                    <span><strong>Professor:</strong> <?php echo htmlspecialchars($subject['professor_name']); ?></span>
-                </div>
-                <div class="detail-item">
-                    <i class="fas fa-calendar-alt"></i>
-                    <span><strong>Schedule:</strong> <?php echo htmlspecialchars($subject['schedule']); ?></span>
-                </div>
-                <div class="detail-item">
-                    <i class="fas fa-graduation-cap"></i>
-                    <span><strong>Credits:</strong> <?php echo htmlspecialchars($subject['credits']); ?></span>
-                </div>
-                <div class="detail-item">
-                    <i class="fas fa-calendar"></i>
-                    <span><strong>Semester:</strong> <?php echo htmlspecialchars($subject['semester']); ?></span>
-                </div>
-            </div>
         </div>
 
         <div class="card">
-            <div class="card-header">
-                <div class="card-title">
-                    <i class="fas fa-calendar-alt"></i>
-                    Select Term for Evaluation
-                </div>
-            </div>
-
             <div class="terms-container">
                 <!-- Midterm Card -->
                 <div class="term-card midterm" onclick="window.location.href='subject-management.php?subject_id=<?php echo $subject_id; ?>&term=midterm'">
@@ -652,11 +600,6 @@ try {
                         <i class="fas fa-balance-scale"></i>
                     </div>
                     <div class="term-title">MIDTERM</div>
-                    <div class="term-description">
-                        Evaluate your performance for the midterm period. 
-                        Set up class standing categories (60%) and midterm exam (40%).
-                    </div>
-                    
                     <div class="term-stats">
                         <div class="stat-item">
                             <div class="stat-value">60%</div>
@@ -667,18 +610,6 @@ try {
                             <div class="stat-label">Midterm Exam</div>
                         </div>
                     </div>
-
-                    <?php if ($midterm_evaluation): ?>
-                        <div class="term-status status-completed">
-                            <i class="fas fa-check-circle"></i>
-                            Evaluation Started
-                        </div>
-                    <?php else: ?>
-                        <div class="term-status status-not-started">
-                            <i class="fas fa-clock"></i>
-                            Not Started
-                        </div>
-                    <?php endif; ?>
 
                     <button class="btn btn-primary btn-midterm" style="margin-top: 1rem; width: 100%;">
                         <i class="fas fa-edit"></i>
@@ -691,12 +622,7 @@ try {
                     <div class="term-icon">
                         <i class="fas fa-graduation-cap"></i>
                     </div>
-                    <div class="term-title">FINAL</div>
-                    <div class="term-description">
-                        Evaluate your performance for the final period. 
-                        Set up class standing categories (60%) and final exam (40%).
-                    </div>
-                    
+                    <div class="term-title">FINAL</div>   
                     <div class="term-stats">
                         <div class="stat-item">
                             <div class="stat-value">60%</div>
@@ -707,66 +633,6 @@ try {
                             <div class="stat-label">Final Exam</div>
                         </div>
                     </div>
-
-                    <?php if ($final_evaluation): ?>
-                        <div class="term-status status-completed">
-                            <i class="fas fa-check-circle"></i>
-                            Evaluation Started
-                        </div>
-                    <?php else: ?>
-                        <div class="term-status status-not-started">
-                            <i class="fas fa-clock"></i>
-                            Not Started
-                        </div>
-                    <?php endif; ?>
-
-                    <button class="btn btn-primary btn-final" style="margin-top: 1rem; width: 100%;">
-                        <i class="fas fa-edit"></i>
-                        <?php echo $final_evaluation ? 'Manage Final' : 'Start Final Evaluation'; ?>
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <div class="card">
-            <div class="card-header">
-                <div class="card-title">
-                    <i class="fas fa-info-circle"></i>
-                    Grading System Information
-                </div>
-            </div>
-            
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem;">
-                <div style="text-align: center; padding: 1.5rem; background: var(--plp-green-pale); border-radius: var(--border-radius);">
-                    <div style="font-size: 2rem; color: var(--plp-green); margin-bottom: 0.5rem;">
-                        <i class="fas fa-calculator"></i>
-                    </div>
-                    <h3 style="color: var(--plp-green); margin-bottom: 0.5rem;">Overall Grade</h3>
-                    <p style="color: var(--text-medium); font-size: 0.9rem;">
-                        (Midterm Grade + Final Grade) ÷ 2
-                    </p>
-                </div>
-                
-                <div style="text-align: center; padding: 1.5rem; background: var(--plp-green-pale); border-radius: var(--border-radius);">
-                    <div style="font-size: 2rem; color: #3b82f6; margin-bottom: 0.5rem;">
-                        <i class="fas fa-balance-scale"></i>
-                    </div>
-                    <h3 style="color: #3b82f6; margin-bottom: 0.5rem;">Midterm Structure</h3>
-                    <p style="color: var(--text-medium); font-size: 0.9rem;">
-                        60% Class Standing<br>
-                        40% Midterm Exam
-                    </p>
-                </div>
-                
-                <div style="text-align: center; padding: 1.5rem; background: var(--plp-green-pale); border-radius: var(--border-radius);">
-                    <div style="font-size: 2rem; color: #ef4444; margin-bottom: 0.5rem;">
-                        <i class="fas fa-graduation-cap"></i>
-                    </div>
-                    <h3 style="color: #ef4444; margin-bottom: 0.5rem;">Final Structure</h3>
-                    <p style="color: var(--text-medium); font-size: 0.9rem;">
-                        60% Class Standing<br>
-                        40% Final Exam
-                    </p>
                 </div>
             </div>
         </div>
