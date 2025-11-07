@@ -736,7 +736,7 @@ function getGradeDescription($grade) {
                 <div style="width: 100px;"></div> 
                 <a href="student-subjects.php" class="back-btn">
                     <i class="fas fa-arrow-left"></i>
-                    Back to Subjects
+                    Back
                 </a>
             </div>
         </div>
@@ -786,17 +786,9 @@ function getGradeDescription($grade) {
             <div class="terms-container">
                 <!-- Midterm Card -->
                 <div class="term-card midterm" onclick="window.location.href='subject-management.php?subject_id=<?php echo $subject_id; ?>&term=midterm'">
-                    <div class="term-icon">
-                        <i class="fas fa-balance-scale"></i>
-                    </div>
                     <div class="term-title">MIDTERM</div>
                     
                     <?php if ($midtermGrade > 0): ?>
-                        <div class="term-grade"><?php echo number_format($midtermGrade, 1); ?>%</div>
-                        <div class="term-grade-description">
-                            <?php echo getGradeDescription($midtermGrade); ?>
-                        </div>
-                        
                         <div class="term-stats">
                             <div class="stat-item">
                                 <div class="stat-value">60%</div>
@@ -824,25 +816,13 @@ function getGradeDescription($grade) {
                             </div>
                         </div>
                     <?php endif; ?>
-                    
-                    <button class="manage-btn" onclick="event.stopPropagation(); window.location.href='subject-management.php?subject_id=<?php echo $subject_id; ?>&term=midterm'">
-                        <i class="fas fa-cog"></i> Manage Midterm
-                    </button>
                 </div>
 
                 <!-- Final Card -->
                 <div class="term-card final" onclick="window.location.href='subject-management.php?subject_id=<?php echo $subject_id; ?>&term=final'">
-                    <div class="term-icon">
-                        <i class="fas fa-graduation-cap"></i>
-                    </div>
                     <div class="term-title">FINAL</div>
                     
                     <?php if ($finalGrade > 0): ?>
-                        <div class="term-grade"><?php echo number_format($finalGrade, 1); ?>%</div>
-                        <div class="term-grade-description">
-                            <?php echo getGradeDescription($finalGrade); ?>
-                        </div>
-                        
                         <div class="term-stats">
                             <div class="stat-item">
                                 <div class="stat-value">60%</div>
@@ -870,10 +850,6 @@ function getGradeDescription($grade) {
                             </div>
                         </div>
                     <?php endif; ?>
-                    
-                    <button class="manage-btn" onclick="event.stopPropagation(); window.location.href='subject-management.php?subject_id=<?php echo $subject_id; ?>&term=final'">
-                        <i class="fas fa-cog"></i> Manage Final
-                    </button>
                 </div>
             </div>
         </div>
