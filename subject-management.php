@@ -61,7 +61,7 @@ try {
     $error_message = 'Database error: ' . $e->getMessage();
 }
 
-// Get categories for the specific term
+// Get categories for the specific term ONLY
 $categories = [];
 $classStandings = [];
 $midtermExam = [];
@@ -109,7 +109,7 @@ try {
     $allScores = [];
 }
 
-// Filter scores based on term
+// Filter scores based on CURRENT TERM ONLY
 $classStandings = array_filter($allScores, function($score) use ($term) {
     if ($score['score_type'] !== 'class_standing') return false;
     if (!$score['category_id']) return false;
@@ -121,6 +121,7 @@ $classStandings = array_filter($allScores, function($score) use ($term) {
     return false;
 });
 
+// Get exam scores
 $midtermExam = array_filter($allScores, function($score) {
     return $score['score_type'] === 'midterm_exam';
 });
@@ -130,7 +131,7 @@ $finalExam = array_filter($allScores, function($score) {
 });
 
 // Initialize ML insights variables
-$hasScores = !empty($classStandings) || !empty($midtermExam) || !empty($finalExam);
+$hasScores = !empty($classStandings) || ($term === 'midterm' && !empty($midtermExam)) || ($term === 'final' && !empty($finalExam));
 $totalClassStanding = 0;
 $midtermScore = 0;
 $finalScore = 0;
@@ -144,9 +145,9 @@ $behavioralInsights = [];
 $interventions = [];
 $recommendations = [];
 
-// Calculate grades and generate insights
+// Calculate grades for CURRENT TERM ONLY
 if ($hasScores) {
-    // CLASS STANDING CALCULATION (60% - includes attendance)
+    // CLASS STANDING CALCULATION (60% - includes attendance) FOR CURRENT TERM
     $categoryTotals = [];
     foreach ($categories as $category) {
         $categoryTotals[$category['id']] = [
@@ -192,11 +193,11 @@ if ($hasScores) {
         $totalClassStanding = 60;
     }
 
-    // MAJOR EXAM CALCULATION (40%)
+    // MAJOR EXAM CALCULATION (40%) FOR CURRENT TERM ONLY
     $midtermScore = 0;
     $finalScore = 0;
 
-    if (!empty($midtermExam)) {
+    if ($term === 'midterm' && !empty($midtermExam)) {
         $midterm = reset($midtermExam);
         if ($midterm['max_score'] > 0) {
             $midtermPercentage = ($midterm['score_value'] / $midterm['max_score']) * 100;
@@ -204,7 +205,7 @@ if ($hasScores) {
         }
     }
 
-    if (!empty($finalExam)) {
+    if ($term === 'final' && !empty($finalExam)) {
         $final = reset($finalExam);
         if ($final['max_score'] > 0) {
             $finalPercentage = ($final['score_value'] / $final['max_score']) * 100;
@@ -212,88 +213,13 @@ if ($hasScores) {
         }
     }
 
-    // CALCULATE TERM GRADE AND OVERALL GRADE
+    // CALCULATE TERM GRADE FOR CURRENT TERM ONLY
     if ($term === 'midterm') {
         $termGrade = $totalClassStanding + $midtermScore;
-        // For midterm view, we only show midterm grade
-        $overallGrade = $termGrade;
+        $overallGrade = $termGrade; // For midterm, overall grade is just the midterm grade
     } else {
         $termGrade = $totalClassStanding + $finalScore;
-        // For final view, calculate overall subject grade: (midterm + final) / 2
-        $midtermTotal = 0;
-        $finalTotal = 0;
-        
-        // Calculate midterm total if available
-        $midtermCategories = supabaseFetch('student_class_standing_categories', [
-            'student_subject_id' => $subject_id,
-            'term_type' => 'midterm'
-        ]);
-        
-        if ($midtermCategories) {
-            $midtermClassStandings = array_filter($allScores, function($score) {
-                if ($score['score_type'] !== 'class_standing') return false;
-                if (!$score['category_id']) return false;
-                
-                $category_data = supabaseFetch('student_class_standing_categories', ['id' => $score['category_id']]);
-                if ($category_data && count($category_data) > 0) {
-                    return $category_data[0]['term_type'] === 'midterm';
-                }
-                return false;
-            });
-            
-            // Calculate midterm class standing
-            $midtermClassStandingTotal = 0;
-            $midtermCategoryTotals = [];
-            
-            foreach ($midtermCategories as $category) {
-                $midtermCategoryTotals[$category['id']] = [
-                    'percentage' => $category['category_percentage'],
-                    'total_score' => 0,
-                    'max_possible' => 0
-                ];
-            }
-            
-            foreach ($midtermClassStandings as $standing) {
-                if ($standing['category_id'] && isset($midtermCategoryTotals[$standing['category_id']])) {
-                    $categoryId = $standing['category_id'];
-                    if (strtolower($midtermCategories[array_search($categoryId, array_column($midtermCategories, 'id'))]['category_name']) === 'attendance') {
-                        $scoreValue = ($standing['score_name'] === 'Present') ? 1 : 0;
-                        $midtermCategoryTotals[$categoryId]['total_score'] += $scoreValue;
-                        $midtermCategoryTotals[$categoryId]['max_possible'] += 1;
-                    } else {
-                        $midtermCategoryTotals[$categoryId]['total_score'] += $standing['score_value'];
-                        $midtermCategoryTotals[$categoryId]['max_possible'] += $standing['max_score'];
-                    }
-                }
-            }
-            
-            foreach ($midtermCategoryTotals as $categoryId => $category) {
-                if ($category['max_possible'] > 0) {
-                    $percentageScore = ($category['total_score'] / $category['max_possible']) * 100;
-                    $weightedScore = ($percentageScore * $category['percentage']) / 100;
-                    $midtermClassStandingTotal += $weightedScore;
-                }
-            }
-            
-            if ($midtermClassStandingTotal > 60) {
-                $midtermClassStandingTotal = 60;
-            }
-            
-            // Calculate midterm exam score
-            $midtermExamScore = 0;
-            if (!empty($midtermExam)) {
-                $midterm = reset($midtermExam);
-                if ($midterm['max_score'] > 0) {
-                    $midtermPercentage = ($midterm['score_value'] / $midterm['max_score']) * 100;
-                    $midtermExamScore = ($midtermPercentage * 40) / 100;
-                }
-            }
-            
-            $midtermTotal = $midtermClassStandingTotal + $midtermExamScore;
-        }
-        
-        $finalTotal = $termGrade;
-        $overallGrade = ($midtermTotal + $finalTotal) / 2;
+        $overallGrade = $termGrade; // For final, overall grade is just the final grade
     }
 
     if ($termGrade > 100) {
@@ -303,7 +229,7 @@ if ($hasScores) {
         $overallGrade = 100;
     }
 
-    // GWA CALCULATION based on overall grade
+    // GWA CALCULATION based on current term grade
     if ($overallGrade >= 90) {
         $gwa = 1.00;
     } elseif ($overallGrade >= 85) {
@@ -358,11 +284,11 @@ if ($hasScores) {
     ]];
 }
 
-// FORM HANDLING (same as before)
+// FORM HANDLING - Only allow actions for current term
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $scoreUpdated = false;
     
-    // ADD CLASS STANDING CATEGORY
+    // ADD CLASS STANDING CATEGORY - Only for current term
     if (isset($_POST['add_category'])) {
         $category_name = trim($_POST['category_name']);
         $category_percentage = floatval($_POST['category_percentage']);
@@ -377,7 +303,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'student_subject_id' => $subject_id,
                     'category_name' => $category_name,
                     'category_percentage' => $category_percentage,
-                    'term_type' => $term,
+                    'term_type' => $term, // Current term only
                     'created_at' => date('Y-m-d H:i:s')
                 ];
                 
@@ -395,7 +321,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     
-    // ADD CLASS STANDING SCORE
+    // ADD CLASS STANDING SCORE - Only for current term categories
     elseif (isset($_POST['add_standing'])) {
         $category_id = intval($_POST['category_id']);
         $score_name = trim($_POST['score_name']);
@@ -403,7 +329,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $max_score = floatval($_POST['max_score']);
         $score_date = $_POST['score_date'];
         
-        if (empty($score_name) || $score_value < 0 || $max_score <= 0 || empty($score_date)) {
+        // Verify category belongs to current term
+        $category_data = supabaseFetch('student_class_standing_categories', ['id' => $category_id]);
+        if (!$category_data || $category_data[0]['term_type'] !== $term) {
+            $error_message = 'Invalid category for current term.';
+        } elseif (empty($score_name) || $score_value < 0 || $max_score <= 0 || empty($score_date)) {
             $error_message = 'Please fill all fields with valid values.';
         } elseif ($score_value > $max_score) {
             $error_message = 'Score value cannot exceed maximum score.';
@@ -445,13 +375,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     
-    // ADD ATTENDANCE
+    // ADD ATTENDANCE - Only for current term categories
     elseif (isset($_POST['add_attendance'])) {
         $category_id = intval($_POST['category_id']);
         $attendance_date = $_POST['attendance_date'];
         $attendance_status = $_POST['attendance_status'];
         
-        if (empty($attendance_date)) {
+        // Verify category belongs to current term
+        $category_data = supabaseFetch('student_class_standing_categories', ['id' => $category_id]);
+        if (!$category_data || $category_data[0]['term_type'] !== $term) {
+            $error_message = 'Invalid category for current term.';
+        } elseif (empty($attendance_date)) {
             $error_message = 'Please select a date.';
         } else {
             try {
@@ -503,13 +437,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     
-    // ADD MAJOR EXAM
+    // ADD MAJOR EXAM - Only allow current term exam
     elseif (isset($_POST['add_exam'])) {
         $exam_type = $_POST['exam_type'];
         $score_value = floatval($_POST['score_value']);
         $max_score = floatval($_POST['max_score']);
         
-        if ($score_value < 0 || $max_score <= 0) {
+        // Verify exam type matches current term
+        if (($term === 'midterm' && $exam_type !== 'midterm_exam') || ($term === 'final' && $exam_type !== 'final_exam')) {
+            $error_message = 'Invalid exam type for current term.';
+        } elseif ($score_value < 0 || $max_score <= 0) {
             $error_message = 'Score value and maximum score must be positive numbers.';
         } elseif ($score_value > $max_score) {
             $error_message = 'Score value cannot exceed maximum score.';
@@ -517,7 +454,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $exam_name = $exam_type === 'midterm_exam' ? 'Midterm Exam' : 'Final Exam';
             
             try {
-                // Delete any existing exam score
+                // Delete any existing exam score for this term
                 supabaseDelete('student_subject_scores', [
                     'student_subject_id' => $subject_id,
                     'score_type' => $exam_type
@@ -558,37 +495,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     
-    // UPDATE SCORE
+    // UPDATE SCORE - Only for current term scores
     elseif (isset($_POST['update_score'])) {
         $score_id = intval($_POST['score_id']);
-        $score_value = floatval($_POST['score_value']);
         
         try {
             $score_data = supabaseFetch('student_subject_scores', ['id' => $score_id]);
             
             if ($score_data && count($score_data) > 0) {
                 $score = $score_data[0];
-                if ($score_value > $score['max_score']) {
-                    $error_message = 'Score value cannot exceed maximum score of ' . $score['max_score'];
-                } else {
-                    $update_data = ['score_value' => $score_value];
-                    $result = supabaseUpdate('student_subject_scores', $update_data, ['id' => $score_id]);
-                    
-                    if ($result) {
-                        $success_message = 'Score updated successfully!';
-                        $scoreUpdated = true;
-                        InterventionSystem::logBehavior(
-                            $student['id'], 
-                            'grade_update', 
-                            [
-                                'subject_id' => $subject_id,
-                                'subject_name' => $subject['subject_name'],
-                                'action' => 'update_score',
-                                'term' => $term
-                            ]
-                        );
+                
+                // Verify score belongs to current term
+                if ($score['category_id']) {
+                    $category_data = supabaseFetch('student_class_standing_categories', ['id' => $score['category_id']]);
+                    if (!$category_data || $category_data[0]['term_type'] !== $term) {
+                        $error_message = 'Cannot update score from different term.';
+                    }
+                } else if ($score['score_type'] === 'midterm_exam' && $term !== 'midterm') {
+                    $error_message = 'Cannot update midterm exam in final term view.';
+                } else if ($score['score_type'] === 'final_exam' && $term !== 'final') {
+                    $error_message = 'Cannot update final exam in midterm term view.';
+                }
+                
+                if (!$error_message) {
+                    $score_value = floatval($_POST['score_value']);
+                    if ($score_value > $score['max_score']) {
+                        $error_message = 'Score value cannot exceed maximum score of ' . $score['max_score'];
                     } else {
-                        $error_message = 'Failed to update score.';
+                        $update_data = ['score_value' => $score_value];
+                        $result = supabaseUpdate('student_subject_scores', $update_data, ['id' => $score_id]);
+                        
+                        if ($result) {
+                            $success_message = 'Score updated successfully!';
+                            $scoreUpdated = true;
+                            InterventionSystem::logBehavior(
+                                $student['id'], 
+                                'grade_update', 
+                                [
+                                    'subject_id' => $subject_id,
+                                    'subject_name' => $subject['subject_name'],
+                                    'action' => 'update_score',
+                                    'term' => $term
+                                ]
+                            );
+                        } else {
+                            $error_message = 'Failed to update score.';
+                        }
                     }
                 }
             } else {
@@ -599,37 +551,65 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     
-    // DELETE SCORE
+    // DELETE SCORE - Only for current term scores
     elseif (isset($_POST['delete_score'])) {
         $score_id = intval($_POST['score_id']);
         
         try {
-            $result = supabaseDelete('student_subject_scores', ['id' => $score_id]);
+            $score_data = supabaseFetch('student_subject_scores', ['id' => $score_id]);
             
-            if ($result) {
-                $success_message = 'Score deleted successfully!';
-                $scoreUpdated = true;
+            if ($score_data && count($score_data) > 0) {
+                $score = $score_data[0];
+                
+                // Verify score belongs to current term
+                if ($score['category_id']) {
+                    $category_data = supabaseFetch('student_class_standing_categories', ['id' => $score['category_id']]);
+                    if (!$category_data || $category_data[0]['term_type'] !== $term) {
+                        $error_message = 'Cannot delete score from different term.';
+                    }
+                } else if ($score['score_type'] === 'midterm_exam' && $term !== 'midterm') {
+                    $error_message = 'Cannot delete midterm exam in final term view.';
+                } else if ($score['score_type'] === 'final_exam' && $term !== 'final') {
+                    $error_message = 'Cannot delete final exam in midterm term view.';
+                }
+                
+                if (!$error_message) {
+                    $result = supabaseDelete('student_subject_scores', ['id' => $score_id]);
+                    
+                    if ($result) {
+                        $success_message = 'Score deleted successfully!';
+                        $scoreUpdated = true;
+                    } else {
+                        $error_message = 'Failed to delete score.';
+                    }
+                }
             } else {
-                $error_message = 'Failed to delete score.';
+                $error_message = 'Score not found.';
             }
         } catch (Exception $e) {
             $error_message = 'Database error: ' . $e->getMessage();
         }
     }
     
-    // DELETE CATEGORY
+    // DELETE CATEGORY - Only for current term categories
     elseif (isset($_POST['delete_category'])) {
         $category_id = intval($_POST['category_id']);
         
         try {
-            supabaseDelete('student_subject_scores', ['category_id' => $category_id]);
-            $result = supabaseDelete('student_class_standing_categories', ['id' => $category_id]);
-            
-            if ($result) {
-                $success_message = 'Category deleted successfully!';
-                $scoreUpdated = true;
+            // Verify category belongs to current term
+            $category_data = supabaseFetch('student_class_standing_categories', ['id' => $category_id]);
+            if (!$category_data || $category_data[0]['term_type'] !== $term) {
+                $error_message = 'Cannot delete category from different term.';
             } else {
-                $error_message = 'Failed to delete category.';
+                supabaseDelete('student_subject_scores', ['category_id' => $category_id]);
+                $result = supabaseDelete('student_class_standing_categories', ['id' => $category_id]);
+                
+                if ($result) {
+                    $success_message = 'Category deleted successfully!';
+                    $scoreUpdated = true;
+                } else {
+                    $error_message = 'Failed to delete category.';
+                }
             }
         } catch (Exception $e) {
             $error_message = 'Database error: ' . $e->getMessage();
@@ -1623,11 +1603,15 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
         <div class="header">
             <div class="class-title">
                 <?php echo htmlspecialchars($subject['subject_code'] . ' - ' . $subject['subject_name']); ?>
+                <span class="term-indicator">
+                    <i class="fas <?php echo $term === 'midterm' ? 'fa-balance-scale' : 'fa-graduation-cap'; ?>"></i>
+                    <?php echo strtoupper($term); ?> TERM
+                </span>
             </div>
             <div class="header-actions">
                 <a href="termevaluations.php?subject_id=<?php echo $subject_id; ?>" class="btn btn-secondary">
-                    <i class="fas <?php echo $term === 'midterm' ? 'fa-arrow-left' : 'fa-arrow-left'; ?>"></i>
-                    <?php echo strtoupper($term); ?> 
+                    <i class="fas fa-arrow-left"></i>
+                    Back to Terms
                 </a>
             </div>
         </div>
@@ -1637,7 +1621,7 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
             <div class="performance-grid">
                 <div class="performance-card">
                     <div class="performance-label">
-                        <?php echo $term === 'midterm' ? 'Midterm Grade' : 'Final Grade'; ?>
+                        <?php echo ucfirst($term); ?> Grade
                     </div>
                     <?php if ($hasScores): ?>
                         <div class="performance-value"><?php echo number_format($termGrade, 1); ?>%</div>
@@ -1650,19 +1634,6 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
                             elseif ($termGrade >= 70) echo 'Passing';
                             else echo 'Needs Improvement';
                             ?>
-                        </div>
-                    <?php else: ?>
-                        <div class="performance-value" style="color: var(--text-light);">--</div>
-                        <div class="performance-label">No scores added</div>
-                    <?php endif; ?>
-                </div>
-                
-                <div class="performance-card">
-                    <div class="performance-label">Overall Subject Grade</div>
-                    <?php if ($hasScores): ?>
-                        <div class="performance-value"><?php echo number_format($overallGrade, 1); ?>%</div>
-                        <div class="performance-label" style="margin-top: 0.5rem; font-size: 0.9rem; color: var(--text-medium);">
-                            (Midterm + Final) / 2
                         </div>
                     <?php else: ?>
                         <div class="performance-value" style="color: var(--text-light);">--</div>
@@ -1728,12 +1699,12 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
             </div>
         </div>
 
-        <!-- Class Standing Categories Section -->
+        <!-- Class Standing Categories Section - CURRENT TERM ONLY -->
         <div class="category-section">
             <div class="section-header">
                 <div class="section-title">
                     <i class="fas fa-layer-group"></i>
-                    Class Standing Categories (60%)
+                    <?php echo ucfirst($term); ?> Class Standing Categories (60%)
                 </div>
                 <?php if ($canAddCategory): ?>
                     <div class="allocation-info">
@@ -1754,7 +1725,7 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
             <?php if (empty($categories)): ?>
                 <div class="empty-state">
                     <i class="fas fa-folder-open" style="font-size: 2.5rem; color: var(--text-light); margin-bottom: 1rem;"></i>
-                    <h3 style="color: var(--text-dark); margin-bottom: 0.5rem; font-size: 1.1rem;">No Categories Created</h3>
+                    <h3 style="color: var(--text-dark); margin-bottom: 0.5rem; font-size: 1.1rem;">No <?php echo $term; ?> Categories Created</h3>
                     <?php if ($canAddCategory): ?>
                         <button class="btn btn-primary" onclick="openAddCategoryModal()">
                             <i class="fas fa-plus-circle"></i> Create First Category
@@ -1860,43 +1831,59 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
             <?php endif; ?>
         </div>
 
-        <!-- Major Exams Section -->
+        <!-- Major Exams Section - CURRENT TERM EXAM ONLY -->
         <div class="standings-section">
             <div class="section-title">
                 <i class="fas fa-layer-group"></i>
-                Major Exams (40%)
+                <?php echo ucfirst($term); ?> Major Exam (40%)
             </div>
             <br>
             <div class="management-grid">
-                <!-- Midterm Exam -->
-                <div class="management-card major-exam-card" onclick="openExamModal('midterm_exam')">
-                    <h3>MIDTERM EXAM</h3>
-                    <div class="major-exam-badge">40%</div>
-                    <?php if (!empty($midtermExam)): ?>
-                        <?php 
-                        $midterm = reset($midtermExam);
-                        ?>
-                    <?php else: ?>
-                        <p style="color: var(--text-light); margin-top: 0.5rem; font-size: 0.9rem;">
-                            Click to add score
-                        </p>
-                    <?php endif; ?>
-                </div>
-
-                <!-- Final Exam -->
-                <div class="management-card major-exam-card" onclick="openExamModal('final_exam')">
-                    <h3>FINAL EXAM</h3>
-                    <div class="major-exam-badge">40%</div>
-                    <?php if (!empty($finalExam)): ?>
-                        <?php 
-                        $final = reset($finalExam);
-                        ?>
-                    <?php else: ?>
-                        <p style="color: var(--text-light); margin-top: 0.5rem; font-size: 0.9rem;">
-                            Click to add score
-                        </p>
-                    <?php endif; ?>
-                </div>
+                <?php if ($term === 'midterm'): ?>
+                    <!-- Midterm Exam Only -->
+                    <div class="management-card major-exam-card" onclick="openExamModal('midterm_exam')">
+                        <h3>MIDTERM EXAM</h3>
+                        <div class="major-exam-badge">40%</div>
+                        <?php if (!empty($midtermExam)): ?>
+                            <?php 
+                            $midterm = reset($midtermExam);
+                            $midtermPercentage = ($midterm['max_score'] > 0) ? ($midterm['score_value'] / $midterm['max_score']) * 100 : 0;
+                            ?>
+                            <div class="performance-value" style="font-size: 1.5rem; margin: 0.5rem 0;">
+                                <?php echo number_format($midtermPercentage, 1); ?>%
+                            </div>
+                            <p style="color: var(--text-medium); margin-top: 0.5rem; font-size: 0.9rem;">
+                                <?php echo $midterm['score_value']; ?> / <?php echo $midterm['max_score']; ?>
+                            </p>
+                        <?php else: ?>
+                            <p style="color: var(--text-light); margin-top: 0.5rem; font-size: 0.9rem;">
+                                Click to add midterm exam score
+                            </p>
+                        <?php endif; ?>
+                    </div>
+                <?php else: ?>
+                    <!-- Final Exam Only -->
+                    <div class="management-card major-exam-card" onclick="openExamModal('final_exam')">
+                        <h3>FINAL EXAM</h3>
+                        <div class="major-exam-badge">40%</div>
+                        <?php if (!empty($finalExam)): ?>
+                            <?php 
+                            $final = reset($finalExam);
+                            $finalPercentage = ($final['max_score'] > 0) ? ($final['score_value'] / $final['max_score']) * 100 : 0;
+                            ?>
+                            <div class="performance-value" style="font-size: 1.5rem; margin: 0.5rem 0;">
+                                <?php echo number_format($finalPercentage, 1); ?>%
+                            </div>
+                            <p style="color: var(--text-medium); margin-top: 0.5rem; font-size: 0.9rem;">
+                                <?php echo $final['score_value']; ?> / <?php echo $final['max_score']; ?>
+                            </p>
+                        <?php else: ?>
+                            <p style="color: var(--text-light); margin-top: 0.5rem; font-size: 0.9rem;">
+                                Click to add final exam score
+                            </p>
+                        <?php endif; ?>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
         
@@ -2005,12 +1992,12 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
         <?php endif; ?>
     </div>
 
-    <!-- Add Category Modal -->
+    <!-- Add Category Modal - CURRENT TERM ONLY -->
     <?php if ($canAddCategory): ?>
         <div class="modal" id="addCategoryModal">
             <div class="modal-content">
                 <span class="close" onclick="closeAddCategoryModal()">&times;</span>
-                <h3 class="modal-title">Add Class Standing Category</h3>
+                <h3 class="modal-title">Add <?php echo ucfirst($term); ?> Class Standing Category</h3>
                 <form id="categoryForm" method="POST">
                     <input type="hidden" name="add_category" value="1">
                     
@@ -2036,7 +2023,7 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
         </div>
     <?php endif; ?>
 
-    <!-- Add Score Modal -->
+    <!-- Add Score Modal - CURRENT TERM CATEGORIES ONLY -->
     <div class="modal" id="addScoreModal">
         <div class="modal-content">
             <span class="close" onclick="closeAddScoreModal()">&times;</span>
@@ -2073,7 +2060,7 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
         </div>
     </div>
 
-    <!-- Add Attendance Modal -->
+    <!-- Add Attendance Modal - CURRENT TERM CATEGORIES ONLY -->
     <div class="modal" id="addAttendanceModal">
         <div class="modal-content">
             <span class="close" onclick="closeAddAttendanceModal()">&times;</span>
@@ -2112,7 +2099,7 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
     </div>
     
 
-    <!-- Edit Score Modal -->
+    <!-- Edit Score Modal - CURRENT TERM SCORES ONLY -->
     <div class="modal" id="editScoreModal">
         <div class="modal-content">
             <span class="close" id="closeEditModal">&times;</span>
@@ -2147,14 +2134,16 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
         </div>
     </div>
 
-    <!-- Add Exam Score Modal -->
+    <!-- Add Exam Score Modal - CURRENT TERM EXAM ONLY -->
     <div class="modal" id="examModal">
         <div class="modal-content">
             <span class="close" id="closeExamModal">&times;</span>
-            <h3 class="modal-title" id="examModalTitle">Add Exam Score</h3>
+            <h3 class="modal-title" id="examModalTitle">
+                <?php echo $term === 'midterm' ? 'Add Midterm Exam Score' : 'Add Final Exam Score'; ?>
+            </h3>
             <form id="examForm" method="POST">
                 <input type="hidden" name="add_exam" value="1">
-                <input type="hidden" name="exam_type" id="examType">
+                <input type="hidden" name="exam_type" id="examType" value="<?php echo $term === 'midterm' ? 'midterm_exam' : 'final_exam'; ?>">
                 
                 <div class="form-group">
                     <label for="exam_score" class="form-label">Your Exam Score</label>
@@ -2174,7 +2163,7 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
         </div>
     </div>
 
-        <!--  Logout Modal -->
+    <!-- Logout Modal -->
     <div class="modal" id="logoutModal">
         <div class="modal-content" style="max-width: 450px; text-align: center;">
             <h3 style="color: var(--plp-green); font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem;">
@@ -2229,22 +2218,9 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
             });
         });
 
-        // Load existing exam scores into modal when opening
-        const examModal = document.getElementById('examModal');
-        if (examModal) {
-            examModal.addEventListener('show', function() {
-                const examType = document.getElementById('examType').value;
-                loadExistingExamScore(examType);
-            });
-        }
+        // Set exam type based on current term
+        document.getElementById('examType').value = '<?php echo $term === 'midterm' ? 'midterm_exam' : 'final_exam'; ?>';
     });
-
-    function loadExistingExamScore(examType) {
-        // This function would load existing exam scores if any
-        // For now, we'll just reset the form to ensure clean state
-        document.getElementById('exam_score').value = '';
-        document.getElementById('max_score').value = '';
-    }
 
     function openAddCategoryModal() {
         document.getElementById('addCategoryModal').classList.add('show');
@@ -2306,11 +2282,20 @@ $autoShowInsights = isset($_GET['show_insights']) || $success_message;
     }
 
     function openExamModal(examType) {
+        // Only allow current term exam
+        const currentTerm = '<?php echo $term; ?>';
+        const allowedExamType = currentTerm === 'midterm' ? 'midterm_exam' : 'final_exam';
+        
+        if (examType !== allowedExamType) {
+            alert('You can only add ' + currentTerm + ' exam in ' + currentTerm + ' term view.');
+            return;
+        }
+        
         document.getElementById('examType').value = examType;
         document.getElementById('examModalTitle').textContent = 
             examType === 'midterm_exam' ? 'Add Midterm Exam Score' : 'Add Final Exam Score';
         
-        // ALWAYS reset form values to empty to ensure clean state
+        // Reset form
         document.getElementById('examForm').reset();
         document.getElementById('exam_score').value = '';
         document.getElementById('max_score').value = '';
