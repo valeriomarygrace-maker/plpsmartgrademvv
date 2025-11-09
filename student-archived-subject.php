@@ -692,7 +692,6 @@ function calculateDetailedGradesForArchivedSubject($archived_subject_id) {
     ];
 }
 
-// Add these helper functions
 function getSubjectRiskDescription($grade) {
     if ($grade >= 85) return 'Low Risk';
     elseif ($grade >= 80) return 'Moderate Risk';
