@@ -9,8 +9,8 @@ class MLService {
             return [
                 'success' => false, 
                 'source' => 'disabled',
-                'risk_level' => calculateRiskLevel($subjectGrade),
-                'risk_description' => getRiskDescription(calculateRiskLevel($subjectGrade))
+                'risk_level' => self::calculateRiskLevel($subjectGrade),
+                'risk_description' => self::getRiskDescription(self::calculateRiskLevel($subjectGrade))
             ];
         }
         
@@ -53,9 +53,25 @@ class MLService {
         return [
             'success' => false, 
             'source' => 'service_unavailable',
-            'risk_level' => calculateRiskLevel($subjectGrade),
-            'risk_description' => getRiskDescription(calculateRiskLevel($subjectGrade))
+            'risk_level' => self::calculateRiskLevel($subjectGrade),
+            'risk_description' => self::getRiskDescription(self::calculateRiskLevel($subjectGrade))
         ];
+    }
+    
+    // Add these as static methods inside MLService class
+    private static function calculateRiskLevel($grade) {
+        if ($grade >= 85) return 'low_risk';
+        elseif ($grade >= 80) return 'moderate_risk';
+        else return 'high_risk';
+    }
+
+    private static function getRiskDescription($riskLevel) {
+        switch ($riskLevel) {
+            case 'low_risk': return 'Excellent/Good Performance';
+            case 'moderate_risk': return 'Needs Improvement';
+            case 'high_risk': return 'Need to Communicate with Professor';
+            default: return 'No Data Inputted';
+        }
     }
     
     public static function setEnabled($enabled) {
@@ -296,22 +312,6 @@ class InterventionSystem {
         }
         
         return $recommendations;
-    }
-}
-
-// Global helper functions
-function calculateRiskLevel($grade) {
-    if ($grade >= 85) return 'low_risk';
-    elseif ($grade >= 80) return 'moderate_risk';
-    else return 'high_risk';
-}
-
-function getRiskDescription($riskLevel) {
-    switch ($riskLevel) {
-        case 'low_risk': return 'Excellent/Good Performance';
-        case 'moderate_risk': return 'Needs Improvement';
-        case 'high_risk': return 'Need to Communicate with Professor';
-        default: return 'No Data Inputted';
     }
 }
 ?>
