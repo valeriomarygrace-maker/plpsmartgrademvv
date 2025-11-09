@@ -34,21 +34,12 @@ try {
     $subject_count = $check_subjects ? count($check_subjects) : 0;
     
     if ($subject_count == 0) {
-         $actual_subjects = [
-                        // First Semester
-                        ['COMP 104', 'Data Structures and Algorithms', 3, 'First Semester'],
-                        ['COMP 105', 'Information Management', 3, 'First Semester'],
-                        ['IT 102', 'Quantitative Methods', 3, 'First Semester'],
-                        ['IT 201', 'IT Elective: Platform Technologies', 3, 'First Semester'],
-                        ['IT 202', 'IT Elective: Object-Oriented Programming (VB.Net)', 3, 'First Semester'],
-                        
-                        // Second Semester
-                        ['IT 103', 'Advanced Database Systems', 3, 'Second Semester'],
-                        ['IT 104', 'Integrative Programming and Technologies I', 3, 'Second Semester'],
-                        ['IT 105', 'Networking I', 3, 'Second Semester'],
-                        ['IT 301', 'Web Programming', 3, 'Second Semester'],
-                        ['COMP 106', 'Applications Development and Emerging Technologies', 3, 'Second Semester']
-                    ];
+        $actual_subjects = [
+            // First Semester
+            ['subject_code' => 'COMP 104', 'subject_name' => 'Data Structures and Algorithms', 'credits' => 3, 'semester' => 'First Semester'],
+            ['subject_code' => 'COMP 105', 'subject_name' => 'Information Management', 'credits' => 3, 'semester' => 'First Semester'],
+            // ... your other subjects
+        ];
         
         foreach ($actual_subjects as $subject_data) {
             $subject_data['created_at'] = date('Y-m-d H:i:s');
@@ -86,27 +77,31 @@ try {
         '1st Semester' => 'First Semester',
         '2nd Semester' => 'Second Semester', 
         '1st' => 'First Semester',
-        '2nd' => 'Second Semester',
-        'First Semester' => 'First Semester',
-        'Second Semester' => 'Second Semester',
-        'First' => 'First Semester',
-        'Second' => 'Second Semester'
+        '2nd' => 'Second Semester'
     ];
     
     $student_semester_raw = $student['semester'];
-    $student_semester = $semester_mapping[$student_semester_raw] ?? $student_semester_raw;
+    $student_semester = $semester_mapping[$student_semester_raw] ?? 'First Semester';
     
-    // Try multiple approaches to find subjects
     $all_subjects = supabaseFetch('subjects', ['semester' => $student_semester]);
     
-    // If no subjects found, try with raw semester
     if (!$all_subjects || count($all_subjects) === 0) {
         $all_subjects = supabaseFetch('subjects', ['semester' => $student_semester_raw]);
-    }
-    
-    // If still no subjects, get all subjects
-    if (!$all_subjects || count($all_subjects) === 0) {
-        $all_subjects = supabaseFetchAll('subjects');
+        
+        if (!$all_subjects || count($all_subjects) === 0) {
+            $all_subjects = supabaseFetchAll('subjects');
+            if ($all_subjects) {
+                $all_subjects = array_filter($all_subjects, function($subject) use ($student_semester, $student_semester_raw) {
+                    $subject_semester = strtolower($subject['semester'] ?? '');
+                    $search_semester = strtolower($student_semester);
+                    $search_semester_raw = strtolower($student_semester_raw);
+                    
+                    return strpos($subject_semester, $search_semester) !== false || 
+                           strpos($subject_semester, $search_semester_raw) !== false;
+                });
+                $all_subjects = array_values($all_subjects);
+            }
+        }
     }
     
     $enrolled_subject_ids = [];
@@ -187,15 +182,122 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_subject'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
     $subject_record_id = $_POST['subject_record_id'];
     
-    // Use the simple archive function
-    $archive_result = archiveSubject($subject_record_id, $student['id']);
-    
-    if ($archive_result['success']) {
-        $success_message = $archive_result['message'];
-        header("Location: student-subjects.php");
-        exit;
-    } else {
-        $error_message = $archive_result['message'];
+    try {
+        $subject_data = supabaseFetch('student_subjects', ['id' => $subject_record_id, 'student_id' => $student['id']]);
+        if (!$subject_data || count($subject_data) === 0) {
+            throw new Exception("Subject not found.");
+        }
+        
+        $subject_to_archive = $subject_data[0];
+        
+        // Archive the main subject record
+        $archived_subject = supabaseInsert('archived_subjects', [
+            'student_id' => $subject_to_archive['student_id'],
+            'subject_id' => $subject_to_archive['subject_id'],
+            'professor_name' => $subject_to_archive['professor_name'],
+            'archived_at' => date('Y-m-d H:i:s')
+        ]);
+        
+        if (!$archived_subject) {
+            throw new Exception("Failed to archive subject.");
+        }
+        
+        $archived_subject_id = $archived_subject['id'];
+        
+        // Archive categories and scores
+        $categories = supabaseFetch('student_class_standing_categories', ['student_subject_id' => $subject_record_id]);
+        
+        if ($categories && is_array($categories)) {
+            foreach ($categories as $category) {
+                $archived_category = supabaseInsert('archived_class_standing_categories', [
+                    'archived_subject_id' => $archived_subject_id,
+                    'category_name' => $category['category_name'],
+                    'category_percentage' => $category['category_percentage'],
+                    'archived_at' => date('Y-m-d H:i:s')
+                ]);
+                
+                if ($archived_category) {
+                    $archived_category_id = $archived_category['id'];
+                    
+                    $scores = supabaseFetch('student_subject_scores', ['category_id' => $category['id']]);
+                    if ($scores && is_array($scores)) {
+                        foreach ($scores as $score) {
+                            supabaseInsert('archived_subject_scores', [
+                                'archived_category_id' => $archived_category_id,
+                                'score_type' => $score['score_type'],
+                                'score_name' => $score['score_name'],
+                                'score_value' => $score['score_value'],
+                                'max_score' => $score['max_score'],
+                                'score_date' => $score['score_date'],
+                                'archived_at' => date('Y-m-d H:i:s')
+                            ]);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Archive exam scores
+        $exam_scores = supabaseFetch('student_subject_scores', [
+            'student_subject_id' => $subject_record_id, 
+            'category_id' => NULL
+        ]);
+
+        if ($exam_scores && is_array($exam_scores)) {
+            foreach ($exam_scores as $score) {
+                $exam_category = supabaseInsert('archived_class_standing_categories', [
+                    'archived_subject_id' => $archived_subject_id,
+                    'category_name' => 'Exam Scores',
+                    'category_percentage' => 0,
+                    'archived_at' => date('Y-m-d H:i:s')
+                ]);
+                
+                if ($exam_category) {
+                    supabaseInsert('archived_subject_scores', [
+                        'archived_category_id' => $exam_category['id'],
+                        'score_type' => $score['score_type'],
+                        'score_name' => $score['score_name'],
+                        'score_value' => $score['score_value'],
+                        'max_score' => $score['max_score'],
+                        'score_date' => $score['score_date'],
+                        'archived_at' => date('Y-m-d H:i:s')
+                    ]);
+                }
+            }
+        }
+                
+        // Archive performance data
+        $performance_data = supabaseFetch('subject_performance', ['student_subject_id' => $subject_record_id]);
+        if ($performance_data && count($performance_data) > 0) {
+            $performance = $performance_data[0];
+            supabaseInsert('archived_subject_performance', [
+                'archived_subject_id' => $archived_subject_id,
+                'overall_grade' => $performance['overall_grade'],
+                'gpa' => $performance['gpa'],
+                'class_standing' => $performance['class_standing'],
+                'exams_score' => $performance['exams_score'],
+                'risk_level' => $performance['risk_level'],
+                'risk_description' => $performance['risk_description'],
+                'archived_at' => date('Y-m-d H:i:s')
+            ]);
+        }
+        
+        // Delete from active tables
+        supabaseDelete('student_subject_scores', ['student_subject_id' => $subject_record_id]);
+        supabaseDelete('student_class_standing_categories', ['student_subject_id' => $subject_record_id]);
+        supabaseDelete('subject_performance', ['student_subject_id' => $subject_record_id]);
+        $delete_result = supabaseDelete('student_subjects', ['id' => $subject_record_id]);
+        
+        if ($delete_result) {
+            $success_message = 'Subject archived successfully with all records preserved!';
+            header("Location: student-subjects.php");
+            exit;
+        } else {
+            throw new Exception("Failed to delete subject from active records.");
+        }
+        
+    } catch (Exception $e) {
+        $error_message = 'Database error during archiving: ' . $e->getMessage();
     }
 }
 
