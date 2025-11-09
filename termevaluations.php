@@ -74,7 +74,7 @@ try {
     ]);
     
     // Calculate Midterm Grade
-    if ($midtermCategories) {
+    if ($midtermCategories && is_array($midtermCategories)) {
         $midtermClassStandings = array_filter($allScores, function($score) {
             if ($score['score_type'] !== 'class_standing') return false;
             if (!$score['category_id']) return false;
@@ -92,7 +92,7 @@ try {
         
         foreach ($midtermCategories as $category) {
             $midtermCategoryTotals[$category['id']] = [
-                'percentage' => $category['category_percentage'],
+                'percentage' => floatval($category['category_percentage']),
                 'total_score' => 0,
                 'max_possible' => 0
             ];
@@ -101,15 +101,23 @@ try {
         foreach ($midtermClassStandings as $standing) {
             if ($standing['category_id'] && isset($midtermCategoryTotals[$standing['category_id']])) {
                 $categoryId = $standing['category_id'];
-                $categoryName = $midtermCategories[array_search($categoryId, array_column($midtermCategories, 'id'))]['category_name'];
+                $categoryName = '';
                 
-                if (strtolower($categoryName) === 'attendance') {
+                // Find category name
+                foreach ($midtermCategories as $cat) {
+                    if ($cat['id'] == $categoryId) {
+                        $categoryName = strtolower($cat['category_name']);
+                        break;
+                    }
+                }
+                
+                if ($categoryName === 'attendance') {
                     $scoreValue = ($standing['score_name'] === 'Present') ? 1 : 0;
                     $midtermCategoryTotals[$categoryId]['total_score'] += $scoreValue;
                     $midtermCategoryTotals[$categoryId]['max_possible'] += 1;
                 } else {
-                    $midtermCategoryTotals[$categoryId]['total_score'] += $standing['score_value'];
-                    $midtermCategoryTotals[$categoryId]['max_possible'] += $standing['max_score'];
+                    $midtermCategoryTotals[$categoryId]['total_score'] += floatval($standing['score_value']);
+                    $midtermCategoryTotals[$categoryId]['max_possible'] += floatval($standing['max_score']);
                 }
             }
         }
@@ -134,8 +142,8 @@ try {
         $midtermExamScore = 0;
         if (!empty($midtermExam)) {
             $midterm = reset($midtermExam);
-            if ($midterm['max_score'] > 0) {
-                $midtermPercentage = ($midterm['score_value'] / $midterm['max_score']) * 100;
+            if (floatval($midterm['max_score']) > 0) {
+                $midtermPercentage = (floatval($midterm['score_value']) / floatval($midterm['max_score'])) * 100;
                 $midtermExamScore = ($midtermPercentage * 40) / 100;
             }
         }
@@ -147,7 +155,7 @@ try {
     }
     
     // Calculate Final Grade
-    if ($finalCategories) {
+    if ($finalCategories && is_array($finalCategories)) {
         $finalClassStandings = array_filter($allScores, function($score) {
             if ($score['score_type'] !== 'class_standing') return false;
             if (!$score['category_id']) return false;
@@ -165,7 +173,7 @@ try {
         
         foreach ($finalCategories as $category) {
             $finalCategoryTotals[$category['id']] = [
-                'percentage' => $category['category_percentage'],
+                'percentage' => floatval($category['category_percentage']),
                 'total_score' => 0,
                 'max_possible' => 0
             ];
@@ -174,15 +182,23 @@ try {
         foreach ($finalClassStandings as $standing) {
             if ($standing['category_id'] && isset($finalCategoryTotals[$standing['category_id']])) {
                 $categoryId = $standing['category_id'];
-                $categoryName = $finalCategories[array_search($categoryId, array_column($finalCategories, 'id'))]['category_name'];
+                $categoryName = '';
                 
-                if (strtolower($categoryName) === 'attendance') {
+                // Find category name
+                foreach ($finalCategories as $cat) {
+                    if ($cat['id'] == $categoryId) {
+                        $categoryName = strtolower($cat['category_name']);
+                        break;
+                    }
+                }
+                
+                if ($categoryName === 'attendance') {
                     $scoreValue = ($standing['score_name'] === 'Present') ? 1 : 0;
                     $finalCategoryTotals[$categoryId]['total_score'] += $scoreValue;
                     $finalCategoryTotals[$categoryId]['max_possible'] += 1;
                 } else {
-                    $finalCategoryTotals[$categoryId]['total_score'] += $standing['score_value'];
-                    $finalCategoryTotals[$categoryId]['max_possible'] += $standing['max_score'];
+                    $finalCategoryTotals[$categoryId]['total_score'] += floatval($standing['score_value']);
+                    $finalCategoryTotals[$categoryId]['max_possible'] += floatval($standing['max_score']);
                 }
             }
         }
@@ -207,8 +223,8 @@ try {
         $finalExamScore = 0;
         if (!empty($finalExam)) {
             $final = reset($finalExam);
-            if ($final['max_score'] > 0) {
-                $finalPercentage = ($final['score_value'] / $final['max_score']) * 100;
+            if (floatval($final['max_score']) > 0) {
+                $finalPercentage = (floatval($final['score_value']) / floatval($final['max_score'])) * 100;
                 $finalExamScore = ($finalPercentage * 40) / 100;
             }
         }
@@ -232,7 +248,11 @@ try {
         $subjectGrade = 100;
     }
     
+    // DEBUG: Log the calculated grades
+    error_log("Calculated Grades - Subject: $subjectGrade, Midterm: $midtermGrade, Final: $finalGrade");
+    
 } catch (Exception $e) {
+    error_log("Error calculating grades: " . $e->getMessage());
     // If there's an error calculating grades, they will remain 0
 }
 
@@ -260,7 +280,6 @@ function getSubjectRiskDetailedDescription($grade) {
     else return 'Need to Communicate with Professor';
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>

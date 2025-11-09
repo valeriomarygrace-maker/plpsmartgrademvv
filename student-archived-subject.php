@@ -114,13 +114,19 @@ try {
                 
                 // Use archived performance data if available, otherwise use calculated data
                 $final_performance = $archived_performance ? [
-                    'midterm_grade' => $archived_performance['class_standing'] ?? 0,
-                    'final_grade' => $archived_performance['exams_score'] ?? 0,
-                    'subject_grade' => $archived_performance['overall_grade'] ?? 0,
+                    'midterm_grade' => $archived_performance['midterm_grade'] ?? $archived_performance['class_standing'] ?? 0,
+                    'final_grade' => $archived_performance['final_grade'] ?? $archived_performance['exams_score'] ?? 0,
+                    'subject_grade' => $archived_performance['subject_grade'] ?? $archived_performance['overall_grade'] ?? 0,
                     'risk_level' => $archived_performance['risk_level'] ?? 'no-data',
                     'risk_description' => $archived_performance['risk_description'] ?? 'No Data Inputted',
-                    'has_scores' => ($archived_performance['overall_grade'] ?? 0) > 0
+                    'has_scores' => ($archived_performance['subject_grade'] ?? $archived_performance['overall_grade'] ?? 0) > 0
                 ] : $calculated_performance;
+                
+                // DEBUG: Log the performance data
+                error_log("Archived Subject {$archived_subject['id']}: " . 
+                         "Subject Grade: {$final_performance['subject_grade']}, " .
+                         "Midterm: {$final_performance['midterm_grade']}, " .
+                         "Final: {$final_performance['final_grade']}");
                 
                 // Combine all data
                 $archived_subjects[] = array_merge($archived_subject, [
