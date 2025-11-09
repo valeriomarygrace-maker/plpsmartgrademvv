@@ -1,11 +1,6 @@
 <?php
 require_once 'config.php';
 
-// Remove the session_start() here since it's already handled in config.php
-// if (session_status() === PHP_SESSION_NONE) {
-//     session_start();
-// }
-
 if (!isset($_SESSION['logged_in']) || $_SESSION['user_type'] !== 'student') {
     header('Location: login.php');
     exit;
@@ -36,19 +31,19 @@ try {
     if ($subject_count == 0) {
         $actual_subjects = [
             // First Semester
-                        ['COMP 104', 'Data Structures and Algorithms', 3, 'First Semester'],
-                        ['COMP 105', 'Information Management', 3, 'First Semester'],
-                        ['IT 102', 'Quantitative Methods', 3, 'First Semester'],
-                        ['IT 201', 'IT Elective: Platform Technologies', 3, 'First Semester'],
-                        ['IT 202', 'IT Elective: Object-Oriented Programming (VB.Net)', 3, 'First Semester'],
-                        
-                        // Second Semester
-                        ['IT 103', 'Advanced Database Systems', 3, 'Second Semester'],
-                        ['IT 104', 'Integrative Programming and Technologies I', 3, 'Second Semester'],
-                        ['IT 105', 'Networking I', 3, 'Second Semester'],
-                        ['IT 301', 'Web Programming', 3, 'Second Semester'],
-                        ['COMP 106', 'Applications Development and Emerging Technologies', 3, 'Second Semester']
-                    ];
+            ['COMP 104', 'Data Structures and Algorithms', 3, 'First Semester'],
+            ['COMP 105', 'Information Management', 3, 'First Semester'],
+            ['IT 102', 'Quantitative Methods', 3, 'First Semester'],
+            ['IT 201', 'IT Elective: Platform Technologies', 3, 'First Semester'],
+            ['IT 202', 'IT Elective: Object-Oriented Programming (VB.Net)', 3, 'First Semester'],
+            
+            // Second Semester
+            ['IT 103', 'Advanced Database Systems', 3, 'Second Semester'],
+            ['IT 104', 'Integrative Programming and Technologies I', 3, 'Second Semester'],
+            ['IT 105', 'Networking I', 3, 'Second Semester'],
+            ['IT 301', 'Web Programming', 3, 'Second Semester'],
+            ['COMP 106', 'Applications Development and Emerging Technologies', 3, 'Second Semester']
+        ];
         
         foreach ($actual_subjects as $subject_data) {
             $subject_data['created_at'] = date('Y-m-d H:i:s');
@@ -135,7 +130,7 @@ try {
     $available_subjects = [];
 }
 
-// Handle add subject
+// Handle add subject - FIXED: Removed schedule requirement
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_subject'])) {
     $subject_id = $_POST['subject_id'];
     $professor_name = trim($_POST['professor_name']);
@@ -150,6 +145,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_subject'])) {
                 'student_id' => $student['id'],
                 'subject_id' => $subject_id,
                 'professor_name' => $professor_name,
+                'schedule' => 'Not Set', // Default value for required field
                 'created_at' => date('Y-m-d H:i:s')
             ];
             
@@ -160,7 +156,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_subject'])) {
                 header("Location: student-subjects.php");
                 exit;
             } else {
-                $error_message = 'Failed to add subject.';
+                $error_message = 'Failed to add subject. Please try again.';
             }
         } catch (Exception $e) {
             $error_message = 'Database error: ' . $e->getMessage();
@@ -187,7 +183,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_subject'])) {
     }
 }
 
-// Handle archive subject
+// Handle archive subject - FIXED: Removed schedule reference
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
     $subject_record_id = $_POST['subject_record_id'];
     
@@ -199,12 +195,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
         
         $subject_to_archive = $subject_data[0];
         
-        // Archive the main subject record - include schedule even if empty
+        // Archive the main subject record
         $archived_subject = supabaseInsert('archived_subjects', [
             'student_id' => $subject_to_archive['student_id'],
             'subject_id' => $subject_to_archive['subject_id'],
             'professor_name' => $subject_to_archive['professor_name'],
-            'schedule' => $subject_to_archive['schedule'] ?? 'Not Set', // Add schedule field
+            'schedule' => 'Not Set', // Default value
             'archived_at' => date('Y-m-d H:i:s')
         ]);
         
@@ -314,7 +310,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
     }
 }
 
-// Handle update subject
+// Handle update subject - FIXED: Only professor name
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
     $subject_record_id = $_POST['subject_record_id'];
     $professor_name = trim($_POST['professor_name']);
@@ -351,7 +347,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
     <title>My Subjects - PLP SmartGrade</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<style>
+    <style>
+        /* Your existing CSS styles remain exactly the same */
         :root {
             --plp-green: #006341;
             --plp-green-light: #008856;
@@ -1461,7 +1458,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
     </div>
 
     <script>
-        // Your JavaScript code remains exactly the same
         const addSubjectBtn = document.getElementById('addSubjectBtn');
         const addSubjectModal = document.getElementById('addSubjectModal');
         const cancelAddSubject = document.getElementById('cancelAddSubject');
