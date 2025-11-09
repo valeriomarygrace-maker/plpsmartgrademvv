@@ -36,10 +36,19 @@ try {
     if ($subject_count == 0) {
         $actual_subjects = [
             // First Semester
-            ['subject_code' => 'COMP 104', 'subject_name' => 'Data Structures and Algorithms', 'credits' => 3, 'semester' => 'First Semester'],
-            ['subject_code' => 'COMP 105', 'subject_name' => 'Information Management', 'credits' => 3, 'semester' => 'First Semester'],
-            // ... your other subjects
-        ];
+                        ['COMP 104', 'Data Structures and Algorithms', 3, 'First Semester'],
+                        ['COMP 105', 'Information Management', 3, 'First Semester'],
+                        ['IT 102', 'Quantitative Methods', 3, 'First Semester'],
+                        ['IT 201', 'IT Elective: Platform Technologies', 3, 'First Semester'],
+                        ['IT 202', 'IT Elective: Object-Oriented Programming (VB.Net)', 3, 'First Semester'],
+                        
+                        // Second Semester
+                        ['IT 103', 'Advanced Database Systems', 3, 'Second Semester'],
+                        ['IT 104', 'Integrative Programming and Technologies I', 3, 'Second Semester'],
+                        ['IT 105', 'Networking I', 3, 'Second Semester'],
+                        ['IT 301', 'Web Programming', 3, 'Second Semester'],
+                        ['COMP 106', 'Applications Development and Emerging Technologies', 3, 'Second Semester']
+                    ];
         
         foreach ($actual_subjects as $subject_data) {
             $subject_data['created_at'] = date('Y-m-d H:i:s');
@@ -190,11 +199,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
         
         $subject_to_archive = $subject_data[0];
         
-        // Archive the main subject record
+        // Archive the main subject record - include schedule even if empty
         $archived_subject = supabaseInsert('archived_subjects', [
             'student_id' => $subject_to_archive['student_id'],
             'subject_id' => $subject_to_archive['subject_id'],
             'professor_name' => $subject_to_archive['professor_name'],
+            'schedule' => $subject_to_archive['schedule'] ?? 'Not Set', // Add schedule field
             'archived_at' => date('Y-m-d H:i:s')
         ]);
         
@@ -237,24 +247,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
             }
         }
         
-        // Archive exam scores
+        // Archive exam scores (scores without category_id)
         $exam_scores = supabaseFetch('student_subject_scores', [
             'student_subject_id' => $subject_record_id, 
             'category_id' => NULL
         ]);
 
         if ($exam_scores && is_array($exam_scores)) {
-            foreach ($exam_scores as $score) {
-                $exam_category = supabaseInsert('archived_class_standing_categories', [
-                    'archived_subject_id' => $archived_subject_id,
-                    'category_name' => 'Exam Scores',
-                    'category_percentage' => 0,
-                    'archived_at' => date('Y-m-d H:i:s')
-                ]);
-                
-                if ($exam_category) {
+            // Create a special category for exam scores
+            $exam_category = supabaseInsert('archived_class_standing_categories', [
+                'archived_subject_id' => $archived_subject_id,
+                'category_name' => 'Exam Scores',
+                'category_percentage' => 0,
+                'archived_at' => date('Y-m-d H:i:s')
+            ]);
+            
+            if ($exam_category) {
+                $exam_category_id = $exam_category['id'];
+                foreach ($exam_scores as $score) {
                     supabaseInsert('archived_subject_scores', [
-                        'archived_category_id' => $exam_category['id'],
+                        'archived_category_id' => $exam_category_id,
                         'score_type' => $score['score_type'],
                         'score_name' => $score['score_name'],
                         'score_value' => $score['score_value'],
@@ -298,6 +310,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
         
     } catch (Exception $e) {
         $error_message = 'Database error during archiving: ' . $e->getMessage();
+        error_log("Archive error: " . $e->getMessage());
     }
 }
 
