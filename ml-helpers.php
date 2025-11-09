@@ -334,7 +334,7 @@ function getImprovementSuggestions($currentGrade, $targetGrade = 85) {
         } elseif ($improvementNeeded > 5) {
             $suggestions[] = "Consistent performance on remaining assessments should help reach target.";
         } else {
-            $suggestions[] = "Small improvements in upcoming assessment can help reach target.";
+            $suggestions[] = "Small improvements in upcoming assignments can help reach target.";
         }
     } else {
         $suggestions[] = "You're meeting or exceeding your target grade. Maintain this performance!";

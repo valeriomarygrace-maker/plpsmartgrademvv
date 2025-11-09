@@ -49,7 +49,7 @@ try {
                         'credits' => $subject_info['credits'],
                         'semester' => $subject_info['semester'],
                         'overall_grade' => $performance['overall_grade'] ?? 0,
-                        'subject_grade' => $performance['overall_grade'] ?? 0, // Changed from gwa to subject_grade
+                        'subject_grade' => $performance['overall_grade'] ?? 0,
                         'risk_level' => $performance['risk_level'] ?? 'no-data',
                         'has_scores' => ($performance && $performance['overall_grade'] > 0)
                     ]);
@@ -61,7 +61,7 @@ try {
         $recent_scores = getRecentScoresForStudent($student['id'], 3);
         
         // Calculate overall performance metrics
-        $performance_metrics = calculateOverallPerformanceMetrics($student['id']); // Renamed to avoid conflict
+        $performance_metrics = calculateOverallPerformanceMetrics($student['id']);
         
         // Get semester risk data for the graph
         $semester_risk_data = getSemesterRiskData($student['id']);
@@ -138,7 +138,7 @@ function calculateOverallPerformanceMetrics($student_id) {
         'total_subjects' => 0,
         'subjects_with_scores' => 0,
         'average_grade' => 0,
-        'average_subject_grade' => 0, // Changed from average_gwa
+        'average_subject_grade' => 0,
         'low_risk_count' => 0,
         'medium_risk_count' => 0,
         'high_risk_count' => 0
@@ -151,7 +151,7 @@ function calculateOverallPerformanceMetrics($student_id) {
         if ($student_subjects && is_array($student_subjects)) {
             $metrics['total_subjects'] = count($student_subjects);
             $total_grade = 0;
-            $total_subject_grade = 0; // Changed from total_gwa
+            $total_subject_grade = 0;
             $subjects_with_data = 0;
             
             foreach ($student_subjects as $subject_record) {
@@ -162,7 +162,7 @@ function calculateOverallPerformanceMetrics($student_id) {
                     if ($performance['overall_grade'] > 0) {
                         $metrics['subjects_with_scores']++;
                         $total_grade += $performance['overall_grade'];
-                        $total_subject_grade += $performance['overall_grade']; // Use percentage grade directly
+                        $total_subject_grade += $performance['overall_grade'];
                         $subjects_with_data++;
                         
                         // Count risk levels
@@ -183,7 +183,7 @@ function calculateOverallPerformanceMetrics($student_id) {
             
             if ($subjects_with_data > 0) {
                 $metrics['average_grade'] = round($total_grade / $subjects_with_data, 1);
-                $metrics['average_subject_grade'] = round($total_subject_grade / $subjects_with_data, 1); // Changed from average_gwa
+                $metrics['average_subject_grade'] = round($total_subject_grade / $subjects_with_data, 1);
             }
         }
         
@@ -229,7 +229,7 @@ function getUniqueProfessors($student_id) {
 }
 
 /**
- * Get semester risk data for bar chart - UPDATED FOR DUAL RISK DISPLAY
+ * Get semester risk data for bar chart
  */
 function getSemesterRiskData($student_id) {
     $data = [
@@ -282,7 +282,7 @@ function getSemesterRiskData($student_id) {
                         $is_high_risk = ($risk_level === 'high' || $risk_level === 'failed');
                         $is_low_risk = ($risk_level === 'low' || $risk_level === 'medium');
                     } else {
-                        // Calculate performance if not stored (same as archived subjects page)
+                        // Calculate performance if not stored
                         $calculated_performance = calculateArchivedSubjectPerformance($archived_subject['id']);
                         if ($calculated_performance) {
                             $final_grade = $calculated_performance['overall_grade'];
@@ -345,7 +345,7 @@ function getSemesterRiskData($student_id) {
 }
 
 /**
- * Calculate performance for archived subject (same as in student-archived-subject.php)
+ * Calculate performance for archived subject
  */
 function calculateArchivedSubjectPerformance($archived_subject_id) {
     try {
@@ -414,7 +414,7 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
         if (!$hasScores) {
             return [
                 'overall_grade' => 0,
-                'subject_grade' => 0, // Changed from gwa
+                'subject_grade' => 0,
                 'class_standing' => 0,
                 'exams_score' => 0,
                 'risk_level' => 'no-data',
@@ -449,7 +449,7 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
         
         return [
             'overall_grade' => $overallGrade,
-            'subject_grade' => $overallGrade, // Use percentage grade directly
+            'subject_grade' => $overallGrade,
             'class_standing' => $totalClassStanding,
             'exams_score' => $midtermScore + $finalScore,
             'risk_level' => $riskLevel,
@@ -1360,9 +1360,9 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
         function initializeCharts() {
             const semesterRiskData = <?php echo json_encode($semester_risk_data); ?>;
             
-            console.log('Risk Data:', semesterRiskData); // Debug log
+            console.log('Risk Data:', semesterRiskData);
             
-            // Risk Overview Chart (for the 3-column grid)
+            // Risk Overview Chart
             const riskOverviewCtx = document.getElementById('riskOverviewChart')?.getContext('2d');
             if (riskOverviewCtx) {
                 // Calculate data for the chart
