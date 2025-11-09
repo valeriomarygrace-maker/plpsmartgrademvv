@@ -70,8 +70,7 @@ $allScores = [];
 
 try {
     $categories = supabaseFetch('student_class_standing_categories', [
-        'student_subject_id' => $subject_id,
-        'term_type' => $term
+        'student_subject_id' => $subject_id
     ]);
     if (!$categories) $categories = [];
 } catch (Exception $e) {
@@ -94,14 +93,11 @@ try {
             $category_data = supabaseFetch('student_class_standing_categories', ['id' => $score['category_id']]);
             if ($category_data && count($category_data) > 0) {
                 $score['category_name'] = $category_data[0]['category_name'];
-                $score['term_type'] = $category_data[0]['term_type'];
             } else {
                 $score['category_name'] = '';
-                $score['term_type'] = '';
             }
         } else {
             $score['category_name'] = '';
-            $score['term_type'] = '';
         }
     }
     
@@ -110,15 +106,8 @@ try {
 }
 
 // Filter scores based on CURRENT TERM ONLY
-$classStandings = array_filter($allScores, function($score) use ($term) {
-    if ($score['score_type'] !== 'class_standing') return false;
-    if (!$score['category_id']) return false;
-    
-    $category_data = supabaseFetch('student_class_standing_categories', ['id' => $score['category_id']]);
-    if ($category_data && count($category_data) > 0) {
-        return $category_data[0]['term_type'] === $term;
-    }
-    return false;
+$classStandings = array_filter($allScores, function($score) {
+    return $score['score_type'] === 'class_standing';
 });
 
 // Get exam scores
@@ -239,27 +228,15 @@ if ($hasScores) {
     $finalTotal = 0;
     
     // Get midterm total grade
-    $midtermCategories = supabaseFetch('student_class_standing_categories', [
-        'student_subject_id' => $subject_id,
-        'term_type' => 'midterm'
-    ]);
+    $midtermClassStandings = array_filter($allScores, function($score) {
+        return $score['score_type'] === 'class_standing';
+    });
     
-    if ($midtermCategories) {
-        $midtermClassStandings = array_filter($allScores, function($score) {
-            if ($score['score_type'] !== 'class_standing') return false;
-            if (!$score['category_id']) return false;
-            
-            $category_data = supabaseFetch('student_class_standing_categories', ['id' => $score['category_id']]);
-            if ($category_data && count($category_data) > 0) {
-                return $category_data[0]['term_type'] === 'midterm';
-            }
-            return false;
-        });
-        
+    if ($midtermClassStandings) {
         $midtermClassStandingTotal = 0;
         $midtermCategoryTotals = [];
         
-        foreach ($midtermCategories as $category) {
+        foreach ($categories as $category) {
             $midtermCategoryTotals[$category['id']] = [
                 'percentage' => $category['category_percentage'],
                 'total_score' => 0,
@@ -270,7 +247,7 @@ if ($hasScores) {
         foreach ($midtermClassStandings as $standing) {
             if ($standing['category_id'] && isset($midtermCategoryTotals[$standing['category_id']])) {
                 $categoryId = $standing['category_id'];
-                $categoryName = $midtermCategories[array_search($categoryId, array_column($midtermCategories, 'id'))]['category_name'];
+                $categoryName = $categories[array_search($categoryId, array_column($categories, 'id'))]['category_name'];
                 
                 if (strtolower($categoryName) === 'attendance') {
                     $scoreValue = ($standing['score_name'] === 'Present') ? 1 : 0;
@@ -308,27 +285,15 @@ if ($hasScores) {
     }
     
     // Get final total grade
-    $finalCategories = supabaseFetch('student_class_standing_categories', [
-        'student_subject_id' => $subject_id,
-        'term_type' => 'final'
-    ]);
+    $finalClassStandings = array_filter($allScores, function($score) {
+        return $score['score_type'] === 'class_standing';
+    });
     
-    if ($finalCategories) {
-        $finalClassStandings = array_filter($allScores, function($score) {
-            if ($score['score_type'] !== 'class_standing') return false;
-            if (!$score['category_id']) return false;
-            
-            $category_data = supabaseFetch('student_class_standing_categories', ['id' => $score['category_id']]);
-            if ($category_data && count($category_data) > 0) {
-                return $category_data[0]['term_type'] === 'final';
-            }
-            return false;
-        });
-        
+    if ($finalClassStandings) {
         $finalClassStandingTotal = 0;
         $finalCategoryTotals = [];
         
-        foreach ($finalCategories as $category) {
+        foreach ($categories as $category) {
             $finalCategoryTotals[$category['id']] = [
                 'percentage' => $category['category_percentage'],
                 'total_score' => 0,
@@ -339,7 +304,7 @@ if ($hasScores) {
         foreach ($finalClassStandings as $standing) {
             if ($standing['category_id'] && isset($finalCategoryTotals[$standing['category_id']])) {
                 $categoryId = $standing['category_id'];
-                $categoryName = $finalCategories[array_search($categoryId, array_column($finalCategories, 'id'))]['category_name'];
+                $categoryName = $categories[array_search($categoryId, array_column($categories, 'id'))]['category_name'];
                 
                 if (strtolower($categoryName) === 'attendance') {
                     $scoreValue = ($standing['score_name'] === 'Present') ? 1 : 0;
@@ -526,7 +491,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'student_subject_id' => $subject_id,
                     'category_name' => $category_name,
                     'category_percentage' => $category_percentage,
-                    'term_type' => $term, // Current term only
                     'created_at' => date('Y-m-d H:i:s')
                 ];
                 
@@ -535,8 +499,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($result) {
                     $success_message = 'Category added successfully!';
                     $scoreUpdated = true;
+                    
+                    // Refresh the page to show the new category
+                    echo "<script>window.location.href = 'subject-management.php?subject_id=$subject_id&term=$term&success=category_added';</script>";
+                    exit;
                 } else {
-                    $error_message = 'Failed to add category.';
+                    $error_message = 'Failed to add category. Please check your database connection.';
                 }
             } catch (Exception $e) {
                 $error_message = 'Database error: ' . $e->getMessage();
@@ -552,10 +520,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $max_score = floatval($_POST['max_score']);
         $score_date = $_POST['score_date'];
         
-        // Verify category belongs to current term
+        // Verify category exists
         $category_data = supabaseFetch('student_class_standing_categories', ['id' => $category_id]);
-        if (!$category_data || $category_data[0]['term_type'] !== $term) {
-            $error_message = 'Invalid category for current term.';
+        if (!$category_data) {
+            $error_message = 'Invalid category.';
         } elseif (empty($score_name) || $score_value < 0 || $max_score <= 0 || empty($score_date)) {
             $error_message = 'Please fill all fields with valid values.';
         } elseif ($score_value > $max_score) {
@@ -604,10 +572,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $attendance_date = $_POST['attendance_date'];
         $attendance_status = $_POST['attendance_status'];
         
-        // Verify category belongs to current term
+        // Verify category exists
         $category_data = supabaseFetch('student_class_standing_categories', ['id' => $category_id]);
-        if (!$category_data || $category_data[0]['term_type'] !== $term) {
-            $error_message = 'Invalid category for current term.';
+        if (!$category_data) {
+            $error_message = 'Invalid category.';
         } elseif (empty($attendance_date)) {
             $error_message = 'Please select a date.';
         } else {
@@ -728,42 +696,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($score_data && count($score_data) > 0) {
                 $score = $score_data[0];
                 
-                // Verify score belongs to current term
-                if ($score['category_id']) {
-                    $category_data = supabaseFetch('student_class_standing_categories', ['id' => $score['category_id']]);
-                    if (!$category_data || $category_data[0]['term_type'] !== $term) {
-                        $error_message = 'Cannot update score from different term.';
-                    }
-                } else if ($score['score_type'] === 'midterm_exam' && $term !== 'midterm') {
-                    $error_message = 'Cannot update midterm exam in final term view.';
-                } else if ($score['score_type'] === 'final_exam' && $term !== 'final') {
-                    $error_message = 'Cannot update final exam in midterm term view.';
-                }
-                
-                if (!$error_message) {
-                    $score_value = floatval($_POST['score_value']);
-                    if ($score_value > $score['max_score']) {
-                        $error_message = 'Score value cannot exceed maximum score of ' . $score['max_score'];
+                $score_value = floatval($_POST['score_value']);
+                if ($score_value > $score['max_score']) {
+                    $error_message = 'Score value cannot exceed maximum score of ' . $score['max_score'];
+                } else {
+                    $update_data = ['score_value' => $score_value];
+                    $result = supabaseUpdate('student_subject_scores', $update_data, ['id' => $score_id]);
+                    
+                    if ($result) {
+                        $success_message = 'Score updated successfully!';
+                        $scoreUpdated = true;
+                        InterventionSystem::logBehavior(
+                            $student['id'], 
+                            'grade_update', 
+                            [
+                                'subject_id' => $subject_id,
+                                'subject_name' => $subject['subject_name'],
+                                'action' => 'update_score',
+                                'term' => $term
+                            ]
+                        );
                     } else {
-                        $update_data = ['score_value' => $score_value];
-                        $result = supabaseUpdate('student_subject_scores', $update_data, ['id' => $score_id]);
-                        
-                        if ($result) {
-                            $success_message = 'Score updated successfully!';
-                            $scoreUpdated = true;
-                            InterventionSystem::logBehavior(
-                                $student['id'], 
-                                'grade_update', 
-                                [
-                                    'subject_id' => $subject_id,
-                                    'subject_name' => $subject['subject_name'],
-                                    'action' => 'update_score',
-                                    'term' => $term
-                                ]
-                            );
-                        } else {
-                            $error_message = 'Failed to update score.';
-                        }
+                        $error_message = 'Failed to update score.';
                     }
                 }
             } else {
@@ -782,29 +736,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $score_data = supabaseFetch('student_subject_scores', ['id' => $score_id]);
             
             if ($score_data && count($score_data) > 0) {
-                $score = $score_data[0];
+                $result = supabaseDelete('student_subject_scores', ['id' => $score_id]);
                 
-                // Verify score belongs to current term
-                if ($score['category_id']) {
-                    $category_data = supabaseFetch('student_class_standing_categories', ['id' => $score['category_id']]);
-                    if (!$category_data || $category_data[0]['term_type'] !== $term) {
-                        $error_message = 'Cannot delete score from different term.';
-                    }
-                } else if ($score['score_type'] === 'midterm_exam' && $term !== 'midterm') {
-                    $error_message = 'Cannot delete midterm exam in final term view.';
-                } else if ($score['score_type'] === 'final_exam' && $term !== 'final') {
-                    $error_message = 'Cannot delete final exam in midterm term view.';
-                }
-                
-                if (!$error_message) {
-                    $result = supabaseDelete('student_subject_scores', ['id' => $score_id]);
-                    
-                    if ($result) {
-                        $success_message = 'Score deleted successfully!';
-                        $scoreUpdated = true;
-                    } else {
-                        $error_message = 'Failed to delete score.';
-                    }
+                if ($result) {
+                    $success_message = 'Score deleted successfully!';
+                    $scoreUpdated = true;
+                } else {
+                    $error_message = 'Failed to delete score.';
                 }
             } else {
                 $error_message = 'Score not found.';
@@ -819,10 +757,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $category_id = intval($_POST['category_id']);
         
         try {
-            // Verify category belongs to current term
+            // Verify category exists
             $category_data = supabaseFetch('student_class_standing_categories', ['id' => $category_id]);
-            if (!$category_data || $category_data[0]['term_type'] !== $term) {
-                $error_message = 'Cannot delete category from different term.';
+            if (!$category_data) {
+                $error_message = 'Category not found.';
             } else {
                 supabaseDelete('student_subject_scores', ['category_id' => $category_id]);
                 $result = supabaseDelete('student_class_standing_categories', ['id' => $category_id]);
