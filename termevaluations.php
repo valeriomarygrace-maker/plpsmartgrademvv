@@ -804,18 +804,7 @@ function getSubjectRiskDetailedDescription($grade) {
                                 <div class="stat-label">Midterm Exam</div>
                             </div>
                         </div>
-            
-                        <div class="term-stats">
-                            <div class="stat-item">
-                                <div class="stat-value">60%</div>
-                                <div class="stat-label">Class Standing</div>
-                            </div>
-                            <div class="stat-item">
-                                <div class="stat-value">40%</div>
-                                <div class="stat-label">Midterm Exam</div>
-                            </div>
-                        </div>
-                </div>
+                    </div>
 
                 <!-- Final Card -->
                 <div class="term-card final" onclick="window.location.href='subject-management.php?subject_id=<?php echo $subject_id; ?>&term=final'">
@@ -830,21 +819,10 @@ function getSubjectRiskDetailedDescription($grade) {
                                 <div class="stat-label">Final Exam</div>
                             </div>
                         </div>
-
-                        <div class="term-stats">
-                            <div class="stat-item">
-                                <div class="stat-value">60%</div>
-                                <div class="stat-label">Class Standing</div>
-                            </div>
-                            <div class="stat-item">
-                                <div class="stat-value">40%</div>
-                                <div class="stat-label">Final Exam</div>
-                            </div>
-                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
 
     <script>
         // Add click handlers for the term cards
