@@ -7,8 +7,7 @@ CREATE TABLE public.archived_class_standing_categories (
   category_name character varying NOT NULL,
   category_percentage numeric NOT NULL,
   archived_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT archived_class_standing_categories_pkey PRIMARY KEY (id),
-  CONSTRAINT archived_class_standing_categories_archived_subject_id_fkey FOREIGN KEY (archived_subject_id) REFERENCES public.archived_subjects(id)
+  CONSTRAINT archived_class_standing_categories_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.archived_subject_performance (
   id bigint NOT NULL DEFAULT nextval('archived_subject_performance_id_seq'::regclass),
@@ -20,8 +19,7 @@ CREATE TABLE public.archived_subject_performance (
   risk_level character varying DEFAULT 'no-data'::character varying,
   risk_description character varying DEFAULT 'No Data Inputted'::character varying,
   archived_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT archived_subject_performance_pkey PRIMARY KEY (id),
-  CONSTRAINT archived_subject_performance_archived_subject_id_fkey FOREIGN KEY (archived_subject_id) REFERENCES public.archived_subjects(id)
+  CONSTRAINT archived_subject_performance_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.archived_subject_scores (
   id bigint NOT NULL DEFAULT nextval('archived_subject_scores_id_seq'::regclass),
@@ -40,7 +38,11 @@ CREATE TABLE public.archived_subjects (
   student_id bigint NOT NULL,
   subject_id bigint NOT NULL,
   professor_name character varying NOT NULL,
-  schedule character varying NOT NULL,
+  schedule character varying DEFAULT 'Not Set'::character varying,
+  subject_code character varying NOT NULL,
+  subject_name character varying NOT NULL,
+  credits integer NOT NULL,
+  semester character varying NOT NULL,
   archived_at timestamp with time zone DEFAULT now(),
   CONSTRAINT archived_subjects_pkey PRIMARY KEY (id),
   CONSTRAINT archived_subjects_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id),
@@ -175,7 +177,6 @@ CREATE TABLE public.subjects (
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT subjects_pkey PRIMARY KEY (id)
 );
-
 
 --NEW DATABASE---------------
 

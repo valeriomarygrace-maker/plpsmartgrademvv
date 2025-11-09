@@ -86,31 +86,27 @@ try {
         '1st Semester' => 'First Semester',
         '2nd Semester' => 'Second Semester', 
         '1st' => 'First Semester',
-        '2nd' => 'Second Semester'
+        '2nd' => 'Second Semester',
+        'First Semester' => 'First Semester',
+        'Second Semester' => 'Second Semester',
+        'First' => 'First Semester',
+        'Second' => 'Second Semester'
     ];
     
     $student_semester_raw = $student['semester'];
-    $student_semester = $semester_mapping[$student_semester_raw] ?? 'First Semester';
+    $student_semester = $semester_mapping[$student_semester_raw] ?? $student_semester_raw;
     
+    // Try multiple approaches to find subjects
     $all_subjects = supabaseFetch('subjects', ['semester' => $student_semester]);
     
+    // If no subjects found, try with raw semester
     if (!$all_subjects || count($all_subjects) === 0) {
         $all_subjects = supabaseFetch('subjects', ['semester' => $student_semester_raw]);
-        
-        if (!$all_subjects || count($all_subjects) === 0) {
-            $all_subjects = supabaseFetchAll('subjects');
-            if ($all_subjects) {
-                $all_subjects = array_filter($all_subjects, function($subject) use ($student_semester, $student_semester_raw) {
-                    $subject_semester = strtolower($subject['semester'] ?? '');
-                    $search_semester = strtolower($student_semester);
-                    $search_semester_raw = strtolower($student_semester_raw);
-                    
-                    return strpos($subject_semester, $search_semester) !== false || 
-                           strpos($subject_semester, $search_semester_raw) !== false;
-                });
-                $all_subjects = array_values($all_subjects);
-            }
-        }
+    }
+    
+    // If still no subjects, get all subjects
+    if (!$all_subjects || count($all_subjects) === 0) {
+        $all_subjects = supabaseFetchAll('subjects');
     }
     
     $enrolled_subject_ids = [];
