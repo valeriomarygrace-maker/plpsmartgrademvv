@@ -1578,7 +1578,7 @@ function getGradeDescription($grade) {
             </div>
         </div>
 
-        <!-- Simplified Performance Overview - REMOVED GWA -->
+        <!-- Simplified Performance Overview  -->
         <div class="performance-overview">
             <div class="performance-grid">
                 <div class="performance-card">
@@ -2150,7 +2150,6 @@ function getGradeDescription($grade) {
     </div>
 
 <script>
-    // Add this JavaScript to force refresh and prevent caching
     document.addEventListener('DOMContentLoaded', function() {
         // Clear any cached form data
         if (window.history.replaceState) {

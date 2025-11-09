@@ -60,6 +60,12 @@ try {
     // Get all scores for this subject
     $allScores = supabaseFetch('student_subject_scores', ['student_subject_id' => $subject_id]);
     if (!$allScores) $allScores = [];
+    
+    // DEBUG: Log all scores found
+    error_log("All scores count: " . count($allScores));
+    foreach ($allScores as $score) {
+        error_log("Score - Type: " . $score['score_type'] . ", Name: " . $score['score_name'] . ", Value: " . $score['score_value']);
+    }
 
     // Get midterm categories
     $midtermCategories = supabaseFetch('student_class_standing_categories', [
@@ -73,6 +79,12 @@ try {
         'term_type' => 'final'
     ]);
 
+    // DEBUG: Log categories
+    error_log("Midterm categories: " . ($midtermCategories ? count($midtermCategories) : 0));
+    error_log("Final categories: " . ($finalCategories ? count($finalCategories) : 0));
+
+    // SIMPLIFIED GRADE CALCULATION - More reliable approach
+    
     // Calculate Midterm Grade
     if ($midtermCategories && count($midtermCategories) > 0) {
         $midtermClassStanding = 0;
@@ -191,7 +203,14 @@ try {
         if ($subjectGrade > 100) $subjectGrade = 100;
     }
     
+    // DEBUG: Log final calculated grades
+    error_log("FINAL CALCULATED GRADES:");
+    error_log("Subject Grade: " . $subjectGrade);
+    error_log("Midterm Grade: " . $midtermGrade);
+    error_log("Final Grade: " . $finalGrade);
+    
 } catch (Exception $e) {
+    error_log("Error calculating grades: " . $e->getMessage());
     // If there's an error calculating grades, they will remain 0
 }
 
@@ -211,7 +230,15 @@ function getSubjectRiskDescription($grade) {
     elseif ($grade >= 80) return 'Moderate Risk';
     else return 'High Risk';
 }
+
+// Get detailed risk description for SUBJECT GRADE
+function getSubjectRiskDetailedDescription($grade) {
+    if ($grade >= 85) return 'Excellent/Good Performance';
+    elseif ($grade >= 80) return 'Needs Improvement';
+    else return 'Need to Communicate with Professor';
+}
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -221,6 +248,7 @@ function getSubjectRiskDescription($grade) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        /* Your existing CSS styles remain the same */
         :root {
             --plp-green: #006341;
             --plp-green-light: #008856;
@@ -697,12 +725,25 @@ function getSubjectRiskDescription($grade) {
         <div class="header">
             <div class="header-content">
                 <div class="subject-name"><?php echo htmlspecialchars($subject['subject_code'] . ' - ' . $subject['subject_name']); ?></div>
+                <div style="width: 100px;"></div> 
                 <a href="student-subjects.php" class="back-btn">
                     <i class="fas fa-arrow-left"></i>
                     Back
                 </a>
             </div>
         </div>
+
+        <!-- Optional: Debug Information (remove in production) -->
+        <?php if (isset($_GET['debug'])): ?>
+        <div class="debug-info">
+            <strong>Debug Information:</strong><br>
+            Subject ID: <?php echo $subject_id; ?><br>
+            Student ID: <?php echo $student['id']; ?><br>
+            Midterm Grade: <?php echo $midtermGrade; ?><br>
+            Final Grade: <?php echo $finalGrade; ?><br>
+            Subject Grade: <?php echo $subjectGrade; ?><br>
+        </div>
+        <?php endif; ?>
 
         <div class="card">
             <!-- Overview Section -->
@@ -762,17 +803,6 @@ function getSubjectRiskDescription($grade) {
                 <!-- Midterm Card -->
                 <div class="term-card midterm" onclick="window.location.href='subject-management.php?subject_id=<?php echo $subject_id; ?>&term=midterm'">
                     <div class="term-title">MIDTERM</div>
-                    <?php if ($midtermGrade > 0): ?>
-                        <div class="term-grade"><?php echo number_format($midtermGrade, 1); ?>%</div>
-                        <div class="term-grade-description">
-                            <?php echo getTermGradeDescription($midtermGrade); ?>
-                        </div>
-                    <?php else: ?>
-                        <div class="term-grade no-data">--</div>
-                        <div class="term-grade-description">
-                            No midterm grades calculated
-                        </div>
-                    <?php endif; ?>
                     <div class="term-stats">
                         <div class="stat-item">
                             <div class="stat-value">60%</div>
@@ -788,17 +818,6 @@ function getSubjectRiskDescription($grade) {
                 <!-- Final Card -->
                 <div class="term-card final" onclick="window.location.href='subject-management.php?subject_id=<?php echo $subject_id; ?>&term=final'">
                     <div class="term-title">FINAL</div>
-                    <?php if ($finalGrade > 0): ?>
-                        <div class="term-grade"><?php echo number_format($finalGrade, 1); ?>%</div>
-                        <div class="term-grade-description">
-                            <?php echo getTermGradeDescription($finalGrade); ?>
-                        </div>
-                    <?php else: ?>
-                        <div class="term-grade no-data">--</div>
-                        <div class="term-grade-description">
-                            No final grades calculated
-                        </div>
-                    <?php endif; ?>
                     <div class="term-stats">
                         <div class="stat-item">
                             <div class="stat-value">60%</div>
@@ -815,6 +834,7 @@ function getSubjectRiskDescription($grade) {
     </div>
 
     <script>
+        // Add click handlers for the term cards
         document.querySelectorAll('.term-card').forEach(card => {
             card.addEventListener('click', function() {
                 const url = this.getAttribute('onclick').match(/'([^']+)'/)[1];
