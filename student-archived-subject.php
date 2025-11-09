@@ -58,12 +58,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_subject'])) {
             throw new Exception("This subject is already in your active subjects.");
         }
         
-        // Restore to student_subjects
+        // Restore to student_subjects - NO SCHEDULE FIELD
         $restore_data = [
             'student_id' => $archived_subject['student_id'],
             'subject_id' => $archived_subject['subject_id'],
             'professor_name' => $archived_subject['professor_name'],
-            'schedule' => $archived_subject['schedule'],
             'created_at' => date('Y-m-d H:i:s')
         ];
         
@@ -216,7 +215,7 @@ try {
                     } else {
                         $performance = [
                             'overall_grade' => 0,
-                            'gwa' => 0,
+                            'subject_grade' => 0,
                             'class_standing' => 0,
                             'exams_score' => 0,
                             'risk_level' => 'no-data',
@@ -235,7 +234,7 @@ try {
                     'credits' => $subject_info['credits'],
                     'semester' => $subject_info['semester'],
                     'overall_grade' => $performance['overall_grade'] ?? 0,
-                    'gwa' => $performance['gwa'] ?? 0,
+                    'subject_grade' => $performance['subject_grade'] ?? 0,
                     'class_standing' => $performance['class_standing'] ?? 0,
                     'exams_score' => $performance['exams_score'] ?? 0,
                     'risk_level' => $performance['risk_level'] ?? 'no-data',
@@ -260,7 +259,7 @@ try {
 }
 
 /**
- * Calculate performance for archived subject from scores (Supabase version) - UPDATED FOR GWA
+ * Calculate performance for archived subject from scores (Supabase version) - UPDATED FOR SUBJECT GRADE
  */
 function calculateArchivedSubjectPerformance($archived_subject_id) {
     try {
@@ -329,7 +328,7 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
         if (!$hasScores) {
             return [
                 'overall_grade' => 0,
-                'gwa' => 0,
+                'subject_grade' => 0,
                 'class_standing' => 0,
                 'exams_score' => 0,
                 'risk_level' => 'no-data',
@@ -344,20 +343,17 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
             $overallGrade = 100;
         }
         
-        // Calculate GWA (General Weighted Average) - Philippine system
-        $gwa = calculateGWA($overallGrade);
-        
-        // Calculate risk level based on GWA
+        // Calculate risk level based on percentage grade
         $riskLevel = 'no-data';
         $riskDescription = 'No Data Inputted';
 
-        if ($gwa <= 1.75) {
+        if ($overallGrade >= 85) {
             $riskLevel = 'low';
             $riskDescription = 'Low Risk';
-        } elseif ($gwa <= 2.50) {
+        } elseif ($overallGrade >= 80) {
             $riskLevel = 'medium';
             $riskDescription = 'Medium Risk';
-        } elseif ($gwa <= 3.00) {
+        } elseif ($overallGrade >= 75) {
             $riskLevel = 'high';
             $riskDescription = 'High Risk';
         } else {
@@ -367,7 +363,7 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
         
         return [
             'overall_grade' => $overallGrade,
-            'gwa' => $gwa,
+            'subject_grade' => $overallGrade,
             'class_standing' => $totalClassStanding,
             'exams_score' => $midtermScore + $finalScore,
             'risk_level' => $riskLevel,
@@ -382,19 +378,15 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
 }
 
 /**
- * Calculate GWA from grade (Philippine system)
+ * Get grade description for percentage grade
  */
-function calculateGWA($grade) {
-    if ($grade >= 90) return 1.00;
-    elseif ($grade >= 85) return 1.25;
-    elseif ($grade >= 80) return 1.50;
-    elseif ($grade >= 75) return 1.75;
-    elseif ($grade >= 70) return 2.00;
-    elseif ($grade >= 65) return 2.25;
-    elseif ($grade >= 60) return 2.50;
-    elseif ($grade >= 55) return 2.75;
-    elseif ($grade >= 50) return 3.00;
-    else return 5.00;
+function getGradeDescription($grade) {
+    if ($grade >= 90) return 'Excellent';
+    elseif ($grade >= 85) return 'Very Good';
+    elseif ($grade >= 80) return 'Good';
+    elseif ($grade >= 75) return 'Satisfactory';
+    elseif ($grade >= 70) return 'Passing';
+    else return 'Needs Improvement';
 }
 ?>
 
@@ -1436,10 +1428,6 @@ function calculateGWA($grade) {
                                     <span><strong>Professor:</strong> <?php echo htmlspecialchars($subject['professor_name']); ?></span>
                                 </div>
                                 <div class="info-item">
-                                    <i class="fas fa-calendar-alt"></i>
-                                    <span><strong>Schedule:</strong> <?php echo htmlspecialchars($subject['schedule']); ?></span>
-                                </div>
-                                <div class="info-item">
                                     <i class="fas fa-calendar"></i>
                                     <span><strong>Semester:</strong> <?php echo htmlspecialchars($subject['semester']); ?></span>
                                 </div>
@@ -1448,7 +1436,7 @@ function calculateGWA($grade) {
                                     <span><strong>Archived:</strong> <?php echo date('M j, Y g:i A', strtotime($subject['archived_at'])); ?></span>
                                 </div>
                             </div>
-                            
+
                             <div class="subject-actions">
                                 <form action="student-archived-subject.php" method="POST" style="display: inline;">
                                     <input type="hidden" name="archived_subject_id" value="<?php echo $subject['id']; ?>">
@@ -1458,7 +1446,7 @@ function calculateGWA($grade) {
                                 </form>
                                 <button type="button" class="btn-view" onclick="openViewModal(
                                     <?php echo $subject['overall_grade'] ?? 0; ?>,
-                                    <?php echo $subject['gwa'] ?? 0; ?>,
+                                    <?php echo $subject['subject_grade'] ?? 0; ?>,
                                     <?php echo $subject['class_standing'] ?? 0; ?>,
                                     <?php echo $subject['exams_score'] ?? 0; ?>,
                                     '<?php echo $subject['risk_level'] ?? 'no-data'; ?>',
@@ -1491,8 +1479,8 @@ function calculateGWA($grade) {
                     </div>
                     
                     <div class="detail-item">
-                        <div class="detail-label">GWA</div>
-                        <div class="detail-value" id="view_gwa" style="font-size: 1.4rem; font-weight: 700; color: var(--plp-green); margin: 0.5rem 0;">--</div>
+                        <div class="detail-label">Subject Grade</div>
+                        <div class="detail-value" id="view_subject_grade" style="font-size: 1.4rem; font-weight: 700; color: var(--plp-green); margin: 0.5rem 0;">--</div>
                         <div class="risk-badge" id="view_risk_badge" style="display: none; margin-top: 0.2rem;">No Data</div>
                     </div>
                     
@@ -1581,76 +1569,19 @@ function calculateGWA($grade) {
         });
 
         function openViewModal(
-            overallGrade = 0, gwa = 0, classStanding = 0, examsScore = 0, riskLevel = 'no-data', 
+            overallGrade = 0, subjectGrade = 0, classStanding = 0, examsScore = 0, riskLevel = 'no-data', 
             riskDescription = 'No Data Inputted', hasScores = false
         ) {
+            console.log('Opening modal with data:', { overallGrade, subjectGrade, classStanding, examsScore, riskLevel, riskDescription, hasScores });
+            
             // Set performance data
             const overallGradeNum = parseFloat(overallGrade) || 0;
-            const gwaNum = parseFloat(gwa) || 0;
+            const subjectGradeNum = parseFloat(subjectGrade) || 0;
             const classStandingNum = parseFloat(classStanding) || 0;
             const examsScoreNum = parseFloat(examsScore) || 0;
             
             document.getElementById('view_overall_grade').textContent = hasScores ? overallGradeNum.toFixed(1) + '%' : '--';
-            document.getElementById('view_gwa').textContent = hasScores ? gwaNum.toFixed(2) : '--';
-            document.getElementById('view_class_standing').textContent = hasScores ? classStandingNum.toFixed(1) + '%' : '--';
-            document.getElementById('view_exams_score').textContent = hasScores ? examsScoreNum.toFixed(1) + '%' : '--';
-            document.getElementById('view_risk_description').textContent = riskDescription;
-            
-            // Set risk badge
-            const riskBadge = document.getElementById('view_risk_badge');
-            if (hasScores && riskLevel !== 'no-data') {
-                riskBadge.textContent = riskLevel.charAt(0).toUpperCase() + riskLevel.slice(1) + ' Risk';
-                riskBadge.className = 'risk-badge ' + riskLevel;
-                riskBadge.style.display = 'inline-block';
-            } else {
-                riskBadge.textContent = 'No Data';
-                riskBadge.className = 'risk-badge no-data';
-                riskBadge.style.display = 'inline-block';
-            }
-            
-            // Show modal
-            document.getElementById('viewModal').classList.add('show');
-        }
-
-        document.getElementById('closeViewModal').addEventListener('click', function() {
-            document.getElementById('viewModal').classList.remove('show');
-        });
-
-        // Close modal when clicking outside
-        window.addEventListener('click', function(e) {
-            if (e.target === document.getElementById('viewModal')) {
-                document.getElementById('viewModal').classList.remove('show');
-            }
-        });
-
-        // Auto-hide success/error messages
-        setTimeout(() => {
-            const alerts = document.querySelectorAll('.alert-success, .alert-error');
-            alerts.forEach(alert => {
-                alert.style.transition = 'opacity 0.1s ease';
-                alert.style.opacity = '0';
-                setTimeout(() => {
-                    if (alert.parentNode) {
-                        alert.remove();
-                    }
-                }, 100);
-            });
-        }, 1000);
-
-        function openViewModal(
-            overallGrade = 0, gwa = 0, classStanding = 0, examsScore = 0, riskLevel = 'no-data', 
-            riskDescription = 'No Data Inputted', hasScores = false
-        ) {
-            console.log('Opening modal with data:', { overallGrade, gwa, classStanding, examsScore, riskLevel, riskDescription, hasScores });
-            
-            // Set performance data
-            const overallGradeNum = parseFloat(overallGrade) || 0;
-            const gwaNum = parseFloat(gwa) || 0;
-            const classStandingNum = parseFloat(classStanding) || 0;
-            const examsScoreNum = parseFloat(examsScore) || 0;
-            
-            document.getElementById('view_overall_grade').textContent = hasScores ? overallGradeNum.toFixed(1) + '%' : '--';
-            document.getElementById('view_gwa').textContent = hasScores ? gwaNum.toFixed(2) : '--';
+            document.getElementById('view_subject_grade').textContent = hasScores ? subjectGradeNum.toFixed(1) + '%' : '--';
             document.getElementById('view_class_standing').textContent = hasScores ? classStandingNum.toFixed(1) + '%' : '--';
             document.getElementById('view_exams_score').textContent = hasScores ? examsScoreNum.toFixed(1) + '%' : '--';
             
@@ -1717,4 +1648,3 @@ function calculateGWA($grade) {
         });
     </script>
 </body>
-</html>

@@ -1,5 +1,6 @@
 <?php
 require_once 'config.php';
+require_once 'ml-helpers.php';
 
 // Start session if not already started
 if (session_status() === PHP_SESSION_NONE) {
@@ -65,19 +66,16 @@ try {
                         
                         $has_scores = false;
                         $overall_grade = 0;
-                        $gwa = 0;
                         
                         if ($performance) {
                             $has_scores = true;
                             $overall_grade = $performance['overall_grade'] ?? 0;
-                            $gwa = $performance['gwa'] ?? calculateGWA($overall_grade);
                         } else {
                             // Calculate performance from scores if no performance data exists
                             $calculated_performance = calculateArchivedSubjectPerformance($archived_subject['id']);
                             if ($calculated_performance && $calculated_performance['has_scores']) {
                                 $has_scores = true;
                                 $overall_grade = $calculated_performance['overall_grade'];
-                                $gwa = $calculated_performance['gwa'];
                             }
                         }
                         
@@ -88,10 +86,8 @@ try {
                             'credits' => $subject['credits'],
                             'semester' => $subject['semester'],
                             'professor_name' => $archived_subject['professor_name'],
-                            'schedule' => $archived_subject['schedule'],
                             'archived_at' => $archived_subject['archived_at'],
                             'overall_grade' => $overall_grade,
-                            'gwa' => $gwa,
                             'has_scores' => $has_scores
                         ];
                     }
@@ -110,14 +106,14 @@ try {
 }
 
 /**
- * Calculate performance for archived subject from scores - UPDATED FOR GWA
+ * Calculate performance for archived subject from scores
  */
 function calculateArchivedSubjectPerformance($archived_subject_id) {
     try {
         // Get all categories for this archived subject
         $categories = supabaseFetch('archived_class_standing_categories', ['archived_subject_id' => $archived_subject_id]);
         
-        if (empty($categories)) {
+        if (!$categories || !is_array($categories)) {
             return null;
         }
         
@@ -128,21 +124,24 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
         
         // Calculate class standing from categories
         foreach ($categories as $category) {
-            $scores = supabaseFetch('archived_subject_scores', ['archived_category_id' => $category['id'], 'score_type' => 'class_standing']);
+            $scores = supabaseFetch('archived_subject_scores', [
+                'archived_category_id' => $category['id'], 
+                'score_type' => 'class_standing'
+            ]);
             
-            if (!empty($scores)) {
+            if ($scores && is_array($scores) && count($scores) > 0) {
                 $hasScores = true;
                 $categoryTotal = 0;
                 $categoryMax = 0;
                 
                 foreach ($scores as $score) {
-                    $categoryTotal += $score['score_value'];
-                    $categoryMax += $score['max_score'];
+                    $categoryTotal += floatval($score['score_value']);
+                    $categoryMax += floatval($score['max_score']);
                 }
                 
                 if ($categoryMax > 0) {
                     $categoryPercentage = ($categoryTotal / $categoryMax) * 100;
-                    $weightedScore = ($categoryPercentage * $category['category_percentage']) / 100;
+                    $weightedScore = ($categoryPercentage * floatval($category['category_percentage'])) / 100;
                     $totalClassStanding += $weightedScore;
                 }
             }
@@ -153,26 +152,29 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
             $totalClassStanding = 60;
         }
         
-        // Get exam scores
-        $midterm_exams = supabaseFetch('archived_subject_scores', ['score_type' => 'midterm_exam']);
-        $final_exams = supabaseFetch('archived_subject_scores', ['score_type' => 'final_exam']);
-        $exam_scores = array_merge($midterm_exams ?: [], $final_exams ?: []);
-        
-        foreach ($exam_scores as $exam) {
-            if ($exam['max_score'] > 0) {
-                $examPercentage = ($exam['score_value'] / $exam['max_score']) * 100;
-                if ($exam['score_type'] === 'midterm_exam') {
-                    $midtermScore = ($examPercentage * 20) / 100;
-                } elseif ($exam['score_type'] === 'final_exam') {
-                    $finalScore = ($examPercentage * 20) / 100;
+        // Get exam scores from all categories for this archived subject
+        foreach ($categories as $category) {
+            $exam_scores = supabaseFetch('archived_subject_scores', ['archived_category_id' => $category['id']]);
+            
+            if ($exam_scores && is_array($exam_scores)) {
+                foreach ($exam_scores as $exam) {
+                    if (floatval($exam['max_score']) > 0) {
+                        $examPercentage = (floatval($exam['score_value']) / floatval($exam['max_score'])) * 100;
+                        if ($exam['score_type'] === 'midterm_exam') {
+                            $midtermScore = ($examPercentage * 20) / 100;
+                            $hasScores = true;
+                        } elseif ($exam['score_type'] === 'final_exam') {
+                            $finalScore = ($examPercentage * 20) / 100;
+                            $hasScores = true;
+                        }
+                    }
                 }
             }
         }
         
-        if (!$hasScores && $midtermScore == 0 && $finalScore == 0) {
+        if (!$hasScores) {
             return [
                 'overall_grade' => 0,
-                'gwa' => 0,
                 'has_scores' => false
             ];
         }
@@ -183,12 +185,8 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
             $overallGrade = 100;
         }
         
-        // Calculate GWA
-        $gwa = calculateGWA($overallGrade);
-        
         return [
             'overall_grade' => $overallGrade,
-            'gwa' => $gwa,
             'has_scores' => true
         ];
         
@@ -196,22 +194,6 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
         error_log("Error calculating archived subject performance: " . $e->getMessage());
         return null;
     }
-}
-
-/**
- * Calculate GWA from grade (Philippine system)
- */
-function calculateGWA($grade) {
-    if ($grade >= 90) return 1.00;
-    elseif ($grade >= 85) return 1.25;
-    elseif ($grade >= 80) return 1.50;
-    elseif ($grade >= 75) return 1.75;
-    elseif ($grade >= 70) return 2.00;
-    elseif ($grade >= 65) return 2.25;
-    elseif ($grade >= 60) return 2.50;
-    elseif ($grade >= 55) return 2.75;
-    elseif ($grade >= 50) return 3.00;
-    else return 5.00;
 }
 ?>
 <!DOCTYPE html>
@@ -849,9 +831,8 @@ function calculateGWA($grade) {
                                 <th>Subject Code</th>
                                 <th>Subject Description</th>
                                 <th>Professor</th>
-                                <th>Schedule</th>
                                 <th>Credits</th>
-                                <th>GWA</th>
+                                <th>Subject Grade</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -864,22 +845,21 @@ function calculateGWA($grade) {
                                         <div class="subject-name"><?php echo htmlspecialchars($subject['subject_name']); ?></div>
                                     </td>
                                     <td><?php echo htmlspecialchars($subject['professor_name']); ?></td>
-                                    <td><?php echo htmlspecialchars($subject['schedule']); ?></td>
                                     <td class="credits"><?php echo htmlspecialchars($subject['credits']); ?></td>
-                                    <td class="gwa 
+                                    <td class="grade 
                                         <?php if ($subject['has_scores']): ?>
                                             <?php 
-                                            if ($subject['gwa'] <= 1.25) echo 'gwa-excellent';
-                                            elseif ($subject['gwa'] <= 1.75) echo 'gwa-good';
-                                            elseif ($subject['gwa'] <= 2.50) echo 'gwa-average';
-                                            elseif ($subject['gwa'] <= 3.00) echo 'gwa-poor';
-                                            else echo 'gwa-failed';
+                                            if ($subject['overall_grade'] >= 90) echo 'grade-excellent';
+                                            elseif ($subject['overall_grade'] >= 85) echo 'grade-good';
+                                            elseif ($subject['overall_grade'] >= 80) echo 'grade-average';
+                                            elseif ($subject['overall_grade'] >= 75) echo 'grade-satisfactory';
+                                            else echo 'grade-poor';
                                             ?>
                                         <?php else: ?>
-                                            gwa-no-data
+                                            grade-no-data
                                         <?php endif; ?>
                                     ">
-                                        <?php echo $subject['has_scores'] ? number_format($subject['gwa'], 2) : '--'; ?>
+                                        <?php echo $subject['has_scores'] ? number_format($subject['overall_grade'], 1) . '%' : '--'; ?>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>

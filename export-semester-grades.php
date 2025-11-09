@@ -42,19 +42,16 @@ try {
                 
                 $has_scores = false;
                 $overall_grade = 0;
-                $gwa = 0;
                 
                 if ($performance) {
                     $has_scores = true;
                     $overall_grade = $performance['overall_grade'] ?? 0;
-                    $gwa = $performance['gpa'] ?? calculateGWA($overall_grade);
                 } else {
                     // Calculate performance from scores if no performance data exists
                     $calculated_performance = calculateArchivedSubjectPerformance($archived_subject['id']);
                     if ($calculated_performance && $calculated_performance['has_scores']) {
                         $has_scores = true;
                         $overall_grade = $calculated_performance['overall_grade'];
-                        $gwa = $calculated_performance['gwa'];
                     }
                 }
                 
@@ -62,10 +59,9 @@ try {
                     'subject_code' => $subject['subject_code'],
                     'subject_name' => $subject['subject_name'],
                     'professor_name' => $archived_subject['professor_name'],
-                    'schedule' => $archived_subject['schedule'],
                     'credits' => $subject['credits'],
-                    'gwa' => $has_scores ? number_format($gwa, 2) : '--',
-                    'overall_grade' => $has_scores ? number_format($overall_grade, 2) : '--',
+                    'subject_grade' => $has_scores ? number_format($overall_grade, 1) . '%' : '--',
+                    'overall_grade' => $has_scores ? number_format($overall_grade, 1) : '--',
                     'risk_level' => $performance['risk_level'] ?? 'no-data',
                     'risk_description' => $performance['risk_description'] ?? 'No Data Inputted'
                 ];
@@ -85,7 +81,7 @@ try {
     echo "<title>PLP SmartGrade - Semester Grades</title>";
     echo "<style>";
     echo "body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; color: #333; line-height: 1.4; }";
-    echo ".header { background: linear-gradient(135deg, #006341 0%, #008856 100%); color: #006341; padding: 25px; border-radius: 8px; margin-bottom: 25px; }";
+    echo ".header { background: linear-gradient(135deg, #006341 0%, #008856 100%); color: white; padding: 25px; border-radius: 8px; margin-bottom: 25px; }";
     echo ".header h1 { margin: 0 0 10px 0; font-size: 24px; font-weight: 700; }";
     echo ".header h2 { margin: 0 0 15px 0; font-size: 18px; font-weight: 600; opacity: 0.9; }";
     echo ".student-info { background: #f8fcf9; padding: 20px; border-radius: 6px; border-left: 4px solid #006341; margin-bottom: 20px; }";
@@ -110,6 +106,7 @@ try {
     echo ".grade-excellent { color: #28a745; font-weight: 700; }";
     echo ".grade-good { color: #17a2b8; font-weight: 700; }";
     echo ".grade-average { color: #ffc107; font-weight: 700; }";
+    echo ".grade-satisfactory { color: #6f42c1; font-weight: 700; }";
     echo ".grade-poor { color: #dc3545; font-weight: 700; }";
     echo ".text-center { text-align: center; }";
     echo ".text-right { text-align: right; }";
@@ -121,6 +118,7 @@ try {
     // Header
     echo "<div class='header'>";
     echo "<h1>PLP SMARTGRADE: " . htmlspecialchars($selected_semester) . "</h1>";
+    echo "<h2>Academic Record</h2>";
     echo "</div>";
     
     // Student Information
@@ -136,21 +134,19 @@ try {
         echo "<table class='grades-table'>";
         echo "<thead>";
         echo "<tr>";
-        echo "<th width='12%'>Subject Code</th>";
-        echo "<th width='25%'>Subject Description</th>";
-        echo "<th width='18%'>Professor</th>";
-        echo "<th width='15%'>Schedule</th>";
-        echo "<th width='8%' class='text-center'>Credits</th>";
-        echo "<th width='10%' class='text-center'>Grade %</th>";
-        echo "<th width='8%' class='text-center'>GWA</th>";
+        echo "<th width='15%'>Subject Code</th>";
+        echo "<th width='30%'>Subject Description</th>";
+        echo "<th width='20%'>Professor</th>";
+        echo "<th width='10%' class='text-center'>Credits</th>";
+        echo "<th width='15%' class='text-center'>Subject Grade</th>";
+        echo "<th width='10%' class='text-center'>Status</th>";
         echo "</tr>";
         echo "</thead>";
         echo "<tbody>";
         
         $total_credits = 0;
         $total_subjects = 0;
-        $total_gwa = 0;
-        $graded_subjects = 0;
+        $passed_subjects = 0;
         
         foreach ($semester_grades as $subject) {
             $total_subjects++;
@@ -164,30 +160,40 @@ try {
                 $risk_display = ucfirst($subject['risk_level']);
             }
             
-            // Determine grade styling
+            // Determine grade styling and count passed subjects
             $grade_class = '';
+            $status = 'No Data';
             if ($subject['overall_grade'] !== '--') {
                 $numeric_grade = floatval($subject['overall_grade']);
-                if ($numeric_grade >= 90) $grade_class = 'grade-excellent';
-                elseif ($numeric_grade >= 80) $grade_class = 'grade-good';
-                elseif ($numeric_grade >= 75) $grade_class = 'grade-average';
-                else $grade_class = 'grade-poor';
-            }
-            
-            // Calculate for semester GWA
-            if ($subject['gwa'] !== '--') {
-                $total_gwa += floatval($subject['gwa']);
-                $graded_subjects++;
+                if ($numeric_grade >= 90) {
+                    $grade_class = 'grade-excellent';
+                    $status = 'Excellent';
+                    $passed_subjects++;
+                } elseif ($numeric_grade >= 85) {
+                    $grade_class = 'grade-good';
+                    $status = 'Very Good';
+                    $passed_subjects++;
+                } elseif ($numeric_grade >= 80) {
+                    $grade_class = 'grade-average';
+                    $status = 'Good';
+                    $passed_subjects++;
+                } elseif ($numeric_grade >= 75) {
+                    $grade_class = 'grade-satisfactory';
+                    $status = 'Satisfactory';
+                    $passed_subjects++;
+                } else {
+                    $grade_class = 'grade-poor';
+                    $status = 'Failed';
+                }
             }
             
             echo "<tr>";
             echo "<td><span class='subject-code'>" . htmlspecialchars($subject['subject_code']) . "</span></td>";
             echo "<td>" . htmlspecialchars($subject['subject_name']) . "</td>";
             echo "<td>" . htmlspecialchars($subject['professor_name']) . "</td>";
-            echo "<td>" . htmlspecialchars($subject['schedule']) . "</td>";
             echo "<td class='text-center'><strong>" . htmlspecialchars($subject['credits']) . "</strong></td>";
-            echo "<td class='text-center " . $grade_class . "'><strong>" . $subject['overall_grade'] . "</strong></td>";
-            echo "<td class='text-center'><strong>" . $subject['gwa'] . "</strong></td>";
+            echo "<td class='text-center " . $grade_class . "'><strong>" . $subject['subject_grade'] . "</strong></td>";
+            echo "<td class='text-center'><span class='risk-badge " . $risk_class . "'>" . $status . "</span></td>";
             echo "</tr>";
         }
         
@@ -195,32 +201,29 @@ try {
         echo "</table>";
         
         // Summary Section
-        $semester_gwa = $graded_subjects > 0 ? $total_gwa / $graded_subjects : 0;
+        $completion_rate = $total_subjects > 0 ? ($passed_subjects / $total_subjects) * 100 : 0;
         
-        // Determine overall remark
-        $overall_remark = '';
-        $remark_class = '';
-        if ($semester_gwa > 0) {
-            if ($semester_gwa <= 1.25) {
-                $overall_remark = 'Excellent - Dean\'s List Potential';
-                $remark_class = 'grade-excellent';
-            } elseif ($semester_gwa <= 1.75) {
-                $overall_remark = 'Very Good - High Performance';
-                $remark_class = 'grade-good';
-            } elseif ($semester_gwa <= 2.50) {
-                $overall_remark = 'Good - Satisfactory Performance';
-                $remark_class = 'grade-average';
-            } elseif ($semester_gwa <= 3.00) {
-                $overall_remark = 'Fair - Needs Improvement';
-                $remark_class = 'grade-poor';
-            } else {
-                $overall_remark = 'Academic Probation Risk';
-                $remark_class = 'grade-poor';
-            }
-        } else {
-            $overall_remark = 'No Grade Data Available';
-            $remark_class = 'risk-no-data';
-        }
+        echo "<div class='summary'>";
+        echo "<h3>Semester Summary</h3>";
+        echo "<div class='summary-grid'>";
+        echo "<div class='summary-item'>";
+        echo "<div class='label'>Total Subjects</div>";
+        echo "<div class='value'>" . $total_subjects . "</div>";
+        echo "</div>";
+        echo "<div class='summary-item'>";
+        echo "<div class='label'>Total Credits</div>";
+        echo "<div class='value'>" . $total_credits . "</div>";
+        echo "</div>";
+        echo "<div class='summary-item'>";
+        echo "<div class='label'>Passed Subjects</div>";
+        echo "<div class='value'>" . $passed_subjects . "</div>";
+        echo "</div>";
+        echo "<div class='summary-item'>";
+        echo "<div class='label'>Completion Rate</div>";
+        echo "<div class='value'>" . number_format($completion_rate, 1) . "%</div>";
+        echo "</div>";
+        echo "</div>";
+        echo "</div>";
         
     } else {
         echo "<div style='text-align: center; padding: 40px; background: #f8fcf9; border-radius: 6px; margin: 20px 0;'>";
@@ -228,6 +231,12 @@ try {
         echo "<p>No academic records found for " . htmlspecialchars($selected_semester) . "</p>";
         echo "</div>";
     }
+    
+    // Footer
+    echo "<div class='footer'>";
+    echo "<p>Generated by PLP SmartGrade System | " . date('F j, Y') . "</p>";
+    echo "<p>This is an official academic record. For any discrepancies, please contact the registrar's office.</p>";
+    echo "</div>";
     
     echo "</body>";
     echo "</html>";
@@ -306,7 +315,6 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
         if (!$hasScores && $midtermScore == 0 && $finalScore == 0) {
             return [
                 'overall_grade' => 0,
-                'gwa' => 0,
                 'has_scores' => false
             ];
         }
@@ -317,12 +325,8 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
             $overallGrade = 100;
         }
         
-        // Calculate GWA
-        $gwa = calculateGWA($overallGrade);
-        
         return [
             'overall_grade' => $overallGrade,
-            'gwa' => $gwa,
             'has_scores' => true
         ];
         
@@ -330,21 +334,5 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
         error_log("Error calculating archived subject performance: " . $e->getMessage());
         return null;
     }
-}
-
-/**
- * Calculate GWA from grade (Philippine system)
- */
-function calculateGWA($grade) {
-    if ($grade >= 90) return 1.00;
-    elseif ($grade >= 85) return 1.25;
-    elseif ($grade >= 80) return 1.50;
-    elseif ($grade >= 75) return 1.75;
-    elseif ($grade >= 70) return 2.00;
-    elseif ($grade >= 65) return 2.25;
-    elseif ($grade >= 60) return 2.50;
-    elseif ($grade >= 55) return 2.75;
-    elseif ($grade >= 50) return 3.00;
-    else return 5.00;
 }
 ?>
