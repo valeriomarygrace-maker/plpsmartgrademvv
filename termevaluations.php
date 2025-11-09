@@ -552,7 +552,7 @@ function getSubjectRiskDetailedDescription($grade) {
             font-size: 0.75rem;
             font-weight: 600;
             text-align: center;
-            margin-top: 0.5rem;
+            margin-top: 0.2rem;
         }
 
         .risk-badge.low {
@@ -574,7 +574,7 @@ function getSubjectRiskDetailedDescription($grade) {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 2rem;
-            margin-top: 1.5rem;
+            margin-top: 1rem;
         }
 
         .term-card {
@@ -639,27 +639,6 @@ function getSubjectRiskDetailedDescription($grade) {
         .stat-label {
             font-size: 0.85rem;
             color: var(--text-medium);
-        }
-
-        .manage-btn {
-            background: var(--plp-green-gradient);
-            color: white;
-            border: none;
-            padding: 0.75rem 1.5rem;
-            border-radius: 50px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: var(--transition);
-            font-family: 'Poppins', sans-serif;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            text-decoration: none;
-        }
-
-        .manage-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 16px rgba(0, 99, 65, 0.4);
         }
 
         .no-data {
@@ -778,14 +757,10 @@ function getSubjectRiskDetailedDescription($grade) {
                             <?php if ($subjectGrade > 0): ?>
                                 <?php 
                                 $riskLevel = getSubjectRiskDescription($subjectGrade);
-                                $riskDetail = getSubjectRiskDetailedDescription($subjectGrade);
                                 ?>
                                 <span class="risk-badge <?php echo strtolower(str_replace(' ', '-', $riskLevel)); ?>">
                                     <?php echo $riskLevel; ?>
                                 </span>
-                                <div style="margin-top: 0.5rem; font-size: 0.75rem;">
-                                    <?php echo $riskDetail; ?>
-                                </div>
                             <?php else: ?>
                                 No grades calculated
                             <?php endif; ?>
@@ -823,10 +798,6 @@ function getSubjectRiskDetailedDescription($grade) {
                     <div class="term-title">MIDTERM</div>
                     
                     <?php if ($midtermGrade > 0): ?>
-                        <div class="term-grade"><?php echo number_format($midtermGrade, 1); ?>%</div>
-                        <div class="term-grade-description">
-                            <?php echo getTermGradeDescription($midtermGrade); ?>
-                        </div>
                         <div class="term-stats">
                             <div class="stat-item">
                                 <div class="stat-value">60%</div>
@@ -851,9 +822,6 @@ function getSubjectRiskDetailedDescription($grade) {
                             </div>
                         </div>
                     <?php endif; ?>
-                    <button class="manage-btn">
-                        <i class="fas fa-cog"></i> Manage Midterm
-                    </button>
                 </div>
 
                 <!-- Final Card -->
@@ -861,10 +829,6 @@ function getSubjectRiskDetailedDescription($grade) {
                     <div class="term-title">FINAL</div>
                     
                     <?php if ($finalGrade > 0): ?>
-                        <div class="term-grade"><?php echo number_format($finalGrade, 1); ?>%</div>
-                        <div class="term-grade-description">
-                            <?php echo getTermGradeDescription($finalGrade); ?>
-                        </div>
                         <div class="term-stats">
                             <div class="stat-item">
                                 <div class="stat-value">60%</div>
@@ -889,9 +853,6 @@ function getSubjectRiskDetailedDescription($grade) {
                             </div>
                         </div>
                     <?php endif; ?>
-                    <button class="manage-btn">
-                        <i class="fas fa-cog"></i> Manage Final
-                    </button>
                 </div>
             </div>
         </div>
@@ -902,16 +863,6 @@ function getSubjectRiskDetailedDescription($grade) {
         document.querySelectorAll('.term-card').forEach(card => {
             card.addEventListener('click', function() {
                 const url = this.getAttribute('onclick').match(/'([^']+)'/)[1];
-                window.location.href = url;
-            });
-        });
-
-        // Add click handlers for manage buttons to prevent double navigation
-        document.querySelectorAll('.manage-btn').forEach(button => {
-            button.addEventListener('click', function(e) {
-                e.stopPropagation();
-                const card = this.closest('.term-card');
-                const url = card.getAttribute('onclick').match(/'([^']+)'/)[1];
                 window.location.href = url;
             });
         });
