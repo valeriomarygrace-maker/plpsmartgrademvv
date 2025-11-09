@@ -1,5 +1,6 @@
 <?php
 require_once 'config.php';
+require_once 'ml-helpers.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -85,10 +86,19 @@ foreach ($categories as $category) {
 $remainingAllocation = 60 - $totalClassStandingPercentage;
 $canAddCategory = ($remainingAllocation > 0);
 
+// FORCE REFRESH - Clear any cached data
+clearstatcache();
+
 try {
     // Get ALL scores first
     $allScores = supabaseFetch('student_subject_scores', ['student_subject_id' => $subject_id]);
     if (!$allScores) $allScores = [];
+    
+    // DEBUG: Check what scores we're getting
+    error_log("All Scores Count: " . count($allScores));
+    foreach ($allScores as $score) {
+        error_log("Score: " . $score['score_name'] . " - " . $score['score_value'] . "/" . $score['max_score']);
+    }
     
     // Filter scores based on CURRENT TERM categories
     $filteredScores = [];
@@ -113,6 +123,7 @@ try {
     $allScores = $filteredScores;
     
 } catch (Exception $e) {
+    error_log("Error fetching scores: " . $e->getMessage());
     $allScores = [];
 }
 
@@ -139,12 +150,24 @@ $finalExam = array_filter($allScores, function($score) {
     return $score['score_type'] === 'final_exam';
 });
 
+// DEBUG: Check filtered scores
+error_log("Class Standings Count: " . count($classStandings));
+foreach ($classStandings as $standing) {
+    error_log("Class Standing: " . $standing['score_name'] . " - " . $standing['score_value'] . "/" . $standing['max_score']);
+}
+
 // Initialize variables
 $hasScores = !empty($classStandings) || ($term === 'midterm' && !empty($midtermExam)) || ($term === 'final' && !empty($finalExam));
 $totalClassStanding = 0;
 $midtermScore = 0;
 $finalScore = 0;
 $termGrade = 0;
+$subjectGrade = 0;
+$riskLevel = 'no-data';
+$riskDescription = 'No Data Inputted';
+$behavioralInsights = [];
+$interventions = [];
+$recommendations = [];
 
 // Calculate grades for CURRENT TERM ONLY
 if ($hasScores) {
@@ -158,7 +181,8 @@ if ($hasScores) {
             'total_score' => 0,
             'max_possible' => 0,
             'percentage_score' => 0,
-            'weighted_score' => 0
+            'weighted_score' => 0,
+            'low_scores' => []
         ];
     }
 
@@ -175,6 +199,17 @@ if ($hasScores) {
                 } else {
                     $categoryTotals[$categoryId]['total_score'] += $standing['score_value'];
                     $categoryTotals[$categoryId]['max_possible'] += $standing['max_score'];
+                    
+                    // Track low scores for behavioral insights
+                    $scorePercentage = ($standing['score_value'] / $standing['max_score']) * 100;
+                    if ($scorePercentage < 75) {
+                        $categoryTotals[$categoryId]['low_scores'][] = [
+                            'name' => $standing['score_name'],
+                            'score' => $standing['score_value'],
+                            'max_score' => $standing['max_score'],
+                            'percentage' => $scorePercentage
+                        ];
+                    }
                 }
             }
         }
@@ -224,10 +259,41 @@ if ($hasScores) {
     if ($termGrade > 100) {
         $termGrade = 100;
     }
+
+    // DEBUG: Show calculation results
+    error_log("Total Class Standing: " . $totalClassStanding);
+    error_log("Term Grade: " . $termGrade);
+
+} else {
+    // NO SCORES - SHOW ENCOURAGING MESSAGES
+    $termGrade = 0;
+    $subjectGrade = 0;
+    $totalClassStanding = 0;
+    $midtermScore = 0;
+    $finalScore = 0;
+    
+    // Provide basic insights even without scores
+    $behavioralInsights = [[
+        'message' => "Welcome to {$term} term! Start adding your scores to get personalized insights.",
+        'priority' => 'low',
+        'source' => 'system'
+    ]];
+    
+    $interventions = [[
+        'message' => "Begin by adding your class standing scores to track your performance.",
+        'priority' => 'low'
+    ]];
+    
+    $recommendations = [[
+        'message' => "Start tracking your quizzes, assignments, and projects to monitor your progress.",
+        'priority' => 'low',
+        'source' => 'system'
+    ]];
 }
 
 // FORM HANDLING - Only allow actions for current term
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $scoreUpdated = false;
     
     // ADD CLASS STANDING CATEGORY - Only for current term
     if (isset($_POST['add_category'])) {
@@ -252,7 +318,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 if ($result) {
                     $success_message = 'Category added successfully for ' . $term . ' term!';
-                    header("Location: subject-management.php?subject_id=$subject_id&term=$term&success=category_added");
+                    
+                    // IMMEDIATE REDIRECT WITH FORCE REFRESH
+                    header("Location: subject-management.php?subject_id=$subject_id&term=$term&success=category_added&t=" . time());
                     exit;
                 } else {
                     $error_message = 'Failed to add category. Please check your database connection.';
@@ -296,7 +364,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 if ($result) {
                     $success_message = 'Score added successfully!';
-                    header("Location: subject-management.php?subject_id=$subject_id&term=$term&success=score_added");
+                    
+                    // IMMEDIATE REDIRECT WITH FORCE REFRESH
+                    header("Location: subject-management.php?subject_id=$subject_id&term=$term&success=score_added&t=" . time());
                     exit;
                 } else {
                     $error_message = 'Failed to add score.';
@@ -347,7 +417,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     
                     if ($result) {
                         $success_message = 'Attendance recorded successfully!';
-                        header("Location: subject-management.php?subject_id=$subject_id&term=$term&success=attendance_added");
+                        
+                        // IMMEDIATE REDIRECT WITH FORCE REFRESH
+                        header("Location: subject-management.php?subject_id=$subject_id&term=$term&success=attendance_added&t=" . time());
                         exit;
                     } else {
                         $error_message = 'Failed to record attendance.';
@@ -396,7 +468,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 if ($result) {
                     $success_message = $exam_name . ' score added successfully!';
-                    header("Location: subject-management.php?subject_id=$subject_id&term=$term&success=exam_added");
+                    
+                    // IMMEDIATE REDIRECT WITH FORCE REFRESH
+                    header("Location: subject-management.php?subject_id=$subject_id&term=$term&success=exam_added&t=" . time());
                     exit;
                 } else {
                     $error_message = 'Failed to add exam score.';
@@ -426,7 +500,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     
                     if ($result) {
                         $success_message = 'Score updated successfully!';
-                        header("Location: subject-management.php?subject_id=$subject_id&term=$term&success=score_updated");
+                        
+                        // IMMEDIATE REDIRECT WITH FORCE REFRESH
+                        header("Location: subject-management.php?subject_id=$subject_id&term=$term&success=score_updated&t=" . time());
                         exit;
                     } else {
                         $error_message = 'Failed to update score.';
@@ -449,7 +525,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             if ($result) {
                 $success_message = 'Score deleted successfully!';
-                header("Location: subject-management.php?subject_id=$subject_id&term=$term&success=score_deleted");
+                
+                // IMMEDIATE REDIRECT WITH FORCE REFRESH
+                header("Location: subject-management.php?subject_id=$subject_id&term=$term&success=score_deleted&t=" . time());
                 exit;
             } else {
                 $error_message = 'Failed to delete score.';
@@ -476,7 +554,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 if ($result) {
                     $success_message = 'Category deleted successfully!';
-                    header("Location: subject-management.php?subject_id=$subject_id&term=$term&success=category_deleted");
+                    
+                    // IMMEDIATE REDIRECT WITH FORCE REFRESH
+                    header("Location: subject-management.php?subject_id=$subject_id&term=$term&success=category_deleted&t=" . time());
                     exit;
                 } else {
                     $error_message = 'Failed to delete category.';
@@ -486,6 +566,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error_message = 'Database error: ' . $e->getMessage();
         }
     }
+}
+
+// Helper functions
+function calculateRiskLevel($grade) {
+    if ($grade >= 85) return 'low_risk';
+    elseif ($grade >= 80) return 'moderate_risk';
+    else return 'high_risk';
+}
+
+function getRiskDescription($riskLevel) {
+    switch ($riskLevel) {
+        case 'low_risk': return 'Excellent/Good Performance';
+        case 'moderate_risk': return 'Needs Improvement';
+        case 'high_risk': return 'Need to Communicate with Professor';
+        default: return 'No Data Inputted';
+    }
+}
+
+function getGradeDescription($grade) {
+    if ($grade >= 90) return 'Excellent';
+    elseif ($grade >= 85) return 'Very Good';
+    elseif ($grade >= 80) return 'Good';
+    elseif ($grade >= 75) return 'Satisfactory';
+    elseif ($grade >= 70) return 'Passing';
+    else return 'Needs Improvement';
 }
 ?>
 <!DOCTYPE html>
@@ -1446,7 +1551,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
     </div>
    
-   
     <div class="main-content">
         <?php if ($success_message): ?>
             <div class="alert-success">
@@ -1468,13 +1572,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
             <div class="header-actions">
                 <a href="termevaluations.php?subject_id=<?php echo $subject_id; ?>" class="btn btn-secondary">
-                    <i class="fas fa-arrow-left"></i>
+                    <i class="fas <?php echo $term === 'midterm' ? 'fa-arrow-left' : 'fa-arrow-left'; ?>"></i>
                     <?php echo strtoupper($term); ?>
                 </a>
             </div>
         </div>
 
-        <!-- Performance Overview -->
+        <!-- Simplified Performance Overview - REMOVED GWA -->
         <div class="performance-overview">
             <div class="performance-grid">
                 <div class="performance-card">
@@ -1483,7 +1587,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                     <?php if ($hasScores): ?>
                         <div class="performance-value"><?php echo number_format($termGrade, 1); ?>%</div>
-                        <div class="performance-label">
+                        <div class="performance-label" style="margin-top: 0.5rem; font-size: 0.9rem; color: var(--text-medium);">
                             <?php
                             if ($termGrade >= 90) echo 'Excellent';
                             elseif ($termGrade >= 85) echo 'Very Good';
@@ -1494,7 +1598,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             ?>
                         </div>
                     <?php else: ?>
-                        <div class="performance-value">--</div>
+                        <div class="performance-value" style="color: var(--text-light);">--</div>
                         <div class="performance-label">No scores added</div>
                     <?php endif; ?>
                 </div>
@@ -1505,7 +1609,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <div class="performance-value"><?php echo number_format($totalClassStanding, 1); ?>%</div>
                         <div class="performance-label">of <?php echo $totalClassStandingPercentage; ?>%</div>
                     <?php else: ?>
-                        <div class="performance-value">--</div>
+                        <div class="performance-value" style="color: var(--text-light);">--</div>
                         <div class="performance-label">No scores added</div>
                     <?php endif; ?>
                 </div>
@@ -1526,14 +1630,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </div>
                         <div class="performance-label">of 40%</div>
                     <?php else: ?>
-                        <div class="performance-value">--</div>
+                        <div class="performance-value" style="color: var(--text-light);">--</div>
                         <div class="performance-label">No exam scores</div>
                     <?php endif; ?>
                 </div>
             </div>
         </div>
 
-        <!-- Class Standing Categories Section -->
+        <!--Class Standing Categories Section-->
         <div class="category-section">
             <div class="section-header">
                 <div class="section-title">
@@ -1558,8 +1662,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             <?php if (empty($categories)): ?>
                 <div class="empty-state">
-                    <i class="fas fa-folder-open"></i>
-                    <h3>No <?php echo $term; ?> Categories Created</h3>
+                    <i class="fas fa-folder-open" style="font-size: 2.5rem; color: var(--text-light); margin-bottom: 1rem;"></i>
+                    <h3 style="color: var(--text-dark); margin-bottom: 0.5rem; font-size: 1.1rem;">No <?php echo $term; ?> Categories Created</h3>
                     <?php if ($canAddCategory): ?>
                         <button class="btn btn-primary" onclick="openAddCategoryModal()">
                             <i class="fas fa-plus-circle"></i> Create First Category
@@ -1584,11 +1688,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     <div class="category-name">
                                         <?php echo htmlspecialchars($category['category_name']); ?>
                                         <?php if ($isAttendance): ?>
-                                            <i class="fas fa-user-check"></i>
+                                            <i class="fas fa-user-check" style="margin-left: 0.5rem; color: var(--plp-green);"></i>
                                         <?php endif; ?>
                                     </div>
                                     <?php if ($categoryTotal && $categoryTotal['max_possible'] > 0): ?>
-                                        <div>
+                                        <div style="font-size: 0.8rem; color: var(--text-medium); margin-top: 0.25rem;">
                                             Score: <?php echo number_format($categoryTotal['percentage_score'], 1); ?>%
                                         </div>
                                     <?php endif; ?>
@@ -1599,9 +1703,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             </div>
                             
                             <div class="category-content">
+                                <!-- REAL-TIME CALCULATION DISPLAY -->
                                 <?php if ($categoryTotal && $categoryTotal['max_possible'] > 0): ?>
-                                    <div>
-                                        <div>
+                                    <div style="background: var(--plp-green-pale); padding: 0.75rem; border-radius: 8px; margin-bottom: 1rem; border-left: 3px solid var(--plp-green);">
+                                        <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-medium);">
                                             <span>Weighted: <?php echo number_format($categoryTotal['weighted_score'], 1); ?>%</span>
                                             <span>Total: <?php echo $categoryTotal['total_score']; ?>/<?php echo $categoryTotal['max_possible']; ?></span>
                                         </div>
@@ -1612,9 +1717,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     <div class="scores-list">
                                         <?php if (empty($categoryScores)): ?>
                                             <div class="empty-scores">
-                                                <i class="fas fa-clipboard-list"></i>
-                                                <p>No scores added yet</p>
-                                                <small>Click "Add Score" to start tracking</small>
+                                                <i class="fas fa-clipboard-list" style="font-size: 1.5rem; color: var(--text-light); margin-bottom: 0.5rem;"></i>
+                                                <p style="color: var(--text-light); margin-bottom: 0.25rem; font-weight: 500; font-size: 0.9rem;">No scores added yet</p>
+                                                <small style="color: var(--text-light); font-size: 0.8rem;">Click "Add Score" to start tracking</small>
                                             </div>
                                         <?php else: ?>
                                             <?php foreach ($categoryScores as $score): ?>
@@ -1630,7 +1735,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                                                 <span class="actual-score"><?php echo $score['score_value']; ?></span>
                                                                 <span class="score-separator">/</span>
                                                                 <span class="max-score"><?php echo $score['max_score']; ?></span>
-                                                                <span>
+                                                                <span style="margin-left: 0.5rem; color: var(--plp-green); font-weight: 600;">
                                                                     (<?php echo $score['max_score'] > 0 ? number_format(($score['score_value'] / $score['max_score']) * 100, 1) : 0; ?>%)
                                                                 </span>
                                                             <?php endif; ?>
@@ -1676,10 +1781,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     </button>
                                 <?php endif; ?>
                                 
+                                <!-- DELETE CATEGORY BUTTON -->
                                 <form method="POST" style="display: inline; margin-top: 0.5rem;">
                                     <input type="hidden" name="delete_category" value="1">
                                     <input type="hidden" name="category_id" value="<?php echo $category['id']; ?>">
-                                    <button type="submit" class="btn" onclick="return confirm('Are you sure you want to delete this category and all its scores?')">
+                                    <button type="submit" class="btn" style="background: var(--danger); color: white; padding: 0.4rem 0.8rem; font-size: 0.8rem;" onclick="return confirm('Are you sure you want to delete this category and all its scores?')">
                                         <i class="fas fa-trash"></i> Delete Category
                                     </button>
                                 </form>
@@ -1690,14 +1796,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <?php endif; ?>
         </div>
 
-        <!-- Major Exams Section -->
+        <!-- Major Exams Section - CURRENT TERM EXAM ONLY -->
         <div class="standings-section">
             <div class="section-title">
                 <i class="fas fa-layer-group"></i>
                 <?php echo ucfirst($term); ?> Major Exam (40%)
             </div>
+            <br>
             <div class="management-grid">
                 <?php if ($term === 'midterm'): ?>
+                    <!-- Midterm Exam Only -->
                     <div class="management-card major-exam-card" onclick="openExamModal('midterm_exam')">
                         <h3>MIDTERM EXAM</h3>
                         <div class="major-exam-badge">40%</div>
@@ -1706,19 +1814,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $midterm = reset($midtermExam);
                             $midtermPercentage = ($midterm['max_score'] > 0) ? ($midterm['score_value'] / $midterm['max_score']) * 100 : 0;
                             ?>
-                            <div class="performance-value">
+                            <div class="performance-value" style="font-size: 1.5rem; margin: 0.5rem 0;">
                                 <?php echo number_format($midtermPercentage, 1); ?>%
                             </div>
-                            <p>
+                            <p style="color: var(--text-medium); margin-top: 0.5rem; font-size: 0.9rem;">
                                 <?php echo $midterm['score_value']; ?> / <?php echo $midterm['max_score']; ?>
                             </p>
                         <?php else: ?>
-                            <p>
+                            <p style="color: var(--text-light); margin-top: 0.5rem; font-size: 0.9rem;">
                                 Click to add midterm exam score
                             </p>
                         <?php endif; ?>
                     </div>
                 <?php else: ?>
+                    <!-- Final Exam Only -->
                     <div class="management-card major-exam-card" onclick="openExamModal('final_exam')">
                         <h3>FINAL EXAM</h3>
                         <div class="major-exam-badge">40%</div>
@@ -1727,14 +1836,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $final = reset($finalExam);
                             $finalPercentage = ($final['max_score'] > 0) ? ($final['score_value'] / $final['max_score']) * 100 : 0;
                             ?>
-                            <div class="performance-value">
+                            <div class="performance-value" style="font-size: 1.5rem; margin: 0.5rem 0;">
                                 <?php echo number_format($finalPercentage, 1); ?>%
                             </div>
-                            <p>
+                            <p style="color: var(--text-medium); margin-top: 0.5rem; font-size: 0.9rem;">
                                 <?php echo $final['score_value']; ?> / <?php echo $final['max_score']; ?>
                             </p>
                         <?php else: ?>
-                            <p>
+                            <p style="color: var(--text-light); margin-top: 0.5rem; font-size: 0.9rem;">
                                 Click to add final exam score
                             </p>
                         <?php endif; ?>
@@ -1742,8 +1851,306 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <?php endif; ?>
             </div>
         </div>
+        
+        <?php if ($hasScores): ?>
+            <div class="insights-section">
+                <div class="insights-tabs">
+                    <button class="insight-tab active" data-tab="insights">
+                         Behavioral
+                    </button>
+                    <button class="insight-tab" data-tab="interventions">
+                        Interventions
+                    </button>
+                    <button class="insight-tab" data-tab="recommendations">
+                        Recommendations
+                    </button>
+                </div>
+
+                <!-- Behavioral Insights Tab -->
+                <div class="insight-content active" id="insights-tab">
+                    <?php if (!empty($behavioralInsights)): ?>
+                        <ul class="insight-list">
+                            <?php foreach ($behavioralInsights as $insight): ?>
+                                <li class="insight-item">
+                                    <i class="fas fa-lightbulb insight-icon"></i>
+                                    <div class="insight-text">
+                                        <?php echo htmlspecialchars($insight['message']); ?>
+                                        <?php if (isset($insight['priority'])): ?>
+                                            <span class="insight-priority priority-<?php echo $insight['priority']; ?>">
+                                                <?php echo ucfirst($insight['priority']); ?>
+                                            </span>
+                                        <?php endif; ?>
+                                        <?php if (isset($insight['source']) && $insight['source'] === 'ml'): ?>
+                                            <span class="insight-priority" style="background: #6366f1; color: white;">
+                                                AI
+                                            </span>
+                                        <?php endif; ?>
+                                    </div>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
+                    <?php else: ?>
+                        <div class="empty-scores">
+                            <p>No behavioral insights available yet.</p>
+                            <small>Continue adding scores to generate insights.</small>
+                        </div>
+                    <?php endif; ?>
+                </div>
+
+                <!-- Interventions Tab -->
+                <div class="insight-content" id="interventions-tab">
+                    <?php if (!empty($interventions)): ?>
+                        <ul class="insight-list">
+                            <?php foreach ($interventions as $intervention): ?>
+                                <li class="insight-item">
+                                    <i class="fas fa-tasks insight-icon"></i>
+                                    <div class="insight-text">
+                                        <?php echo htmlspecialchars($intervention['message']); ?>
+                                        <?php if (isset($intervention['priority'])): ?>
+                                            <span class="insight-priority priority-<?php echo $intervention['priority']; ?>">
+                                                <?php echo ucfirst($intervention['priority']); ?>
+                                            </span>
+                                        <?php endif; ?>
+                                    </div>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
+                    <?php else: ?>
+                        <div class="empty-scores">
+                            <p>No interventions needed at this time.</p>
+                            <small>Your performance is on track!</small>
+                        </div>
+                    <?php endif; ?>
+                </div>
+
+                <!-- Recommendations Tab -->
+                <div class="insight-content" id="recommendations-tab">
+                    <?php if (!empty($recommendations)): ?>
+                        <ul class="insight-list">
+                            <?php foreach ($recommendations as $recommendation): ?>
+                                <li class="insight-item">
+                                    <i class="fas fa-bullseye insight-icon"></i>
+                                    <div class="insight-text">
+                                        <?php echo htmlspecialchars($recommendation['message']); ?>
+                                        <?php if (isset($recommendation['priority'])): ?>
+                                            <span class="insight-priority priority-<?php echo $recommendation['priority']; ?>">
+                                                <?php echo ucfirst($recommendation['priority']); ?>
+                                            </span>
+                                        <?php endif; ?>
+                                        <?php if (isset($recommendation['source']) && $recommendation['source'] === 'ml'): ?>
+                                            <span class="insight-priority" style="background: #6366f1; color: white;">
+                                                AI
+                                            </span>
+                                        <?php endif; ?>
+                                    </div>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
+                    <?php else: ?>
+                        <div class="empty-scores">
+                            <p>No recommendations available yet.</p>
+                            <small>Continue adding scores to get personalized recommendations.</small>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        <?php endif; ?>
     </div>
+
+    <!-- Add Category Modal - CURRENT TERM ONLY -->
+    <?php if ($canAddCategory): ?>
+        <div class="modal" id="addCategoryModal">
+            <div class="modal-content">
+                <span class="close" onclick="closeAddCategoryModal()">&times;</span>
+                <h3 class="modal-title">Add <?php echo ucfirst($term); ?> Class Standing Category</h3>
+                <form id="categoryForm" method="POST">
+                    <input type="hidden" name="add_category" value="1">
+                    
+                    <div class="form-group">
+                        <label for="category_name" class="form-label">Category Name</label>
+                        <input type="text" id="category_name" name="category_name" class="form-input" required placeholder="ex. Quizzes, Assignments, Projects, Attendance">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="category_percentage" class="form-label">Percentage Weight</label>
+                        <input type="number" id="category_percentage" name="category_percentage" class="form-input" min="1" max="<?php echo 60 - $totalClassStandingPercentage; ?>" required placeholder="Enter percentage">
+                        <p style="text-align: left; margin-top: 0.5rem; color: var(--text-medium); font-size: 0.85rem;">
+                            Remaining allocation: <?php echo 60 - $totalClassStandingPercentage; ?>%
+                        </p>
+                    </div>
+                    
+                    <div class="modal-actions">
+                        <button type="button" class="modal-btn modal-btn-cancel" onclick="closeAddCategoryModal()">Cancel</button>
+                        <button type="submit" class="modal-btn modal-btn-confirm">Add Category</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    <?php endif; ?>
+
+    <!-- Add Score Modal - CURRENT TERM CATEGORIES ONLY -->
+    <div class="modal" id="addScoreModal">
+        <div class="modal-content">
+            <span class="close" onclick="closeAddScoreModal()">&times;</span>
+            <h3 class="modal-title" id="addScoreModalTitle">Add Score</h3>
+            <form id="scoreForm" method="POST">
+                <input type="hidden" name="add_standing" value="1">
+                <input type="hidden" name="category_id" id="scoreCategoryId">
+                
+                <div class="form-group">
+                    <label for="score_name" class="form-label">Score Name</label>
+                    <input type="text" id="score_name" name="score_name" class="form-input" required placeholder="ex. Quiz 1, Assignment 2, Project Proposal">
+                </div>
+                
+                <div class="form-group">
+                    <label for="score_value" class="form-label">Your Score</label>
+                    <input type="number" id="score_value" name="score_value" class="form-input" min="0" step="0.1" required placeholder="Enter your score">
+                </div>
+                
+                <div class="form-group">
+                    <label for="max_score" class="form-label">Maximum Score</label>
+                    <input type="number" id="max_score" name="max_score" class="form-input" min="1" step="0.1" required placeholder="Enter total possible score">
+                </div>
+                
+                <div class="form-group">
+                    <label for="score_date" class="form-label">Date</label>
+                    <input type="date" id="score_date" name="score_date" class="form-input" max="<?php echo date('Y-m-d'); ?>" required>
+                </div>
+                
+                <div class="modal-actions">
+                    <button type="button" class="modal-btn modal-btn-cancel" onclick="closeAddScoreModal()">Cancel</button>
+                    <button type="submit" class="modal-btn modal-btn-confirm">Add Score</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Attendance Modal - CURRENT TERM CATEGORIES ONLY -->
+    <div class="modal" id="addAttendanceModal">
+        <div class="modal-content">
+            <span class="close" onclick="closeAddAttendanceModal()">&times;</span>
+            <h3 class="modal-title" id="addAttendanceModalTitle">Add Attendance</h3>
+            <form id="attendanceForm" method="POST">
+                <input type="hidden" name="add_attendance" value="1">
+                <input type="hidden" name="category_id" id="attendanceCategoryId">
+                
+                <div class="form-group">
+                    <label for="attendance_date" class="form-label">Date</label>
+                    <input type="date" id="attendance_date" name="attendance_date" class="form-input" max="<?php echo date('Y-m-d'); ?>" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Status</label>
+                    <div class="attendance-status">
+                        <div class="radio-group">
+                            <label class="radio-option">
+                                <input type="radio" name="attendance_status" value="present" checked>
+                                <span>Present</span>
+                            </label>
+                            <label class="radio-option">
+                                <input type="radio" name="attendance_status" value="absent">
+                                <span>Absent</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="modal-actions">
+                    <button type="button" class="modal-btn modal-btn-cancel" onclick="closeAddAttendanceModal()">Cancel</button>
+                    <button type="submit" class="modal-btn modal-btn-confirm">Add Attendance</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+
+    <!-- Edit Score Modal - CURRENT TERM SCORES ONLY -->
+    <div class="modal" id="editScoreModal">
+        <div class="modal-content">
+            <span class="close" id="closeEditModal">&times;</span>
+            <h3 class="modal-title">Update Score</h3>
+            <form id="editScoreForm" method="POST">
+                <input type="hidden" name="update_score" value="1">
+                <input type="hidden" name="score_id" id="editScoreId">
+                
+                <div class="form-group">
+                    <label for="edit_score_name" class="form-label">Score Name</label>
+                    <input type="text" id="edit_score_name" class="form-input" readonly style="background: #f5f5f5;">
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit_score_value" class="form-label">Your Score</label>
+                    <input type="number" id="edit_score_value" name="score_value" class="form-input" min="0" step="0.1" required>
+                </div>
+                
+                <div class="modal-actions">
+                    <button type="button" class="modal-btn modal-btn-cancel" id="cancelEdit">Cancel</button>
+                    <button type="submit" class="modal-btn modal-btn-confirm">Update Score</button>
+                </div>
+            </form>
+            
+            <form id="deleteScoreForm" method="POST" style="margin-top: 1rem; border-top: 1px solid #eee; padding-top: 1rem;">
+                <input type="hidden" name="delete_score" value="1">
+                <input type="hidden" name="score_id" value="<?php echo $score['id']; ?>">
+                <button type="submit" class="modal-btn" style="background: var(--danger); color: white; width: 100%;" onclick="return confirm('Are you sure you want to delete this score?')">
+                    Delete Score
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Exam Score Modal - CURRENT TERM EXAM ONLY -->
+    <div class="modal" id="examModal">
+        <div class="modal-content">
+            <span class="close" id="closeExamModal">&times;</span>
+            <h3 class="modal-title" id="examModalTitle">
+                <?php echo $term === 'midterm' ? 'Add Midterm Exam Score' : 'Add Final Exam Score'; ?>
+            </h3>
+            <form id="examForm" method="POST">
+                <input type="hidden" name="add_exam" value="1">
+                <input type="hidden" name="exam_type" id="examType" value="<?php echo $term === 'midterm' ? 'midterm_exam' : 'final_exam'; ?>">
+                
+                <div class="form-group">
+                    <label for="exam_score" class="form-label">Your Exam Score</label>
+                    <input type="number" id="exam_score" name="score_value" class="form-input" min="0" step="0.1" required placeholder="Enter your score">
+                </div>
+                
+                <div class="form-group">
+                    <label for="max_score" class="form-label">Maximum Score</label>
+                    <input type="number" id="max_score" name="max_score" class="form-input" min="1" step="0.1" required placeholder="Enter total possible score">
+                </div>
+                
+                <div class="modal-actions">
+                    <button type="button" class="modal-btn modal-btn-cancel" id="cancelExam">Cancel</button>
+                    <button type="submit" class="modal-btn modal-btn-confirm">Save Score</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Logout Modal -->
+    <div class="modal" id="logoutModal">
+        <div class="modal-content" style="max-width: 450px; text-align: center;">
+            <h3 style="color: var(--plp-green); font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem;">
+                Confirm Logout
+            </h3>
+            <div style="color: var(--text-medium); margin-bottom: 2rem; line-height: 1.6;">
+                Are you sure you want to logout? You'll need<br>
+                to log in again to access your account.
+            </div>
+            <div style="display: flex; justify-content: center; gap: 1rem;">
+                <button class="modal-btn modal-btn-cancel" id="cancelLogout" style="min-width: 120px;">
+                    Cancel
+                </button>
+                <button class="modal-btn modal-btn-confirm" id="confirmLogout" style="min-width: 120px;">
+                    Yes, Logout
+                </button>
+            </div>
+        </div>
+    </div>
+
 <script>
+    // Add this JavaScript to force refresh and prevent caching
     document.addEventListener('DOMContentLoaded', function() {
         // Clear any cached form data
         if (window.history.replaceState) {
