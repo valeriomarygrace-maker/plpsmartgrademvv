@@ -69,8 +69,10 @@ $finalExam = [];
 $allScores = [];
 
 try {
+    // Get categories for current term only
     $categories = supabaseFetch('student_class_standing_categories', [
-        'student_subject_id' => $subject_id
+        'student_subject_id' => $subject_id,
+        'term_type' => $term
     ]);
     if (!$categories) $categories = [];
 } catch (Exception $e) {
@@ -84,33 +86,62 @@ foreach ($categories as $category) {
 $remainingAllocation = 60 - $totalClassStandingPercentage;
 $canAddCategory = ($remainingAllocation > 0);
 
+// FORCE REFRESH - Clear any cached data
+clearstatcache();
+
 try {
+    // Get ALL scores first
     $allScores = supabaseFetch('student_subject_scores', ['student_subject_id' => $subject_id]);
     if (!$allScores) $allScores = [];
     
-    foreach ($allScores as &$score) {
+    // DEBUG: Check what scores we're getting
+    error_log("All Scores Count: " . count($allScores));
+    foreach ($allScores as $score) {
+        error_log("Score: " . $score['score_name'] . " - " . $score['score_value'] . "/" . $score['max_score']);
+    }
+    
+    // Filter scores based on CURRENT TERM categories
+    $filteredScores = [];
+    foreach ($allScores as $score) {
         if ($score['category_id']) {
             $category_data = supabaseFetch('student_class_standing_categories', ['id' => $score['category_id']]);
             if ($category_data && count($category_data) > 0) {
-                $score['category_name'] = $category_data[0]['category_name'];
-            } else {
-                $score['category_name'] = '';
+                $category_term = $category_data[0]['term_type'];
+                // Only include scores that belong to current term categories
+                if ($category_term === $term) {
+                    $score['category_name'] = $category_data[0]['category_name'];
+                    $score['category_term'] = $category_term;
+                    $filteredScores[] = $score;
+                }
             }
         } else {
-            $score['category_name'] = '';
+            // For exam scores without category_id, include them
+            $filteredScores[] = $score;
         }
     }
     
+    $allScores = $filteredScores;
+    
 } catch (Exception $e) {
+    error_log("Error fetching scores: " . $e->getMessage());
     $allScores = [];
 }
 
 // Filter scores based on CURRENT TERM ONLY
-$classStandings = array_filter($allScores, function($score) {
-    return $score['score_type'] === 'class_standing';
+$classStandings = array_filter($allScores, function($score) use ($term) {
+    if ($score['score_type'] !== 'class_standing') return false;
+    
+    // For class standing scores, check if they belong to current term categories
+    if ($score['category_id']) {
+        $category_data = supabaseFetch('student_class_standing_categories', ['id' => $score['category_id']]);
+        if ($category_data && count($category_data) > 0) {
+            return $category_data[0]['term_type'] === $term;
+        }
+    }
+    return false;
 });
 
-// Get exam scores
+// Get exam scores - only show current term exam
 $midtermExam = array_filter($allScores, function($score) {
     return $score['score_type'] === 'midterm_exam';
 });
@@ -118,6 +149,12 @@ $midtermExam = array_filter($allScores, function($score) {
 $finalExam = array_filter($allScores, function($score) {
     return $score['score_type'] === 'final_exam';
 });
+
+// DEBUG: Check filtered scores
+error_log("Class Standings Count: " . count($classStandings));
+foreach ($classStandings as $standing) {
+    error_log("Class Standing: " . $standing['score_name'] . " - " . $standing['score_value'] . "/" . $standing['max_score']);
+}
 
 // Initialize variables
 $hasScores = !empty($classStandings) || ($term === 'midterm' && !empty($midtermExam)) || ($term === 'final' && !empty($finalExam));
@@ -223,227 +260,9 @@ if ($hasScores) {
         $termGrade = 100;
     }
 
-    // Calculate Subject Grade (Midterm 100 + Final 100) / 2
-    $midtermTotal = 0;
-    $finalTotal = 0;
-    
-    // Get midterm total grade
-    $midtermClassStandings = array_filter($allScores, function($score) {
-        return $score['score_type'] === 'class_standing';
-    });
-    
-    if ($midtermClassStandings) {
-        $midtermClassStandingTotal = 0;
-        $midtermCategoryTotals = [];
-        
-        foreach ($categories as $category) {
-            $midtermCategoryTotals[$category['id']] = [
-                'percentage' => $category['category_percentage'],
-                'total_score' => 0,
-                'max_possible' => 0
-            ];
-        }
-        
-        foreach ($midtermClassStandings as $standing) {
-            if ($standing['category_id'] && isset($midtermCategoryTotals[$standing['category_id']])) {
-                $categoryId = $standing['category_id'];
-                $categoryName = $categories[array_search($categoryId, array_column($categories, 'id'))]['category_name'];
-                
-                if (strtolower($categoryName) === 'attendance') {
-                    $scoreValue = ($standing['score_name'] === 'Present') ? 1 : 0;
-                    $midtermCategoryTotals[$categoryId]['total_score'] += $scoreValue;
-                    $midtermCategoryTotals[$categoryId]['max_possible'] += 1;
-                } else {
-                    $midtermCategoryTotals[$categoryId]['total_score'] += $standing['score_value'];
-                    $midtermCategoryTotals[$categoryId]['max_possible'] += $standing['max_score'];
-                }
-            }
-        }
-        
-        foreach ($midtermCategoryTotals as $categoryId => $category) {
-            if ($category['max_possible'] > 0) {
-                $percentageScore = ($category['total_score'] / $category['max_possible']) * 100;
-                $weightedScore = ($percentageScore * $category['percentage']) / 100;
-                $midtermClassStandingTotal += $weightedScore;
-            }
-        }
-        
-        if ($midtermClassStandingTotal > 60) {
-            $midtermClassStandingTotal = 60;
-        }
-        
-        $midtermExamScore = 0;
-        if (!empty($midtermExam)) {
-            $midterm = reset($midtermExam);
-            if ($midterm['max_score'] > 0) {
-                $midtermPercentage = ($midterm['score_value'] / $midterm['max_score']) * 100;
-                $midtermExamScore = ($midtermPercentage * 40) / 100;
-            }
-        }
-        
-        $midtermTotal = $midtermClassStandingTotal + $midtermExamScore;
-    }
-    
-    // Get final total grade
-    $finalClassStandings = array_filter($allScores, function($score) {
-        return $score['score_type'] === 'class_standing';
-    });
-    
-    if ($finalClassStandings) {
-        $finalClassStandingTotal = 0;
-        $finalCategoryTotals = [];
-        
-        foreach ($categories as $category) {
-            $finalCategoryTotals[$category['id']] = [
-                'percentage' => $category['category_percentage'],
-                'total_score' => 0,
-                'max_possible' => 0
-            ];
-        }
-        
-        foreach ($finalClassStandings as $standing) {
-            if ($standing['category_id'] && isset($finalCategoryTotals[$standing['category_id']])) {
-                $categoryId = $standing['category_id'];
-                $categoryName = $categories[array_search($categoryId, array_column($categories, 'id'))]['category_name'];
-                
-                if (strtolower($categoryName) === 'attendance') {
-                    $scoreValue = ($standing['score_name'] === 'Present') ? 1 : 0;
-                    $finalCategoryTotals[$categoryId]['total_score'] += $scoreValue;
-                    $finalCategoryTotals[$categoryId]['max_possible'] += 1;
-                } else {
-                    $finalCategoryTotals[$categoryId]['total_score'] += $standing['score_value'];
-                    $finalCategoryTotals[$categoryId]['max_possible'] += $standing['max_score'];
-                }
-            }
-        }
-        
-        foreach ($finalCategoryTotals as $categoryId => $category) {
-            if ($category['max_possible'] > 0) {
-                $percentageScore = ($category['total_score'] / $category['max_possible']) * 100;
-                $weightedScore = ($percentageScore * $category['percentage']) / 100;
-                $finalClassStandingTotal += $weightedScore;
-            }
-        }
-        
-        if ($finalClassStandingTotal > 60) {
-            $finalClassStandingTotal = 60;
-        }
-        
-        $finalExamScore = 0;
-        if (!empty($finalExam)) {
-            $final = reset($finalExam);
-            if ($final['max_score'] > 0) {
-                $finalPercentage = ($final['score_value'] / $final['max_score']) * 100;
-                $finalExamScore = ($finalPercentage * 40) / 100;
-            }
-        }
-        
-        $finalTotal = $finalClassStandingTotal + $finalExamScore;
-    }
-    
-    // Calculate Subject Grade
-    if ($midtermTotal > 0 && $finalTotal > 0) {
-        $subjectGrade = ($midtermTotal + $finalTotal) / 2;
-    } elseif ($midtermTotal > 0) {
-        $subjectGrade = $midtermTotal;
-    } elseif ($finalTotal > 0) {
-        $subjectGrade = $finalTotal;
-    }
-    
-    if ($subjectGrade > 100) {
-        $subjectGrade = 100;
-    }
-
-    // ENHANCED PREDICTION BASED ON SUBJECT GRADE
-    $predictionData = [
-        'class_standings' => [],
-        'exam_scores' => [],
-        'attendance' => [],
-        'subject' => $subject['subject_name'],
-        'term' => $term,
-        'current_grade' => $termGrade,
-        'subject_grade' => $subjectGrade
-    ];
-    
-    // Collect class standing scores for prediction
-    foreach ($classStandings as $standing) {
-        if ($standing['max_score'] > 0) {
-            $percentage = ($standing['score_value'] / $standing['max_score']) * 100;
-            $predictionData['class_standings'][] = $percentage;
-        }
-    }
-    
-    // Collect exam scores for prediction
-    if ($term === 'midterm' && !empty($midtermExam)) {
-        $midterm = reset($midtermExam);
-        if ($midterm['max_score'] > 0) {
-            $percentage = ($midterm['score_value'] / $midterm['max_score']) * 100;
-            $predictionData['exam_scores'][] = $percentage;
-        }
-    } elseif ($term === 'final' && !empty($finalExam)) {
-        $final = reset($finalExam);
-        if ($final['max_score'] > 0) {
-            $percentage = ($final['score_value'] / $final['max_score']) * 100;
-            $predictionData['exam_scores'][] = $percentage;
-        }
-    }
-    
-    // Collect attendance data
-    foreach ($classStandings as $standing) {
-        if (strpos(strtolower($standing['score_name']), 'present') !== false) {
-            $predictionData['attendance'][] = 1;
-        } elseif (strpos(strtolower($standing['score_name']), 'absent') !== false) {
-            $predictionData['attendance'][] = 0;
-        }
-    }
-    
-    // Get ML predictions based on SUBJECT GRADE
-    try {
-        $mlResult = MLService::getMLPredictions(
-            $predictionData['class_standings'],
-            $predictionData['exam_scores'], 
-            $predictionData['attendance'],
-            $predictionData['subject'],
-            $subjectGrade
-        );
-        
-        if ($mlResult['success']) {
-            $riskLevel = $mlResult['risk_level'];
-            $riskDescription = $mlResult['risk_description'];
-        }
-    } catch (Exception $e) {
-        // Fallback to basic risk calculation
-        $riskLevel = calculateRiskLevel($subjectGrade);
-        $riskDescription = getRiskDescription($riskLevel);
-    }
-    
-    // Get enhanced insights based on inputted scores and risk level
-    $behavioralInsights = InterventionSystem::getBehavioralInsights(
-        $student['id'], 
-        $subject_id, 
-        $termGrade,
-        $subjectGrade,
-        $riskLevel,
-        $categoryTotals,
-        $term
-    );
-    
-    $interventions = InterventionSystem::getInterventions(
-        $student['id'], 
-        $subject_id, 
-        $riskLevel,
-        $categoryTotals,
-        $term
-    );
-    
-    $recommendations = InterventionSystem::getRecommendations(
-        $student['id'], 
-        $subject_id, 
-        $subjectGrade, 
-        $riskLevel,
-        $categoryTotals,
-        $term
-    );
+    // DEBUG: Show calculation results
+    error_log("Total Class Standing: " . $totalClassStanding);
+    error_log("Term Grade: " . $termGrade);
 
 } else {
     // NO SCORES - SHOW ENCOURAGING MESSAGES
@@ -491,17 +310,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'student_subject_id' => $subject_id,
                     'category_name' => $category_name,
                     'category_percentage' => $category_percentage,
+                    'term_type' => $term,
                     'created_at' => date('Y-m-d H:i:s')
                 ];
                 
                 $result = supabaseInsert('student_class_standing_categories', $insert_data);
                 
                 if ($result) {
-                    $success_message = 'Category added successfully!';
-                    $scoreUpdated = true;
+                    $success_message = 'Category added successfully for ' . $term . ' term!';
                     
-                    // Refresh the page to show the new category
-                    echo "<script>window.location.href = 'subject-management.php?subject_id=$subject_id&term=$term&success=category_added';</script>";
+                    // IMMEDIATE REDIRECT WITH FORCE REFRESH
+                    header("Location: subject-management.php?subject_id=$subject_id&term=$term&success=category_added&t=" . time());
                     exit;
                 } else {
                     $error_message = 'Failed to add category. Please check your database connection.';
@@ -520,10 +339,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $max_score = floatval($_POST['max_score']);
         $score_date = $_POST['score_date'];
         
-        // Verify category exists
+        // Verify category exists and belongs to current term
         $category_data = supabaseFetch('student_class_standing_categories', ['id' => $category_id]);
-        if (!$category_data) {
-            $error_message = 'Invalid category.';
+        if (!$category_data || $category_data[0]['term_type'] !== $term) {
+            $error_message = 'Invalid category for ' . $term . ' term.';
         } elseif (empty($score_name) || $score_value < 0 || $max_score <= 0 || empty($score_date)) {
             $error_message = 'Please fill all fields with valid values.';
         } elseif ($score_value > $max_score) {
@@ -545,18 +364,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 if ($result) {
                     $success_message = 'Score added successfully!';
-                    $scoreUpdated = true;
-                    InterventionSystem::logBehavior(
-                        $student['id'], 
-                        'grade_update', 
-                        [
-                            'subject_id' => $subject_id,
-                            'subject_name' => $subject['subject_name'],
-                            'action' => 'add_score',
-                            'score_type' => 'class_standing',
-                            'term' => $term
-                        ]
-                    );
+                    
+                    // IMMEDIATE REDIRECT WITH FORCE REFRESH
+                    header("Location: subject-management.php?subject_id=$subject_id&term=$term&success=score_added&t=" . time());
+                    exit;
                 } else {
                     $error_message = 'Failed to add score.';
                 }
@@ -572,10 +383,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $attendance_date = $_POST['attendance_date'];
         $attendance_status = $_POST['attendance_status'];
         
-        // Verify category exists
+        // Verify category exists and belongs to current term
         $category_data = supabaseFetch('student_class_standing_categories', ['id' => $category_id]);
-        if (!$category_data) {
-            $error_message = 'Invalid category.';
+        if (!$category_data || $category_data[0]['term_type'] !== $term) {
+            $error_message = 'Invalid category for ' . $term . ' term.';
         } elseif (empty($attendance_date)) {
             $error_message = 'Please select a date.';
         } else {
@@ -606,18 +417,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     
                     if ($result) {
                         $success_message = 'Attendance recorded successfully!';
-                        $scoreUpdated = true;
-                        InterventionSystem::logBehavior(
-                            $student['id'], 
-                            'attendance_update', 
-                            [
-                                'subject_id' => $subject_id,
-                                'subject_name' => $subject['subject_name'],
-                                'action' => 'add_attendance',
-                                'status' => $attendance_status,
-                                'term' => $term
-                            ]
-                        );
+                        
+                        // IMMEDIATE REDIRECT WITH FORCE REFRESH
+                        header("Location: subject-management.php?subject_id=$subject_id&term=$term&success=attendance_added&t=" . time());
+                        exit;
                     } else {
                         $error_message = 'Failed to record attendance.';
                     }
@@ -665,18 +468,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 if ($result) {
                     $success_message = $exam_name . ' score added successfully!';
-                    $scoreUpdated = true;
-                    InterventionSystem::logBehavior(
-                        $student['id'], 
-                        'exam_update', 
-                        [
-                            'subject_id' => $subject_id,
-                            'subject_name' => $subject['subject_name'],
-                            'action' => 'add_exam',
-                            'exam_type' => $exam_type,
-                            'term' => $term
-                        ]
-                    );
+                    
+                    // IMMEDIATE REDIRECT WITH FORCE REFRESH
+                    header("Location: subject-management.php?subject_id=$subject_id&term=$term&success=exam_added&t=" . time());
+                    exit;
                 } else {
                     $error_message = 'Failed to add exam score.';
                 }
@@ -689,6 +484,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // UPDATE SCORE - Only for current term scores
     elseif (isset($_POST['update_score'])) {
         $score_id = intval($_POST['score_id']);
+        $score_value = floatval($_POST['score_value']);
         
         try {
             $score_data = supabaseFetch('student_subject_scores', ['id' => $score_id]);
@@ -696,7 +492,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($score_data && count($score_data) > 0) {
                 $score = $score_data[0];
                 
-                $score_value = floatval($_POST['score_value']);
                 if ($score_value > $score['max_score']) {
                     $error_message = 'Score value cannot exceed maximum score of ' . $score['max_score'];
                 } else {
@@ -705,17 +500,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     
                     if ($result) {
                         $success_message = 'Score updated successfully!';
-                        $scoreUpdated = true;
-                        InterventionSystem::logBehavior(
-                            $student['id'], 
-                            'grade_update', 
-                            [
-                                'subject_id' => $subject_id,
-                                'subject_name' => $subject['subject_name'],
-                                'action' => 'update_score',
-                                'term' => $term
-                            ]
-                        );
+                        
+                        // IMMEDIATE REDIRECT WITH FORCE REFRESH
+                        header("Location: subject-management.php?subject_id=$subject_id&term=$term&success=score_updated&t=" . time());
+                        exit;
                     } else {
                         $error_message = 'Failed to update score.';
                     }
@@ -733,19 +521,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $score_id = intval($_POST['score_id']);
         
         try {
-            $score_data = supabaseFetch('student_subject_scores', ['id' => $score_id]);
+            $result = supabaseDelete('student_subject_scores', ['id' => $score_id]);
             
-            if ($score_data && count($score_data) > 0) {
-                $result = supabaseDelete('student_subject_scores', ['id' => $score_id]);
+            if ($result) {
+                $success_message = 'Score deleted successfully!';
                 
-                if ($result) {
-                    $success_message = 'Score deleted successfully!';
-                    $scoreUpdated = true;
-                } else {
-                    $error_message = 'Failed to delete score.';
-                }
+                // IMMEDIATE REDIRECT WITH FORCE REFRESH
+                header("Location: subject-management.php?subject_id=$subject_id&term=$term&success=score_deleted&t=" . time());
+                exit;
             } else {
-                $error_message = 'Score not found.';
+                $error_message = 'Failed to delete score.';
             }
         } catch (Exception $e) {
             $error_message = 'Database error: ' . $e->getMessage();
@@ -762,12 +547,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$category_data) {
                 $error_message = 'Category not found.';
             } else {
+                // Delete all scores in this category first
                 supabaseDelete('student_subject_scores', ['category_id' => $category_id]);
+                // Then delete the category
                 $result = supabaseDelete('student_class_standing_categories', ['id' => $category_id]);
                 
                 if ($result) {
                     $success_message = 'Category deleted successfully!';
-                    $scoreUpdated = true;
+                    
+                    // IMMEDIATE REDIRECT WITH FORCE REFRESH
+                    header("Location: subject-management.php?subject_id=$subject_id&term=$term&success=category_deleted&t=" . time());
+                    exit;
                 } else {
                     $error_message = 'Failed to delete category.';
                 }
@@ -776,16 +566,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error_message = 'Database error: ' . $e->getMessage();
         }
     }
-    
-    // If scores were updated, refresh the page to show new insights
-    if ($scoreUpdated) {
-        echo "<script>window.location.href = 'subject-management.php?subject_id=$subject_id&term=$term&show_insights=true';</script>";
-        exit;
-    }
 }
-
-// Check if we should auto-show insights
-$autoShowInsights = isset($_GET['show_insights']) || $success_message;
 
 // Helper functions
 function calculateRiskLevel($grade) {
@@ -1925,12 +1706,6 @@ function getGradeDescription($grade) {
                                 <!-- REAL-TIME CALCULATION DISPLAY -->
                                 <?php if ($categoryTotal && $categoryTotal['max_possible'] > 0): ?>
                                     <div style="background: var(--plp-green-pale); padding: 0.75rem; border-radius: 8px; margin-bottom: 1rem; border-left: 3px solid var(--plp-green);">
-                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
-                                            <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-dark);">Category Performance:</span>
-                                            <span style="font-weight: 700; color: var(--plp-green); font-size: 0.9rem;">
-                                                <?php echo number_format($categoryTotal['percentage_score'], 1); ?>%
-                                            </span>
-                                        </div>
                                         <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-medium);">
                                             <span>Weighted: <?php echo number_format($categoryTotal['weighted_score'], 1); ?>%</span>
                                             <span>Total: <?php echo $categoryTotal['total_score']; ?>/<?php echo $categoryTotal['max_possible']; ?></span>
@@ -2375,6 +2150,43 @@ function getGradeDescription($grade) {
     </div>
 
 <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Clear any cached form data
+        if (window.history.replaceState) {
+            window.history.replaceState(null, null, window.location.href);
+        }
+        
+        // Force refresh if we have success messages
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('success')) {
+            // Remove the success parameter from URL without reloading
+            urlParams.delete('success');
+            urlParams.delete('t');
+            const newUrl = window.location.pathname + '?' + urlParams.toString();
+            window.history.replaceState({}, '', newUrl);
+        }
+        
+        // Add cache busting to all form submissions
+        const forms = document.querySelectorAll('form');
+        forms.forEach(form => {
+            form.addEventListener('submit', function() {
+                // Add timestamp to prevent caching
+                const timestamp = new Date().getTime();
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'cache_buster';
+                input.value = timestamp;
+                this.appendChild(input);
+            });
+        });
+    });
+
+    // Prevent browser back button from showing cached form data
+    window.onpageshow = function(event) {
+        if (event.persisted) {
+            window.location.reload();
+        }
+    };
     // Set today's date as default for score date and disable future dates
     document.addEventListener('DOMContentLoaded', function() {
         const today = new Date().toISOString().split('T')[0];
