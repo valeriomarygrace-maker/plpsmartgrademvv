@@ -1,10 +1,10 @@
-student-subjects.php
 <?php
 require_once 'config.php';
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+// Remove the session_start() here since it's already handled in config.php
+// if (session_status() === PHP_SESSION_NONE) {
+//     session_start();
+// }
 
 if (!isset($_SESSION['logged_in']) || $_SESSION['user_type'] !== 'student') {
     header('Location: login.php');
@@ -338,8 +338,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
     <title>My Subjects - PLP SmartGrade</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        /* Your existing CSS styles remain the same */
+<style>
         :root {
             --plp-green: #006341;
             --plp-green-light: #008856;
@@ -1257,7 +1256,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
             <?php else: ?>
                 <div class="subjects-grid">
                     <?php foreach ($subjects as $subject): ?>
-                        <!-- BAGONG LINE: PUMUPUNTA SA TERMEVALUATION.PHP -->
                         <div class="subject-card" onclick="window.location.href='termevaluations.php?subject_id=<?php echo $subject['id']; ?>'">
                             <div class="subject-header">
                                 <div style="flex: 1;">
@@ -1450,7 +1448,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
     </div>
 
     <script>
-        // Modal functionality
+        // Your JavaScript code remains exactly the same
         const addSubjectBtn = document.getElementById('addSubjectBtn');
         const addSubjectModal = document.getElementById('addSubjectModal');
         const cancelAddSubject = document.getElementById('cancelAddSubject');
