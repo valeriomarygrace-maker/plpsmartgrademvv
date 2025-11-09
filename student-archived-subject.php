@@ -166,6 +166,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_subject'])) {
     }
 }
 
+// Handle AJAX request for term evaluation data
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'get_term_evaluation') {
+    $archived_subject_id = $_POST['archived_subject_id'] ?? 0;
+    
+    if ($archived_subject_id) {
+        displayTermEvaluationForArchivedSubject($archived_subject_id);
+    }
+    exit;
+}
+
 // Fetch archived subjects
 try {
     $archived_subjects_data = supabaseFetch('archived_subjects', ['student_id' => $student['id']]);
@@ -441,6 +451,223 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
             'has_scores' => false
         ];
     }
+}
+
+/**
+ * Display term evaluation interface for archived subject
+ */
+function displayTermEvaluationForArchivedSubject($archived_subject_id) {
+    try {
+        // Get archived subject data
+        $archived_subject_data = supabaseFetch('archived_subjects', ['id' => $archived_subject_id]);
+        
+        if (!$archived_subject_data || count($archived_subject_data) === 0) {
+            echo '<div class="alert-error">Subject not found.</div>';
+            return;
+        }
+        
+        $archived_subject = $archived_subject_data[0];
+        
+        // Get performance data
+        $performance_data = calculateArchivedSubjectPerformance($archived_subject_id);
+        
+        // Get categories and scores for detailed display
+        $categories = supabaseFetch('archived_class_standing_categories', ['archived_subject_id' => $archived_subject_id]);
+        
+        // Calculate grades using the same logic as termevaluations.php
+        $grades = calculateDetailedGradesForArchivedSubject($archived_subject_id);
+        
+        // Display the term evaluation interface
+        ?>
+        <div class="term-evaluation-container">
+            <!-- Overview Section -->
+            <div class="overview-section">
+                <div class="overview-grid">
+                    <div class="overview-card subject-grade-card">
+                        <div class="overview-label">SUBJECT GRADE</div>
+                        <div class="overview-value">
+                            <?php echo $grades['subject_grade'] > 0 ? number_format($grades['subject_grade'], 1) . '%' : '--'; ?>
+                        </div>
+                        <div class="overview-description">
+                            <?php if ($grades['subject_grade'] > 0): ?>
+                                <?php 
+                                $riskLevel = getSubjectRiskDescription($grades['subject_grade']);
+                                ?>
+                                <span class="risk-badge <?php echo strtolower(str_replace(' ', '-', $riskLevel)); ?>">
+                                    <?php echo $riskLevel; ?>
+                                </span>
+                            <?php else: ?>
+                                No grades calculated
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    
+                    <div class="overview-card">
+                        <div class="overview-label">MIDTERM GRADE</div>
+                        <div class="overview-value">
+                            <?php echo $grades['midterm_grade'] > 0 ? number_format($grades['midterm_grade'], 1) . '%' : '--'; ?>
+                        </div>
+                        <div class="overview-description">
+                            <?php if ($grades['midterm_grade'] > 0): ?>
+                                <?php echo getTermGradeDescription($grades['midterm_grade']); ?>
+                            <?php else: ?>
+                                No midterm data
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    
+                    <div class="overview-card">
+                        <div class="overview-label">FINAL GRADE</div>
+                        <div class="overview-value">
+                            <?php echo $grades['final_grade'] > 0 ? number_format($grades['final_grade'], 1) . '%' : '--'; ?>
+                        </div>
+                        <div class="overview-description">
+                            <?php if ($grades['final_grade'] > 0): ?>
+                                <?php echo getTermGradeDescription($grades['final_grade']); ?>
+                            <?php else: ?>
+                                No final data
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Terms Section -->
+            <div class="terms-container">
+                <!-- Midterm Card -->
+                <div class="term-card midterm">
+                    <div class="term-title">MIDTERM</div>
+                    <div class="term-stats">
+                        <div class="stat-item">
+                            <div class="stat-value">60%</div>
+                            <div class="stat-label">Class Standing</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">40%</div>
+                            <div class="stat-label">Midterm Exam</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Midterm Categories -->
+                    <?php if ($categories): ?>
+                        <?php 
+                        $midterm_categories = array_filter($categories, function($cat) {
+                            return isset($cat['term_type']) && $cat['term_type'] === 'midterm';
+                        });
+                        ?>
+                        <?php if (!empty($midterm_categories)): ?>
+                            <div class="categories-section" style="margin-top: 1rem;">
+                                <h4 style="color: var(--text-medium); font-size: 0.9rem; margin-bottom: 0.5rem;">Midterm Categories:</h4>
+                                <?php foreach ($midterm_categories as $category): ?>
+                                    <div style="background: var(--plp-green-pale); padding: 0.5rem; border-radius: 6px; margin-bottom: 0.5rem;">
+                                        <div style="display: flex; justify-content: between; align-items: center;">
+                                            <span style="font-weight: 600;"><?php echo htmlspecialchars($category['category_name']); ?></span>
+                                            <span style="color: var(--plp-green); font-weight: 600;"><?php echo $category['category_percentage']; ?>%</span>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php endif; ?>
+                    <?php endif; ?>
+                </div>
+
+                <!-- Final Card -->
+                <div class="term-card final">
+                    <div class="term-title">FINAL</div>
+                    <div class="term-stats">
+                        <div class="stat-item">
+                            <div class="stat-value">60%</div>
+                            <div class="stat-label">Class Standing</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">40%</div>
+                            <div class="stat-label">Final Exam</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Final Categories -->
+                    <?php if ($categories): ?>
+                        <?php 
+                        $final_categories = array_filter($categories, function($cat) {
+                            return isset($cat['term_type']) && $cat['term_type'] === 'final';
+                        });
+                        ?>
+                        <?php if (!empty($final_categories)): ?>
+                            <div class="categories-section" style="margin-top: 1rem;">
+                                <h4 style="color: var(--text-medium); font-size: 0.9rem; margin-bottom: 0.5rem;">Final Categories:</h4>
+                                <?php foreach ($final_categories as $category): ?>
+                                    <div style="background: var(--plp-green-pale); padding: 0.5rem; border-radius: 6px; margin-bottom: 0.5rem;">
+                                        <div style="display: flex; justify-content: between; align-items: center;">
+                                            <span style="font-weight: 600;"><?php echo htmlspecialchars($category['category_name']); ?></span>
+                                            <span style="color: var(--plp-green); font-weight: 600;"><?php echo $category['category_percentage']; ?>%</span>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php endif; ?>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <!-- Subject Information -->
+            <div class="subject-info-card" style="background: var(--plp-green-pale); padding: 1.5rem; border-radius: var(--border-radius); margin-top: 1.5rem;">
+                <h4 style="color: var(--plp-green); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                    <i class="fas fa-info-circle"></i> Subject Information
+                </h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                    <div>
+                        <strong>Professor:</strong><br>
+                        <?php echo htmlspecialchars($archived_subject['professor_name']); ?>
+                    </div>
+                    <div>
+                        <strong>Schedule:</strong><br>
+                        <?php echo htmlspecialchars($archived_subject['schedule']); ?>
+                    </div>
+                    <div>
+                        <strong>Semester:</strong><br>
+                        <?php echo htmlspecialchars($archived_subject['semester']); ?>
+                    </div>
+                    <div>
+                        <strong>Credits:</strong><br>
+                        <?php echo htmlspecialchars($archived_subject['credits']); ?> credits
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php
+        
+    } catch (Exception $e) {
+        echo '<div class="alert-error">Error loading subject details: ' . htmlspecialchars($e->getMessage()) . '</div>';
+    }
+}
+
+/**
+ * Calculate detailed grades for archived subject
+ */
+function calculateDetailedGradesForArchivedSubject($archived_subject_id) {
+    $performance = calculateArchivedSubjectPerformance($archived_subject_id);
+    
+    return [
+        'midterm_grade' => $performance['midterm_grade'],
+        'final_grade' => $performance['final_grade'],
+        'subject_grade' => $performance['subject_grade']
+    ];
+}
+
+// Add these helper functions if they don't exist
+function getSubjectRiskDescription($grade) {
+    if ($grade >= 85) return 'Low Risk';
+    elseif ($grade >= 80) return 'Moderate Risk';
+    else return 'High Risk';
+}
+
+function getTermGradeDescription($grade) {
+    if ($grade >= 90) return 'Excellent';
+    elseif ($grade >= 85) return 'Very Good';
+    elseif ($grade >= 80) return 'Good';
+    elseif ($grade >= 75) return 'Satisfactory';
+    elseif ($grade >= 70) return 'Passing';
+    else return 'Needs Improvement';
 }
 ?>
 <!DOCTYPE html>
@@ -1365,13 +1592,12 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
                                         <i class="fas fa-undo"></i> Restore
                                     </button>
                                 </form>
-                                <button type="button" class="btn-view" onclick="openViewModal(
-                                    <?php echo $subject['subject_grade'] ?? 0; ?>,
-                                    <?php echo $subject['midterm_grade'] ?? 0; ?>,
-                                    <?php echo $subject['final_grade'] ?? 0; ?>,
-                                    '<?php echo $subject['risk_level'] ?? 'no-data'; ?>',
-                                    '<?php echo addslashes($subject['risk_description'] ?? 'No Data Inputted'); ?>'
-                                )">
+                                <button type="button" class="btn-view" 
+                                    onclick="openViewModal(
+                                        '<?php echo $subject['id']; ?>',
+                                        '<?php echo htmlspecialchars($subject['subject_code']); ?>',
+                                        '<?php echo htmlspecialchars($subject['subject_name']); ?>'
+                                    )">
                                     <i class="fas fa-eye"></i> View Details
                                 </button>
                             </div>
@@ -1384,72 +1610,23 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
 
     <!-- View Details Modal -->
     <div class="modal" id="viewModal">
-        <div class="modal-content" style="max-width: 800px;">
-            <h3 class="modal-title">
-                <i class="fas fa-chart-line"></i>
-                Subject Performance Overview
-            </h3>
-            
-            <div class="overview-section">
-                <div class="overview-grid">
-                    <div class="overview-card subject-grade-card">
-                        <div class="overview-label">SUBJECT GRADE</div>
-                        <div class="overview-value" id="modal_subject_grade">--</div>
-                        <div class="overview-description" id="modal_subject_risk">No grades calculated</div>
-                    </div>
-                    
-                    <div class="overview-card">
-                        <div class="overview-label">MIDTERM GRADE</div>
-                        <div class="overview-value" id="modal_midterm_grade">--</div>
-                        <div class="overview-description" id="modal_midterm_desc">No midterm data</div>
-                    </div>
-                    
-                    <div class="overview-card">
-                        <div class="overview-label">FINAL GRADE</div>
-                        <div class="overview-value" id="modal_final_grade">--</div>
-                        <div class="overview-description" id="modal_final_desc">No final data</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="terms-container">
-                <div class="term-card midterm">
-                    <div class="term-title">
-                        <i class="fas fa-chart-bar"></i> MIDTERM
-                    </div>
-                    <div class="term-stats">
-                        <div class="stat-item">
-                            <div class="stat-value">60%</div>
-                            <div class="stat-label">Class Standing</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-value">40%</div>
-                            <div class="stat-label">Midterm Exam</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="term-card final">
-                    <div class="term-title">
-                        <i class="fas fa-chart-line"></i> FINAL
-                    </div>
-                    <div class="term-stats">
-                        <div class="stat-item">
-                            <div class="stat-value">60%</div>
-                            <div class="stat-label">Class Standing</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-value">40%</div>
-                            <div class="stat-label">Final Exam</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-                        
-            <div class="modal-actions">
-                <button type="button" class="modal-btn modal-btn-cancel" id="closeViewModal">
+        <div class="modal-content" style="max-width: 1000px; height: 90vh; display: flex; flex-direction: column;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--plp-green-lighter);">
+                <h3 class="modal-title" style="margin: 0;">
+                    <i class="fas fa-chart-line"></i>
+                    <span id="modal_subject_title">Subject Performance</span>
+                </h3>
+                <button type="button" class="modal-btn modal-btn-cancel" id="closeViewModal" style="padding: 0.5rem 1rem; font-size: 0.9rem;">
                     <i class="fas fa-times"></i> Close
                 </button>
+            </div>
+            
+            <div id="modalContent" style="flex: 1; overflow-y: auto; padding: 0.5rem;">
+                <!-- Content will be loaded dynamically -->
+                <div style="text-align: center; padding: 2rem; color: var(--text-light);">
+                    <i class="fas fa-spinner fa-spin" style="font-size: 2rem; margin-bottom: 1rem;"></i>
+                    <p>Loading subject details...</p>
+                </div>
             </div>
         </div>
     </div>
@@ -1494,72 +1671,52 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
             }
         });
 
-        function openViewModal(subjectGrade = 0, midtermGrade = 0, finalGrade = 0, riskLevel = 'no-data', riskDescription = 'No Data Inputted') {
-            console.log('Opening modal with data:', { subjectGrade, midtermGrade, finalGrade, riskLevel, riskDescription });
+        function openViewModal(archivedSubjectId, subjectCode, subjectName) {
+            console.log('Opening modal for archived subject:', archivedSubjectId);
             
-            // Set grade data
-            const subjectGradeNum = parseFloat(subjectGrade) || 0;
-            const midtermGradeNum = parseFloat(midtermGrade) || 0;
-            const finalGradeNum = parseFloat(finalGrade) || 0;
+            // Update modal title
+            document.getElementById('modal_subject_title').textContent = subjectCode + ' - ' + subjectName;
             
-            // Update overview cards
-            const subjectGradeElement = document.getElementById('modal_subject_grade');
-            const midtermGradeElement = document.getElementById('modal_midterm_grade');
-            const finalGradeElement = document.getElementById('modal_final_grade');
-            
-            subjectGradeElement.textContent = subjectGradeNum > 0 ? subjectGradeNum.toFixed(1) + '%' : '--';
-            midtermGradeElement.textContent = midtermGradeNum > 0 ? midtermGradeNum.toFixed(1) + '%' : '--';
-            finalGradeElement.textContent = finalGradeNum > 0 ? finalGradeNum.toFixed(1) + '%' : '--';
-            
-            // Update descriptions and risk badges
-            const subjectRiskElement = document.getElementById('modal_subject_risk');
-            const midtermDescElement = document.getElementById('modal_midterm_desc');
-            const finalDescElement = document.getElementById('modal_final_desc');
-            
-            // Clear previous content
-            subjectRiskElement.innerHTML = '';
-            midtermDescElement.textContent = '';
-            finalDescElement.textContent = '';
-            
-            if (subjectGradeNum > 0) {
-                // Create risk badge for subject grade
-                const riskBadge = document.createElement('span');
-                riskBadge.className = 'risk-badge ' + riskLevel;
-                riskBadge.textContent = riskDescription;
-                riskBadge.style.marginTop = '0.5rem';
-                riskBadge.style.display = 'inline-block';
-                
-                subjectRiskElement.appendChild(riskBadge);
-            } else {
-                subjectRiskElement.textContent = 'No grades calculated';
-            }
-            
-            // Update midterm description
-            if (midtermGradeNum > 0) {
-                midtermDescElement.textContent = getTermGradeDescription(midtermGradeNum);
-            } else {
-                midtermDescElement.textContent = 'No midterm data';
-            }
-            
-            // Update final description
-            if (finalGradeNum > 0) {
-                finalDescElement.textContent = getTermGradeDescription(finalGradeNum);
-            } else {
-                finalDescElement.textContent = 'No final data';
-            }
+            // Show loading state
+            const modalContent = document.getElementById('modalContent');
+            modalContent.innerHTML = `
+                <div style="text-align: center; padding: 2rem; color: var(--text-light);">
+                    <i class="fas fa-spinner fa-spin" style="font-size: 2rem; margin-bottom: 1rem;"></i>
+                    <p>Loading subject details...</p>
+                </div>
+            `;
             
             // Show modal
             document.getElementById('viewModal').classList.add('show');
             document.body.style.overflow = 'hidden';
+            
+            // Load term evaluation content
+            loadTermEvaluationContent(archivedSubjectId);
         }
 
-        // Helper function to get term grade description
-        function getTermGradeDescription(grade) {
-            if (grade >= 90) return 'Excellent';
-            if (grade >= 85) return 'Very Good';
-            if (grade >= 80) return 'Good';
-            if (grade >= 75) return 'Satisfactory';
-            return 'Needs Improvement';
+        function loadTermEvaluationContent(archivedSubjectId) {
+            // Create a form to fetch the archived subject data
+            const formData = new FormData();
+            formData.append('archived_subject_id', archivedSubjectId);
+            formData.append('action', 'get_term_evaluation');
+            
+            fetch('student-archived-subject.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.text())
+            .then(html => {
+                document.getElementById('modalContent').innerHTML = html;
+            })
+            .catch(error => {
+                console.error('Error loading term evaluation:', error);
+                document.getElementById('modalContent').innerHTML = `
+                    <div class="alert-error">
+                        <i class="fas fa-exclamation-circle"></i>
+                        Error loading subject details. Please try again.
+                    </div>
+                `;
+            });
         }
 
         // Close modal when clicking close button

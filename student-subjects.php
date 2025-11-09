@@ -230,6 +230,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
                     'archived_subject_id' => $archived_subject_id,
                     'category_name' => $category['category_name'],
                     'category_percentage' => $category['category_percentage'],
+                    'term_type' => $category['term_type'] ?? 'midterm',
                     'archived_at' => date('Y-m-d H:i:s')
                 ]);
                 
