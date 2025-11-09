@@ -91,7 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_subject'])) {
     }
 }
 
-// Fetch archived subjects with calculated performance data
+// Fetch archived subjects
 try {
     // Get all archived subjects for this student
     $archived_subjects_data = supabaseFetch('archived_subjects', ['student_id' => $student['id']]);
@@ -105,8 +105,22 @@ try {
             $subject_info = $subject_data && count($subject_data) > 0 ? $subject_data[0] : null;
             
             if ($subject_info) {
-                // Calculate performance data from archived scores
+                // Get archived performance data if it exists
+                $archived_performance_data = supabaseFetch('archived_subject_performance', ['archived_subject_id' => $archived_subject['id']]);
+                $archived_performance = $archived_performance_data && count($archived_performance_data) > 0 ? $archived_performance_data[0] : null;
+                
+                // Calculate performance data from archived scores as fallback
                 $calculated_performance = calculateArchivedSubjectPerformance($archived_subject['id']);
+                
+                // Use archived performance data if available, otherwise use calculated data
+                $final_performance = $archived_performance ? [
+                    'midterm_grade' => $archived_performance['class_standing'] ?? 0, // Adjust based on your actual data structure
+                    'final_grade' => $archived_performance['exams_score'] ?? 0,     // Adjust based on your actual data structure
+                    'subject_grade' => $archived_performance['overall_grade'] ?? 0,
+                    'risk_level' => $archived_performance['risk_level'] ?? 'no-data',
+                    'risk_description' => $archived_performance['risk_description'] ?? 'No Data Inputted',
+                    'has_scores' => ($archived_performance['overall_grade'] ?? 0) > 0
+                ] : $calculated_performance;
                 
                 // Combine all data
                 $archived_subjects[] = array_merge($archived_subject, [
@@ -114,12 +128,13 @@ try {
                     'subject_name' => $subject_info['subject_name'],
                     'credits' => $subject_info['credits'],
                     'semester' => $subject_info['semester'],
-                    'midterm_grade' => $calculated_performance['midterm_grade'] ?? 0,
-                    'final_grade' => $calculated_performance['final_grade'] ?? 0,
-                    'subject_grade' => $calculated_performance['subject_grade'] ?? 0,
-                    'risk_level' => $calculated_performance['risk_level'] ?? 'no-data',
-                    'risk_description' => $calculated_performance['risk_description'] ?? 'No Data Inputted',
-                    'has_scores' => $calculated_performance['has_scores'] ?? false
+                    'midterm_grade' => $final_performance['midterm_grade'] ?? 0,
+                    'final_grade' => $final_performance['final_grade'] ?? 0,
+                    'subject_grade' => $final_performance['subject_grade'] ?? 0,
+                    'risk_level' => $final_performance['risk_level'] ?? 'no-data',
+                    'risk_description' => $final_performance['risk_description'] ?? 'No Data Inputted',
+                    'has_scores' => $final_performance['has_scores'] ?? false,
+                    'has_archived_performance' => !empty($archived_performance) // Flag to check if we have direct performance data
                 ]);
             }
         }
@@ -137,7 +152,6 @@ try {
     $total_archived = 0;
     error_log("Error fetching archived subjects: " . $e->getMessage());
 }
-
 /**
  * Calculate performance for archived subject from scores
  */
@@ -1308,6 +1322,121 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
                 padding: 0.75rem;
             }
         }
+        /* Add these styles to your existing CSS */
+        .overview-section {
+            margin-bottom: 2rem;
+        }
+
+        .overview-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .overview-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            border-left: 4px solid var(--plp-green);
+            text-align: center;
+            transition: var(--transition);
+        }
+
+        .overview-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--box-shadow-lg);
+        }
+
+        .subject-grade-card {
+            border-left: 4px solid var(--plp-green);
+        }
+
+        .overview-label {
+            font-size: 0.8rem;
+            color: var(--text-light);
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .overview-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--plp-green);
+            margin: 0.5rem 0;
+        }
+
+        .overview-description {
+            font-size: 0.85rem;
+            color: var(--text-medium);
+        }
+
+        .terms-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .term-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .term-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--box-shadow-lg);
+        }
+
+        .term-card.midterm {
+            border-left: 4px solid #3B82F6;
+        }
+
+        .term-card.final {
+            border-left: 4px solid #10B981;
+        }
+
+        .term-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .term-card.midterm .term-title {
+            color: #3B82F6;
+        }
+
+        .term-card.final .term-title {
+            color: #10B981;
+        }
+
+        .term-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--plp-green);
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--text-light);
+        }
     </style>
 </head>
 <body>
@@ -1461,12 +1590,13 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
                                     </button>
                                 </form>
                                 <button type="button" class="btn-view" onclick="openViewModal(
-                                    <?php echo $subject['overall_grade'] ?? 0; ?>,
-                                    <?php echo $subject['class_standing'] ?? 0; ?>,
-                                    <?php echo $subject['exams_score'] ?? 0; ?>,
+                                    <?php echo $subject['subject_grade'] ?? 0; ?>,
+                                    <?php echo $subject['midterm_grade'] ?? 0; ?>,
+                                    <?php echo $subject['final_grade'] ?? 0; ?>,
                                     '<?php echo $subject['risk_level'] ?? 'no-data'; ?>',
                                     '<?php echo addslashes($subject['risk_description'] ?? 'No Data Inputted'); ?>',
-                                    <?php echo $subject['has_scores'] ? 'true' : 'false'; ?>
+                                    <?php echo $subject['has_scores'] ? 'true' : 'false'; ?>,
+                                    <?php echo $subject['has_archived_performance'] ? 'true' : 'false'; ?>
                                 )">
                                     <i class="fas fa-eye"></i> View Details
                                 </button>
@@ -1478,47 +1608,87 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
         </div>
     </div>
 
-    <!-- View Details Modal-->
+    <!-- View Details Modal -->
     <div class="modal" id="viewModal">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width: 800px;">
             <h3 class="modal-title">
                 <i class="fas fa-chart-line"></i>
-                Subject Grades Summary
+                Subject Performance Overview
             </h3>
             
-            <div class="performance-overview">
-                <div class="details-grid">
-                    <div class="detail-item">
-                        <div class="detail-label">Subject Grade</div>
-                        <div class="grade-value" id="view_subject_grade">--</div>
-                        <div class="detail-label" style="font-size: 0.85rem; color: var(--text-medium);">Overall Grade</div>
+            <div class="overview-section" style="margin-bottom: 2rem;">
+                <div class="overview-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+                    <div class="overview-card subject-grade-card" style="background: white; padding: 1.5rem; border-radius: var(--border-radius); box-shadow: var(--box-shadow); border-left: 4px solid var(--plp-green); text-align: center;">
+                        <div class="overview-label" style="font-size: 0.8rem; color: var(--text-light); font-weight: 600; margin-bottom: 0.5rem;">SUBJECT GRADE</div>
+                        <div class="overview-value" id="modal_subject_grade" style="font-size: 2rem; font-weight: 700; color: var(--plp-green); margin: 0.5rem 0;">
+                            --
+                        </div>
+                        <div class="overview-description" id="modal_subject_risk" style="font-size: 0.85rem; color: var(--text-medium);">
+                            No grades calculated
+                        </div>
                     </div>
                     
-                    <div class="detail-item">
-                        <div class="detail-label">Midterm Grade</div>
-                        <div class="grade-value" id="view_midterm_grade">--</div>
-                        <div class="detail-label" style="font-size: 0.85rem; color: var(--text-medium);">Midterm Period</div>
+                    <div class="overview-card" style="background: white; padding: 1.5rem; border-radius: var(--border-radius); box-shadow: var(--box-shadow); border-left: 4px solid var(--plp-green); text-align: center;">
+                        <div class="overview-label" style="font-size: 0.8rem; color: var(--text-light); font-weight: 600; margin-bottom: 0.5rem;">MIDTERM GRADE</div>
+                        <div class="overview-value" id="modal_midterm_grade" style="font-size: 2rem; font-weight: 700; color: var(--plp-green); margin: 0.5rem 0;">
+                            --
+                        </div>
+                        <div class="overview-description" id="modal_midterm_desc" style="font-size: 0.85rem; color: var(--text-medium);">
+                            No midterm data
+                        </div>
                     </div>
                     
-                    <div class="detail-item">
-                        <div class="detail-label">Final Grade</div>
-                        <div class="grade-value" id="view_final_grade">--</div>
-                        <div class="detail-label" style="font-size: 0.85rem; color: var(--text-medium);">Final Period</div>
+                    <div class="overview-card" style="background: white; padding: 1.5rem; border-radius: var(--border-radius); box-shadow: var(--box-shadow); border-left: 4px solid var(--plp-green); text-align: center;">
+                        <div class="overview-label" style="font-size: 0.8rem; color: var(--text-light); font-weight: 600; margin-bottom: 0.5rem;">FINAL GRADE</div>
+                        <div class="overview-value" id="modal_final_grade" style="font-size: 2rem; font-weight: 700; color: var(--plp-green); margin: 0.5rem 0;">
+                            --
+                        </div>
+                        <div class="overview-description" id="modal_final_desc" style="font-size: 0.85rem; color: var(--text-medium);">
+                            No final data
+                        </div>
                     </div>
                 </div>
-                
-                <div style="text-align: center; margin-top: 1rem; padding: 1rem; background: var(--plp-green-pale); border-radius: var(--border-radius);">
-                    <div class="detail-label">Risk Assessment</div>
-                    <div id="view_risk_description" style="color: var(--text-medium); font-size: 0.9rem; margin-top: 0.5rem;">
-                        No data available
+            </div>
+
+            <div class="terms-container" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <!-- Midterm Card -->
+                <div class="term-card midterm" style="background: white; padding: 1.5rem; border-radius: var(--border-radius); box-shadow: var(--box-shadow); border-left: 4px solid #3B82F6; cursor: pointer; transition: var(--transition);">
+                    <div class="term-title" style="font-size: 1.1rem; font-weight: 700; color: #3B82F6; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-chart-bar"></i> MIDTERM
                     </div>
-                    <div class="risk-badge" id="view_risk_badge" style="display: none; margin-top: 0.5rem;">No Data</div>
+                    <div class="term-stats" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="stat-item" style="text-align: center;">
+                            <div class="stat-value" style="font-size: 1.5rem; font-weight: 700; color: var(--plp-green);">60%</div>
+                            <div class="stat-label" style="font-size: 0.8rem; color: var(--text-light);">Class Standing</div>
+                        </div>
+                        <div class="stat-item" style="text-align: center;">
+                            <div class="stat-value" style="font-size: 1.5rem; font-weight: 700; color: var(--plp-green);">40%</div>
+                            <div class="stat-label" style="font-size: 0.8rem; color: var(--text-light);">Midterm Exam</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Final Card -->
+                <div class="term-card final" style="background: white; padding: 1.5rem; border-radius: var(--border-radius); box-shadow: var(--box-shadow); border-left: 4px solid #10B981; cursor: pointer; transition: var(--transition);">
+                    <div class="term-title" style="font-size: 1.1rem; font-weight: 700; color: #10B981; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-chart-line"></i> FINAL
+                    </div>
+                    <div class="term-stats" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="stat-item" style="text-align: center;">
+                            <div class="stat-value" style="font-size: 1.5rem; font-weight: 700; color: var(--plp-green);">60%</div>
+                            <div class="stat-label" style="font-size: 0.8rem; color: var(--text-light);">Class Standing</div>
+                        </div>
+                        <div class="stat-item" style="text-align: center;">
+                            <div class="stat-value" style="font-size: 1.5rem; font-weight: 700; color: var(--plp-green);">40%</div>
+                            <div class="stat-label" style="font-size: 0.8rem; color: var(--text-light);">Final Exam</div>
+                        </div>
+                    </div>
                 </div>
             </div>
                         
             <div class="modal-actions">
                 <button type="button" class="modal-btn modal-btn-cancel" id="closeViewModal">
-                    Close
+                    <i class="fas fa-times"></i> Close
                 </button>
             </div>
         </div>
@@ -1597,25 +1767,63 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
             const midtermGradeNum = parseFloat(midtermGrade) || 0;
             const finalGradeNum = parseFloat(finalGrade) || 0;
             
-            document.getElementById('view_subject_grade').textContent = hasScores ? subjectGradeNum.toFixed(1) + '%' : '--';
-            document.getElementById('view_midterm_grade').textContent = hasScores ? midtermGradeNum.toFixed(1) + '%' : '--';
-            document.getElementById('view_final_grade').textContent = hasScores ? finalGradeNum.toFixed(1) + '%' : '--';
-            document.getElementById('view_risk_description').textContent = riskDescription;
+            // Update overview cards
+            document.getElementById('modal_subject_grade').textContent = hasScores ? subjectGradeNum.toFixed(1) + '%' : '--';
+            document.getElementById('modal_midterm_grade').textContent = hasScores ? midtermGradeNum.toFixed(1) + '%' : '--';
+            document.getElementById('modal_final_grade').textContent = hasScores ? finalGradeNum.toFixed(1) + '%' : '--';
             
-            // Set risk badge
-            const riskBadge = document.getElementById('view_risk_badge');
-            if (hasScores && riskLevel !== 'no-data') {
-                riskBadge.textContent = riskDescription;
+            // Update descriptions and risk badges
+            const subjectRiskElement = document.getElementById('modal_subject_risk');
+            const midtermDescElement = document.getElementById('modal_midterm_desc');
+            const finalDescElement = document.getElementById('modal_final_desc');
+            
+            if (hasScores && subjectGradeNum > 0) {
+                // Create risk badge for subject grade
+                const riskBadge = document.createElement('span');
                 riskBadge.className = 'risk-badge ' + riskLevel;
+                riskBadge.textContent = riskDescription;
+                riskBadge.style.marginTop = '0.5rem';
                 riskBadge.style.display = 'inline-block';
+                
+                subjectRiskElement.innerHTML = '';
+                subjectRiskElement.appendChild(riskBadge);
             } else {
-                riskBadge.textContent = 'No Data Inputted';
-                riskBadge.className = 'risk-badge no-data';
-                riskBadge.style.display = 'inline-block';
+                subjectRiskElement.textContent = 'No grades calculated';
+            }
+            
+            // Update midterm description
+            if (hasScores && midtermGradeNum > 0) {
+                midtermDescElement.textContent = getTermGradeDescription(midtermGradeNum);
+            } else {
+                midtermDescElement.textContent = 'No midterm data';
+            }
+            
+            // Update final description
+            if (hasScores && finalGradeNum > 0) {
+                finalDescElement.textContent = getTermGradeDescription(finalGradeNum);
+            } else {
+                finalDescElement.textContent = 'No final data';
             }
             
             // Show modal
             document.getElementById('viewModal').classList.add('show');
+        }
+
+        // Helper function to get term grade description (similar to termevaluations.php)
+        function getTermGradeDescription(grade) {
+            if (grade >= 90) return 'Excellent';
+            if (grade >= 85) return 'Very Good';
+            if (grade >= 80) return 'Good';
+            if (grade >= 75) return 'Satisfactory';
+            return 'Needs Improvement';
+        }
+
+        // Helper function to get subject risk description (similar to termevaluations.php)
+        function getSubjectRiskDescription(grade) {
+            if (grade >= 85) return 'Low Risk';
+            if (grade >= 80) return 'Moderate Risk';
+            if (grade > 0) return 'High Risk';
+            return 'No Data';
         }
 
         document.getElementById('closeViewModal').addEventListener('click', function() {

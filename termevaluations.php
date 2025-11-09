@@ -747,7 +747,6 @@ function getSubjectRiskDetailedDescription($grade) {
             <!-- Overview Section -->
             <div class="overview-section">
                 <div class="overview-grid">
-                    <!-- SUBJECT GRADE - RISK BASED -->
                     <div class="overview-card subject-grade-card">
                         <div class="overview-label">SUBJECT GRADE</div>
                         <div class="overview-value">
