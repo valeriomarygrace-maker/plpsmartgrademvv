@@ -171,7 +171,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $archived_subject_id = $_POST['archived_subject_id'] ?? 0;
     
     if ($archived_subject_id) {
-        displayTermEvaluationForArchivedSubject($archived_subject_id);
+        displayFullTermEvaluationForArchivedSubject($archived_subject_id);
     }
     exit;
 }
@@ -189,36 +189,8 @@ try {
             $subject_info = $subject_data && count($subject_data) > 0 ? $subject_data[0] : null;
             
             if ($subject_info) {
-                // First, try to get performance from archived_subject_performance table
-                $archived_performance_data = supabaseFetch('archived_subject_performance', ['archived_subject_id' => $archived_subject['id']]);
-                
-                $final_performance = [
-                    'midterm_grade' => 0,
-                    'final_grade' => 0,
-                    'subject_grade' => 0,
-                    'risk_level' => 'no-data',
-                    'risk_description' => 'No Data Inputted',
-                    'has_scores' => false
-                ];
-                
-                if ($archived_performance_data && count($archived_performance_data) > 0) {
-                    // Use the pre-calculated performance data
-                    $archived_performance = $archived_performance_data[0];
-                    
-                    $final_performance = [
-                        'midterm_grade' => $archived_performance['class_standing'] ?? 0,
-                        'final_grade' => $archived_performance['exams_score'] ?? 0,
-                        'subject_grade' => $archived_performance['overall_grade'] ?? 0,
-                        'risk_level' => $archived_performance['risk_level'] ?? 'no-data',
-                        'risk_description' => $archived_performance['risk_description'] ?? 'No Data Inputted',
-                        'has_scores' => ($archived_performance['overall_grade'] ?? 0) > 0
-                    ];
-                    
-                } else {
-                    // Calculate performance from scores (fallback)
-                    $calculated_performance = calculateArchivedSubjectPerformance($archived_subject['id']);
-                    $final_performance = $calculated_performance;
-                }
+                // Calculate performance data
+                $calculated_performance = calculateArchivedSubjectPerformance($archived_subject['id']);
                 
                 // Combine all data
                 $archived_subjects[] = array_merge($archived_subject, [
@@ -226,12 +198,12 @@ try {
                     'subject_name' => $subject_info['subject_name'],
                     'credits' => $subject_info['credits'],
                     'semester' => $subject_info['semester'],
-                    'midterm_grade' => $final_performance['midterm_grade'],
-                    'final_grade' => $final_performance['final_grade'],
-                    'subject_grade' => $final_performance['subject_grade'],
-                    'risk_level' => $final_performance['risk_level'],
-                    'risk_description' => $final_performance['risk_description'],
-                    'has_scores' => $final_performance['has_scores']
+                    'midterm_grade' => $calculated_performance['midterm_grade'],
+                    'final_grade' => $calculated_performance['final_grade'],
+                    'subject_grade' => $calculated_performance['subject_grade'],
+                    'risk_level' => $calculated_performance['risk_level'],
+                    'risk_description' => $calculated_performance['risk_description'],
+                    'has_scores' => $calculated_performance['has_scores']
                 ]);
             }
         }
@@ -454,9 +426,9 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
 }
 
 /**
- * Display term evaluation interface for archived subject
+ * Display FULL term evaluation interface for archived subject (like termevaluations.php)
  */
-function displayTermEvaluationForArchivedSubject($archived_subject_id) {
+function displayFullTermEvaluationForArchivedSubject($archived_subject_id) {
     try {
         // Get archived subject data
         $archived_subject_data = supabaseFetch('archived_subjects', ['id' => $archived_subject_id]);
@@ -468,169 +440,235 @@ function displayTermEvaluationForArchivedSubject($archived_subject_id) {
         
         $archived_subject = $archived_subject_data[0];
         
-        // Get performance data
-        $performance_data = calculateArchivedSubjectPerformance($archived_subject_id);
-        
-        // Get categories and scores for detailed display
-        $categories = supabaseFetch('archived_class_standing_categories', ['archived_subject_id' => $archived_subject_id]);
-        
         // Calculate grades using the same logic as termevaluations.php
         $grades = calculateDetailedGradesForArchivedSubject($archived_subject_id);
         
-        // Display the term evaluation interface
+        // Get all scores for this archived subject
+        $allScores = [];
+        $categories = supabaseFetch('archived_class_standing_categories', ['archived_subject_id' => $archived_subject_id]);
+        if ($categories) {
+            foreach ($categories as $category) {
+                $scores = supabaseFetch('archived_subject_scores', ['archived_category_id' => $category['id']]);
+                if ($scores) {
+                    foreach ($scores as $score) {
+                        $score['category_id'] = $category['id'];
+                        $allScores[] = $score;
+                    }
+                }
+            }
+        }
+        
+        // Get midterm and final categories
+        $midtermCategories = array_filter($categories, function($cat) {
+            return isset($cat['term_type']) && $cat['term_type'] === 'midterm';
+        });
+        
+        $finalCategories = array_filter($categories, function($cat) {
+            return isset($cat['term_type']) && $cat['term_type'] === 'final';
+        });
+
+        // Display the FULL term evaluation interface (like termevaluations.php)
         ?>
-        <div class="term-evaluation-container">
-            <!-- Overview Section -->
-            <div class="overview-section">
-                <div class="overview-grid">
-                    <div class="overview-card subject-grade-card">
-                        <div class="overview-label">SUBJECT GRADE</div>
-                        <div class="overview-value">
-                            <?php echo $grades['subject_grade'] > 0 ? number_format($grades['subject_grade'], 1) . '%' : '--'; ?>
-                        </div>
-                        <div class="overview-description">
-                            <?php if ($grades['subject_grade'] > 0): ?>
+        <!-- Overview Section -->
+        <div class="overview-section">
+            <div class="overview-grid">
+                <div class="overview-card subject-grade-card">
+                    <div class="overview-label">SUBJECT GRADE</div>
+                    <div class="overview-value">
+                        <?php echo $grades['subject_grade'] > 0 ? number_format($grades['subject_grade'], 1) . '%' : '--'; ?>
+                    </div>
+                    <div class="overview-description">
+                        <?php if ($grades['subject_grade'] > 0): ?>
+                            <?php 
+                            $riskLevel = getSubjectRiskDescription($grades['subject_grade']);
+                            ?>
+                            <span class="risk-badge <?php echo strtolower(str_replace(' ', '-', $riskLevel)); ?>">
+                                <?php echo $riskLevel; ?>
+                            </span>
+                        <?php else: ?>
+                            No grades calculated
+                        <?php endif; ?>
+                    </div>
+                </div>
+                
+                <div class="overview-card">
+                    <div class="overview-label">MIDTERM GRADE</div>
+                    <div class="overview-value">
+                        <?php echo $grades['midterm_grade'] > 0 ? number_format($grades['midterm_grade'], 1) . '%' : '--'; ?>
+                    </div>
+                    <div class="overview-description">
+                        <?php if ($grades['midterm_grade'] > 0): ?>
+                            <?php echo getTermGradeDescription($grades['midterm_grade']); ?>
+                        <?php else: ?>
+                            No midterm data
+                        <?php endif; ?>
+                    </div>
+                </div>
+                
+                <div class="overview-card">
+                    <div class="overview-label">FINAL GRADE</div>
+                    <div class="overview-value">
+                        <?php echo $grades['final_grade'] > 0 ? number_format($grades['final_grade'], 1) . '%' : '--'; ?>
+                    </div>
+                    <div class="overview-description">
+                        <?php if ($grades['final_grade'] > 0): ?>
+                            <?php echo getTermGradeDescription($grades['final_grade']); ?>
+                        <?php else: ?>
+                            No final data
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Terms Section -->
+        <div class="terms-container">
+            <!-- Midterm Card -->
+            <div class="term-card midterm">
+                <div class="term-title">MIDTERM</div>
+                <div class="term-stats">
+                    <div class="stat-item">
+                        <div class="stat-value">60%</div>
+                        <div class="stat-label">Class Standing</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">40%</div>
+                        <div class="stat-label">Midterm Exam</div>
+                    </div>
+                </div>
+                
+                <!-- Midterm Categories Details -->
+                <?php if (!empty($midtermCategories)): ?>
+                    <div class="categories-section" style="margin-top: 1rem;">
+                        <h4 style="color: var(--text-medium); font-size: 0.9rem; margin-bottom: 0.5rem;">Midterm Categories:</h4>
+                        <?php foreach ($midtermCategories as $category): ?>
+                            <div style="background: var(--plp-green-pale); padding: 1rem; border-radius: 8px; margin-bottom: 0.75rem;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                    <span style="font-weight: 600; color: var(--plp-green);"><?php echo htmlspecialchars($category['category_name']); ?></span>
+                                    <span style="color: var(--plp-green); font-weight: 600; background: white; padding: 0.25rem 0.5rem; border-radius: 4px;">
+                                        <?php echo $category['category_percentage']; ?>%
+                                    </span>
+                                </div>
+                                
+                                <!-- Show scores for this category -->
                                 <?php 
-                                $riskLevel = getSubjectRiskDescription($grades['subject_grade']);
+                                $categoryScores = array_filter($allScores, function($score) use ($category) {
+                                    return $score['category_id'] == $category['id'];
+                                });
                                 ?>
-                                <span class="risk-badge <?php echo strtolower(str_replace(' ', '-', $riskLevel)); ?>">
-                                    <?php echo $riskLevel; ?>
-                                </span>
-                            <?php else: ?>
-                                No grades calculated
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                    
-                    <div class="overview-card">
-                        <div class="overview-label">MIDTERM GRADE</div>
-                        <div class="overview-value">
-                            <?php echo $grades['midterm_grade'] > 0 ? number_format($grades['midterm_grade'], 1) . '%' : '--'; ?>
-                        </div>
-                        <div class="overview-description">
-                            <?php if ($grades['midterm_grade'] > 0): ?>
-                                <?php echo getTermGradeDescription($grades['midterm_grade']); ?>
-                            <?php else: ?>
-                                No midterm data
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                    
-                    <div class="overview-card">
-                        <div class="overview-label">FINAL GRADE</div>
-                        <div class="overview-value">
-                            <?php echo $grades['final_grade'] > 0 ? number_format($grades['final_grade'], 1) . '%' : '--'; ?>
-                        </div>
-                        <div class="overview-description">
-                            <?php if ($grades['final_grade'] > 0): ?>
-                                <?php echo getTermGradeDescription($grades['final_grade']); ?>
-                            <?php else: ?>
-                                No final data
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Terms Section -->
-            <div class="terms-container">
-                <!-- Midterm Card -->
-                <div class="term-card midterm">
-                    <div class="term-title">MIDTERM</div>
-                    <div class="term-stats">
-                        <div class="stat-item">
-                            <div class="stat-value">60%</div>
-                            <div class="stat-label">Class Standing</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-value">40%</div>
-                            <div class="stat-label">Midterm Exam</div>
-                        </div>
-                    </div>
-                    
-                    <!-- Midterm Categories -->
-                    <?php if ($categories): ?>
-                        <?php 
-                        $midterm_categories = array_filter($categories, function($cat) {
-                            return isset($cat['term_type']) && $cat['term_type'] === 'midterm';
-                        });
-                        ?>
-                        <?php if (!empty($midterm_categories)): ?>
-                            <div class="categories-section" style="margin-top: 1rem;">
-                                <h4 style="color: var(--text-medium); font-size: 0.9rem; margin-bottom: 0.5rem;">Midterm Categories:</h4>
-                                <?php foreach ($midterm_categories as $category): ?>
-                                    <div style="background: var(--plp-green-pale); padding: 0.5rem; border-radius: 6px; margin-bottom: 0.5rem;">
-                                        <div style="display: flex; justify-content: between; align-items: center;">
-                                            <span style="font-weight: 600;"><?php echo htmlspecialchars($category['category_name']); ?></span>
-                                            <span style="color: var(--plp-green); font-weight: 600;"><?php echo $category['category_percentage']; ?>%</span>
+                                <?php if (!empty($categoryScores)): ?>
+                                    <div style="font-size: 0.8rem; color: var(--text-medium);">
+                                        <strong>Scores:</strong>
+                                        <div style="margin-top: 0.25rem;">
+                                            <?php foreach ($categoryScores as $score): ?>
+                                                <div style="display: flex; justify-content: space-between; padding: 0.1rem 0;">
+                                                    <span><?php echo htmlspecialchars($score['score_name']); ?></span>
+                                                    <span><?php echo $score['score_value']; ?>/<?php echo $score['max_score']; ?></span>
+                                                </div>
+                                            <?php endforeach; ?>
                                         </div>
                                     </div>
-                                <?php endforeach; ?>
-                            </div>
-                        <?php endif; ?>
-                    <?php endif; ?>
-                </div>
-
-                <!-- Final Card -->
-                <div class="term-card final">
-                    <div class="term-title">FINAL</div>
-                    <div class="term-stats">
-                        <div class="stat-item">
-                            <div class="stat-value">60%</div>
-                            <div class="stat-label">Class Standing</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-value">40%</div>
-                            <div class="stat-label">Final Exam</div>
-                        </div>
-                    </div>
-                    
-                    <!-- Final Categories -->
-                    <?php if ($categories): ?>
-                        <?php 
-                        $final_categories = array_filter($categories, function($cat) {
-                            return isset($cat['term_type']) && $cat['term_type'] === 'final';
-                        });
-                        ?>
-                        <?php if (!empty($final_categories)): ?>
-                            <div class="categories-section" style="margin-top: 1rem;">
-                                <h4 style="color: var(--text-medium); font-size: 0.9rem; margin-bottom: 0.5rem;">Final Categories:</h4>
-                                <?php foreach ($final_categories as $category): ?>
-                                    <div style="background: var(--plp-green-pale); padding: 0.5rem; border-radius: 6px; margin-bottom: 0.5rem;">
-                                        <div style="display: flex; justify-content: between; align-items: center;">
-                                            <span style="font-weight: 600;"><?php echo htmlspecialchars($category['category_name']); ?></span>
-                                            <span style="color: var(--plp-green); font-weight: 600;"><?php echo $category['category_percentage']; ?>%</span>
-                                        </div>
+                                <?php else: ?>
+                                    <div style="font-size: 0.8rem; color: var(--text-light); font-style: italic;">
+                                        No scores recorded
                                     </div>
-                                <?php endforeach; ?>
+                                <?php endif; ?>
                             </div>
-                        <?php endif; ?>
-                    <?php endif; ?>
-                </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php else: ?>
+                    <div style="text-align: center; color: var(--text-light); font-style: italic; margin-top: 1rem;">
+                        No midterm categories defined
+                    </div>
+                <?php endif; ?>
             </div>
 
-            <!-- Subject Information -->
-            <div class="subject-info-card" style="background: var(--plp-green-pale); padding: 1.5rem; border-radius: var(--border-radius); margin-top: 1.5rem;">
-                <h4 style="color: var(--plp-green); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
-                    <i class="fas fa-info-circle"></i> Subject Information
-                </h4>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
-                    <div>
-                        <strong>Professor:</strong><br>
-                        <?php echo htmlspecialchars($archived_subject['professor_name']); ?>
+            <!-- Final Card -->
+            <div class="term-card final">
+                <div class="term-title">FINAL</div>
+                <div class="term-stats">
+                    <div class="stat-item">
+                        <div class="stat-value">60%</div>
+                        <div class="stat-label">Class Standing</div>
                     </div>
-                    <div>
-                        <strong>Schedule:</strong><br>
-                        <?php echo htmlspecialchars($archived_subject['schedule']); ?>
+                    <div class="stat-item">
+                        <div class="stat-value">40%</div>
+                        <div class="stat-label">Final Exam</div>
                     </div>
-                    <div>
-                        <strong>Semester:</strong><br>
-                        <?php echo htmlspecialchars($archived_subject['semester']); ?>
+                </div>
+                
+                <!-- Final Categories Details -->
+                <?php if (!empty($finalCategories)): ?>
+                    <div class="categories-section" style="margin-top: 1rem;">
+                        <h4 style="color: var(--text-medium); font-size: 0.9rem; margin-bottom: 0.5rem;">Final Categories:</h4>
+                        <?php foreach ($finalCategories as $category): ?>
+                            <div style="background: var(--plp-green-pale); padding: 1rem; border-radius: 8px; margin-bottom: 0.75rem;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                    <span style="font-weight: 600; color: var(--plp-green);"><?php echo htmlspecialchars($category['category_name']); ?></span>
+                                    <span style="color: var(--plp-green); font-weight: 600; background: white; padding: 0.25rem 0.5rem; border-radius: 4px;">
+                                        <?php echo $category['category_percentage']; ?>%
+                                    </span>
+                                </div>
+                                
+                                <!-- Show scores for this category -->
+                                <?php 
+                                $categoryScores = array_filter($allScores, function($score) use ($category) {
+                                    return $score['category_id'] == $category['id'];
+                                });
+                                ?>
+                                <?php if (!empty($categoryScores)): ?>
+                                    <div style="font-size: 0.8rem; color: var(--text-medium);">
+                                        <strong>Scores:</strong>
+                                        <div style="margin-top: 0.25rem;">
+                                            <?php foreach ($categoryScores as $score): ?>
+                                                <div style="display: flex; justify-content: space-between; padding: 0.1rem 0;">
+                                                    <span><?php echo htmlspecialchars($score['score_name']); ?></span>
+                                                    <span><?php echo $score['score_value']; ?>/<?php echo $score['max_score']; ?></span>
+                                                </div>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    </div>
+                                <?php else: ?>
+                                    <div style="font-size: 0.8rem; color: var(--text-light); font-style: italic;">
+                                        No scores recorded
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                        <?php endforeach; ?>
                     </div>
-                    <div>
-                        <strong>Credits:</strong><br>
-                        <?php echo htmlspecialchars($archived_subject['credits']); ?> credits
+                <?php else: ?>
+                    <div style="text-align: center; color: var(--text-light); font-style: italic; margin-top: 1rem;">
+                        No final categories defined
                     </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <!-- Subject Information -->
+        <div class="subject-info-card" style="background: var(--plp-green-pale); padding: 1.5rem; border-radius: var(--border-radius); margin-top: 1.5rem;">
+            <h4 style="color: var(--plp-green); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                <i class="fas fa-info-circle"></i> Subject Information
+            </h4>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                <div>
+                    <strong>Professor:</strong><br>
+                    <?php echo htmlspecialchars($archived_subject['professor_name']); ?>
+                </div>
+                <div>
+                    <strong>Schedule:</strong><br>
+                    <?php echo htmlspecialchars($archived_subject['schedule']); ?>
+                </div>
+                <div>
+                    <strong>Semester:</strong><br>
+                    <?php echo htmlspecialchars($archived_subject['semester']); ?>
+                </div>
+                <div>
+                    <strong>Credits:</strong><br>
+                    <?php echo htmlspecialchars($archived_subject['credits']); ?> credits
+                </div>
+                <div>
+                    <strong>Archived Date:</strong><br>
+                    <?php echo date('M j, Y g:i A', strtotime($archived_subject['archived_at'])); ?>
                 </div>
             </div>
         </div>
@@ -654,7 +692,7 @@ function calculateDetailedGradesForArchivedSubject($archived_subject_id) {
     ];
 }
 
-// Add these helper functions if they don't exist
+// Add these helper functions
 function getSubjectRiskDescription($grade) {
     if ($grade >= 85) return 'Low Risk';
     elseif ($grade >= 80) return 'Moderate Risk';
