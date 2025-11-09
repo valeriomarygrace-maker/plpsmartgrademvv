@@ -1,3 +1,5 @@
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
 
 CREATE TABLE public.archived_class_standing_categories (
   id bigint NOT NULL DEFAULT nextval('archived_class_standing_categories_id_seq'::regclass),
@@ -78,6 +80,7 @@ CREATE TABLE public.student_class_standing_categories (
   category_name character varying NOT NULL,
   category_percentage numeric NOT NULL,
   created_at timestamp with time zone DEFAULT now(),
+  term_type character varying NOT NULL DEFAULT 'midterm'::character varying CHECK (term_type::text = ANY (ARRAY['midterm'::character varying, 'final'::character varying]::text[])),
   CONSTRAINT student_class_standing_categories_pkey PRIMARY KEY (id),
   CONSTRAINT student_class_standing_categories_student_subject_id_fkey FOREIGN KEY (student_subject_id) REFERENCES public.student_subjects(id)
 );

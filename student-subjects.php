@@ -190,11 +190,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
         
         $subject_to_archive = $subject_data[0];
         
-        // Archive the main subject record
+        // Archive the main subject record - include schedule even if empty
         $archived_subject = supabaseInsert('archived_subjects', [
             'student_id' => $subject_to_archive['student_id'],
             'subject_id' => $subject_to_archive['subject_id'],
             'professor_name' => $subject_to_archive['professor_name'],
+            'schedule' => $subject_to_archive['schedule'] ?? 'Not Set', // Add schedule field
             'archived_at' => date('Y-m-d H:i:s')
         ]);
         
@@ -237,24 +238,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
             }
         }
         
-        // Archive exam scores
+        // Archive exam scores (scores without category_id)
         $exam_scores = supabaseFetch('student_subject_scores', [
             'student_subject_id' => $subject_record_id, 
             'category_id' => NULL
         ]);
 
         if ($exam_scores && is_array($exam_scores)) {
-            foreach ($exam_scores as $score) {
-                $exam_category = supabaseInsert('archived_class_standing_categories', [
-                    'archived_subject_id' => $archived_subject_id,
-                    'category_name' => 'Exam Scores',
-                    'category_percentage' => 0,
-                    'archived_at' => date('Y-m-d H:i:s')
-                ]);
-                
-                if ($exam_category) {
+            // Create a special category for exam scores
+            $exam_category = supabaseInsert('archived_class_standing_categories', [
+                'archived_subject_id' => $archived_subject_id,
+                'category_name' => 'Exam Scores',
+                'category_percentage' => 0,
+                'archived_at' => date('Y-m-d H:i:s')
+            ]);
+            
+            if ($exam_category) {
+                $exam_category_id = $exam_category['id'];
+                foreach ($exam_scores as $score) {
                     supabaseInsert('archived_subject_scores', [
-                        'archived_category_id' => $exam_category['id'],
+                        'archived_category_id' => $exam_category_id,
                         'score_type' => $score['score_type'],
                         'score_name' => $score['score_name'],
                         'score_value' => $score['score_value'],
@@ -298,6 +301,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
         
     } catch (Exception $e) {
         $error_message = 'Database error during archiving: ' . $e->getMessage();
+        error_log("Archive error: " . $e->getMessage());
     }
 }
 
