@@ -93,7 +93,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_subject'])) {
 
 // Fetch archived subjects
 try {
-    // Get all archived subjects for this student
     $archived_subjects_data = supabaseFetch('archived_subjects', ['student_id' => $student['id']]);
     
     $archived_subjects = [];
