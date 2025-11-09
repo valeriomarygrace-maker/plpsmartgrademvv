@@ -34,12 +34,21 @@ try {
     $subject_count = $check_subjects ? count($check_subjects) : 0;
     
     if ($subject_count == 0) {
-        $actual_subjects = [
-            // First Semester
-            ['subject_code' => 'COMP 104', 'subject_name' => 'Data Structures and Algorithms', 'credits' => 3, 'semester' => 'First Semester'],
-            ['subject_code' => 'COMP 105', 'subject_name' => 'Information Management', 'credits' => 3, 'semester' => 'First Semester'],
-            // ... your other subjects
-        ];
+         $actual_subjects = [
+                        // First Semester
+                        ['COMP 104', 'Data Structures and Algorithms', 3, 'First Semester'],
+                        ['COMP 105', 'Information Management', 3, 'First Semester'],
+                        ['IT 102', 'Quantitative Methods', 3, 'First Semester'],
+                        ['IT 201', 'IT Elective: Platform Technologies', 3, 'First Semester'],
+                        ['IT 202', 'IT Elective: Object-Oriented Programming (VB.Net)', 3, 'First Semester'],
+                        
+                        // Second Semester
+                        ['IT 103', 'Advanced Database Systems', 3, 'Second Semester'],
+                        ['IT 104', 'Integrative Programming and Technologies I', 3, 'Second Semester'],
+                        ['IT 105', 'Networking I', 3, 'Second Semester'],
+                        ['IT 301', 'Web Programming', 3, 'Second Semester'],
+                        ['COMP 106', 'Applications Development and Emerging Technologies', 3, 'Second Semester']
+                    ];
         
         foreach ($actual_subjects as $subject_data) {
             $subject_data['created_at'] = date('Y-m-d H:i:s');
