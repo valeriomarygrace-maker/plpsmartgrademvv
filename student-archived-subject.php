@@ -104,14 +104,11 @@ try {
             $subject_info = $subject_data && count($subject_data) > 0 ? $subject_data[0] : null;
             
             if ($subject_info) {
-                // Get archived performance data if it exists
                 $archived_performance_data = supabaseFetch('archived_subject_performance', ['archived_subject_id' => $archived_subject['id']]);
                 $archived_performance = $archived_performance_data && count($archived_performance_data) > 0 ? $archived_performance_data[0] : null;
                 
-                // Calculate performance data from archived scores as fallback
                 $calculated_performance = calculateArchivedSubjectPerformance($archived_subject['id']);
                 
-                // Use archived performance data if available, otherwise use calculated data
                 $final_performance = $archived_performance ? [
                     'midterm_grade' => $archived_performance['midterm_grade'] ?? $archived_performance['class_standing'] ?? 0,
                     'final_grade' => $archived_performance['final_grade'] ?? $archived_performance['exams_score'] ?? 0,

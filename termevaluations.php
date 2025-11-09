@@ -61,195 +61,153 @@ try {
     $allScores = supabaseFetch('student_subject_scores', ['student_subject_id' => $subject_id]);
     if (!$allScores) $allScores = [];
     
-    // Get midterm categories and scores
+    // DEBUG: Log all scores found
+    error_log("All scores count: " . count($allScores));
+    foreach ($allScores as $score) {
+        error_log("Score - Type: " . $score['score_type'] . ", Name: " . $score['score_name'] . ", Value: " . $score['score_value']);
+    }
+
+    // Get midterm categories
     $midtermCategories = supabaseFetch('student_class_standing_categories', [
         'student_subject_id' => $subject_id,
         'term_type' => 'midterm'
     ]);
     
-    // Get final categories and scores
+    // Get final categories
     $finalCategories = supabaseFetch('student_class_standing_categories', [
         'student_subject_id' => $subject_id,
         'term_type' => 'final'
     ]);
+
+    // DEBUG: Log categories
+    error_log("Midterm categories: " . ($midtermCategories ? count($midtermCategories) : 0));
+    error_log("Final categories: " . ($finalCategories ? count($finalCategories) : 0));
+
+    // SIMPLIFIED GRADE CALCULATION - More reliable approach
     
     // Calculate Midterm Grade
-    if ($midtermCategories && is_array($midtermCategories)) {
-        $midtermClassStandings = array_filter($allScores, function($score) {
-            if ($score['score_type'] !== 'class_standing') return false;
-            if (!$score['category_id']) return false;
-            
-            $category_data = supabaseFetch('student_class_standing_categories', ['id' => $score['category_id']]);
-            if ($category_data && count($category_data) > 0) {
-                return $category_data[0]['term_type'] === 'midterm';
-            }
-            return false;
-        });
+    if ($midtermCategories && count($midtermCategories) > 0) {
+        $midtermClassStanding = 0;
+        $midtermExamScore = 0;
         
-        // Calculate midterm class standing
-        $midtermClassStandingTotal = 0;
-        $midtermCategoryTotals = [];
-        
+        // Calculate class standing for midterm
         foreach ($midtermCategories as $category) {
-            $midtermCategoryTotals[$category['id']] = [
-                'percentage' => floatval($category['category_percentage']),
-                'total_score' => 0,
-                'max_possible' => 0
-            ];
-        }
-        
-        foreach ($midtermClassStandings as $standing) {
-            if ($standing['category_id'] && isset($midtermCategoryTotals[$standing['category_id']])) {
-                $categoryId = $standing['category_id'];
-                $categoryName = '';
-                
-                // Find category name
-                foreach ($midtermCategories as $cat) {
-                    if ($cat['id'] == $categoryId) {
-                        $categoryName = strtolower($cat['category_name']);
-                        break;
-                    }
-                }
-                
-                if ($categoryName === 'attendance') {
-                    $scoreValue = ($standing['score_name'] === 'Present') ? 1 : 0;
-                    $midtermCategoryTotals[$categoryId]['total_score'] += $scoreValue;
-                    $midtermCategoryTotals[$categoryId]['max_possible'] += 1;
+            $categoryScores = array_filter($allScores, function($score) use ($category) {
+                return $score['category_id'] == $category['id'] && $score['score_type'] === 'class_standing';
+            });
+            
+            $categoryTotal = 0;
+            $categoryMax = 0;
+            
+            foreach ($categoryScores as $score) {
+                if (strtolower($category['category_name']) === 'attendance') {
+                    $scoreValue = ($score['score_name'] === 'Present') ? 1 : 0;
+                    $categoryTotal += $scoreValue;
+                    $categoryMax += 1;
                 } else {
-                    $midtermCategoryTotals[$categoryId]['total_score'] += floatval($standing['score_value']);
-                    $midtermCategoryTotals[$categoryId]['max_possible'] += floatval($standing['max_score']);
+                    $categoryTotal += floatval($score['score_value']);
+                    $categoryMax += floatval($score['max_score']);
                 }
             }
-        }
-        
-        foreach ($midtermCategoryTotals as $categoryId => $category) {
-            if ($category['max_possible'] > 0) {
-                $percentageScore = ($category['total_score'] / $category['max_possible']) * 100;
-                $weightedScore = ($percentageScore * $category['percentage']) / 100;
-                $midtermClassStandingTotal += $weightedScore;
+            
+            if ($categoryMax > 0) {
+                $categoryPercentage = ($categoryTotal / $categoryMax) * 100;
+                $weightedScore = ($categoryPercentage * floatval($category['category_percentage'])) / 100;
+                $midtermClassStanding += $weightedScore;
             }
         }
         
-        if ($midtermClassStandingTotal > 60) {
-            $midtermClassStandingTotal = 60;
+        // Cap class standing at 60%
+        if ($midtermClassStanding > 60) {
+            $midtermClassStanding = 60;
         }
         
-        // Calculate midterm exam score
-        $midtermExam = array_filter($allScores, function($score) {
+        // Get midterm exam
+        $midtermExams = array_filter($allScores, function($score) {
             return $score['score_type'] === 'midterm_exam';
         });
         
-        $midtermExamScore = 0;
-        if (!empty($midtermExam)) {
-            $midterm = reset($midtermExam);
-            if (floatval($midterm['max_score']) > 0) {
-                $midtermPercentage = (floatval($midterm['score_value']) / floatval($midterm['max_score'])) * 100;
-                $midtermExamScore = ($midtermPercentage * 40) / 100;
+        if (!empty($midtermExams)) {
+            $midtermExam = reset($midtermExams);
+            if (floatval($midtermExam['max_score']) > 0) {
+                $midtermExamPercentage = (floatval($midtermExam['score_value']) / floatval($midtermExam['max_score'])) * 100;
+                $midtermExamScore = ($midtermExamPercentage * 40) / 100;
             }
         }
         
-        $midtermGrade = $midtermClassStandingTotal + $midtermExamScore;
-        if ($midtermGrade > 100) {
-            $midtermGrade = 100;
-        }
+        $midtermGrade = $midtermClassStanding + $midtermExamScore;
+        if ($midtermGrade > 100) $midtermGrade = 100;
     }
     
     // Calculate Final Grade
-    if ($finalCategories && is_array($finalCategories)) {
-        $finalClassStandings = array_filter($allScores, function($score) {
-            if ($score['score_type'] !== 'class_standing') return false;
-            if (!$score['category_id']) return false;
-            
-            $category_data = supabaseFetch('student_class_standing_categories', ['id' => $score['category_id']]);
-            if ($category_data && count($category_data) > 0) {
-                return $category_data[0]['term_type'] === 'final';
-            }
-            return false;
-        });
+    if ($finalCategories && count($finalCategories) > 0) {
+        $finalClassStanding = 0;
+        $finalExamScore = 0;
         
-        // Calculate final class standing
-        $finalClassStandingTotal = 0;
-        $finalCategoryTotals = [];
-        
+        // Calculate class standing for final
         foreach ($finalCategories as $category) {
-            $finalCategoryTotals[$category['id']] = [
-                'percentage' => floatval($category['category_percentage']),
-                'total_score' => 0,
-                'max_possible' => 0
-            ];
-        }
-        
-        foreach ($finalClassStandings as $standing) {
-            if ($standing['category_id'] && isset($finalCategoryTotals[$standing['category_id']])) {
-                $categoryId = $standing['category_id'];
-                $categoryName = '';
-                
-                // Find category name
-                foreach ($finalCategories as $cat) {
-                    if ($cat['id'] == $categoryId) {
-                        $categoryName = strtolower($cat['category_name']);
-                        break;
-                    }
-                }
-                
-                if ($categoryName === 'attendance') {
-                    $scoreValue = ($standing['score_name'] === 'Present') ? 1 : 0;
-                    $finalCategoryTotals[$categoryId]['total_score'] += $scoreValue;
-                    $finalCategoryTotals[$categoryId]['max_possible'] += 1;
+            $categoryScores = array_filter($allScores, function($score) use ($category) {
+                return $score['category_id'] == $category['id'] && $score['score_type'] === 'class_standing';
+            });
+            
+            $categoryTotal = 0;
+            $categoryMax = 0;
+            
+            foreach ($categoryScores as $score) {
+                if (strtolower($category['category_name']) === 'attendance') {
+                    $scoreValue = ($score['score_name'] === 'Present') ? 1 : 0;
+                    $categoryTotal += $scoreValue;
+                    $categoryMax += 1;
                 } else {
-                    $finalCategoryTotals[$categoryId]['total_score'] += floatval($standing['score_value']);
-                    $finalCategoryTotals[$categoryId]['max_possible'] += floatval($standing['max_score']);
+                    $categoryTotal += floatval($score['score_value']);
+                    $categoryMax += floatval($score['max_score']);
                 }
             }
-        }
-        
-        foreach ($finalCategoryTotals as $categoryId => $category) {
-            if ($category['max_possible'] > 0) {
-                $percentageScore = ($category['total_score'] / $category['max_possible']) * 100;
-                $weightedScore = ($percentageScore * $category['percentage']) / 100;
-                $finalClassStandingTotal += $weightedScore;
+            
+            if ($categoryMax > 0) {
+                $categoryPercentage = ($categoryTotal / $categoryMax) * 100;
+                $weightedScore = ($categoryPercentage * floatval($category['category_percentage'])) / 100;
+                $finalClassStanding += $weightedScore;
             }
         }
         
-        if ($finalClassStandingTotal > 60) {
-            $finalClassStandingTotal = 60;
+        // Cap class standing at 60%
+        if ($finalClassStanding > 60) {
+            $finalClassStanding = 60;
         }
         
-        // Calculate final exam score
-        $finalExam = array_filter($allScores, function($score) {
+        // Get final exam
+        $finalExams = array_filter($allScores, function($score) {
             return $score['score_type'] === 'final_exam';
         });
         
-        $finalExamScore = 0;
-        if (!empty($finalExam)) {
-            $final = reset($finalExam);
-            if (floatval($final['max_score']) > 0) {
-                $finalPercentage = (floatval($final['score_value']) / floatval($final['max_score'])) * 100;
-                $finalExamScore = ($finalPercentage * 40) / 100;
+        if (!empty($finalExams)) {
+            $finalExam = reset($finalExams);
+            if (floatval($finalExam['max_score']) > 0) {
+                $finalExamPercentage = (floatval($finalExam['score_value']) / floatval($finalExam['max_score'])) * 100;
+                $finalExamScore = ($finalExamPercentage * 40) / 100;
             }
         }
         
-        $finalGrade = $finalClassStandingTotal + $finalExamScore;
-        if ($finalGrade > 100) {
-            $finalGrade = 100;
-        }
+        $finalGrade = $finalClassStanding + $finalExamScore;
+        if ($finalGrade > 100) $finalGrade = 100;
     }
     
     // Calculate Subject Grade (average of midterm and final)
-    if ($midtermGrade > 0 && $finalGrade > 0) {
-        $subjectGrade = ($midtermGrade + $finalGrade) / 2;
-    } elseif ($midtermGrade > 0) {
-        $subjectGrade = $midtermGrade;
-    } elseif ($finalGrade > 0) {
-        $subjectGrade = $finalGrade;
+    $grades = array_filter([$midtermGrade, $finalGrade], function($grade) {
+        return $grade > 0;
+    });
+    
+    if (!empty($grades)) {
+        $subjectGrade = array_sum($grades) / count($grades);
+        if ($subjectGrade > 100) $subjectGrade = 100;
     }
     
-    if ($subjectGrade > 100) {
-        $subjectGrade = 100;
-    }
-    
-    // DEBUG: Log the calculated grades
-    error_log("Calculated Grades - Subject: $subjectGrade, Midterm: $midtermGrade, Final: $finalGrade");
+    // DEBUG: Log final calculated grades
+    error_log("FINAL CALCULATED GRADES:");
+    error_log("Subject Grade: " . $subjectGrade);
+    error_log("Midterm Grade: " . $midtermGrade);
+    error_log("Final Grade: " . $finalGrade);
     
 } catch (Exception $e) {
     error_log("Error calculating grades: " . $e->getMessage());
@@ -280,6 +238,7 @@ function getSubjectRiskDetailedDescription($grade) {
     else return 'Need to Communicate with Professor';
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -695,6 +654,17 @@ function getSubjectRiskDetailedDescription($grade) {
                 grid-template-columns: 1fr;
             }
         }
+
+        /* Add debugging styles */
+        .debug-info {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: var(--border-radius);
+            padding: 1rem;
+            margin-bottom: 1rem;
+            font-family: monospace;
+            font-size: 0.8rem;
+        }
     </style>
 </head>
 <body>
@@ -762,6 +732,18 @@ function getSubjectRiskDetailedDescription($grade) {
             </div>
         </div>
 
+        <!-- Optional: Debug Information (remove in production) -->
+        <?php if (isset($_GET['debug'])): ?>
+        <div class="debug-info">
+            <strong>Debug Information:</strong><br>
+            Subject ID: <?php echo $subject_id; ?><br>
+            Student ID: <?php echo $student['id']; ?><br>
+            Midterm Grade: <?php echo $midtermGrade; ?><br>
+            Final Grade: <?php echo $finalGrade; ?><br>
+            Subject Grade: <?php echo $subjectGrade; ?><br>
+        </div>
+        <?php endif; ?>
+
         <div class="card">
             <!-- Overview Section -->
             <div class="overview-section">
@@ -791,7 +773,11 @@ function getSubjectRiskDetailedDescription($grade) {
                             <?php echo $midtermGrade > 0 ? number_format($midtermGrade, 1) . '%' : '--'; ?>
                         </div>
                         <div class="overview-description">
-                            <?php echo $midtermGrade > 0 ? getTermGradeDescription($midtermGrade) : 'No midterm data'; ?>
+                            <?php if ($midtermGrade > 0): ?>
+                                <?php echo getTermGradeDescription($midtermGrade); ?>
+                            <?php else: ?>
+                                No midterm data
+                            <?php endif; ?>
                         </div>
                     </div>
                     
@@ -801,7 +787,11 @@ function getSubjectRiskDetailedDescription($grade) {
                             <?php echo $finalGrade > 0 ? number_format($finalGrade, 1) . '%' : '--'; ?>
                         </div>
                         <div class="overview-description">
-                            <?php echo $finalGrade > 0 ? getTermGradeDescription($finalGrade) : 'No final data'; ?>
+                            <?php if ($finalGrade > 0): ?>
+                                <?php echo getTermGradeDescription($finalGrade); ?>
+                            <?php else: ?>
+                                No final data
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
@@ -812,35 +802,57 @@ function getSubjectRiskDetailedDescription($grade) {
                 <!-- Midterm Card -->
                 <div class="term-card midterm" onclick="window.location.href='subject-management.php?subject_id=<?php echo $subject_id; ?>&term=midterm'">
                     <div class="term-title">MIDTERM</div>
-                        <div class="term-stats">
-                            <div class="stat-item">
-                                <div class="stat-value">60%</div>
-                                <div class="stat-label">Class Standing</div>
-                            </div>
-                            <div class="stat-item">
-                                <div class="stat-value">40%</div>
-                                <div class="stat-label">Midterm Exam</div>
-                            </div>
+                    <?php if ($midtermGrade > 0): ?>
+                        <div class="term-grade"><?php echo number_format($midtermGrade, 1); ?>%</div>
+                        <div class="term-grade-description">
+                            <?php echo getTermGradeDescription($midtermGrade); ?>
+                        </div>
+                    <?php else: ?>
+                        <div class="term-grade no-data">--</div>
+                        <div class="term-grade-description">
+                            No midterm grades calculated
+                        </div>
+                    <?php endif; ?>
+                    <div class="term-stats">
+                        <div class="stat-item">
+                            <div class="stat-value">60%</div>
+                            <div class="stat-label">Class Standing</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">40%</div>
+                            <div class="stat-label">Midterm Exam</div>
                         </div>
                     </div>
+                </div>
 
                 <!-- Final Card -->
                 <div class="term-card final" onclick="window.location.href='subject-management.php?subject_id=<?php echo $subject_id; ?>&term=final'">
                     <div class="term-title">FINAL</div>
-                        <div class="term-stats">
-                            <div class="stat-item">
-                                <div class="stat-value">60%</div>
-                                <div class="stat-label">Class Standing</div>
-                            </div>
-                            <div class="stat-item">
-                                <div class="stat-value">40%</div>
-                                <div class="stat-label">Final Exam</div>
-                            </div>
+                    <?php if ($finalGrade > 0): ?>
+                        <div class="term-grade"><?php echo number_format($finalGrade, 1); ?>%</div>
+                        <div class="term-grade-description">
+                            <?php echo getTermGradeDescription($finalGrade); ?>
+                        </div>
+                    <?php else: ?>
+                        <div class="term-grade no-data">--</div>
+                        <div class="term-grade-description">
+                            No final grades calculated
+                        </div>
+                    <?php endif; ?>
+                    <div class="term-stats">
+                        <div class="stat-item">
+                            <div class="stat-value">60%</div>
+                            <div class="stat-label">Class Standing</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">40%</div>
+                            <div class="stat-label">Final Exam</div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
+    </div>
 
     <script>
         // Add click handlers for the term cards
