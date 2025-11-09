@@ -60,12 +60,6 @@ try {
     // Get all scores for this subject
     $allScores = supabaseFetch('student_subject_scores', ['student_subject_id' => $subject_id]);
     if (!$allScores) $allScores = [];
-    
-    // DEBUG: Log all scores found
-    error_log("All scores count: " . count($allScores));
-    foreach ($allScores as $score) {
-        error_log("Score - Type: " . $score['score_type'] . ", Name: " . $score['score_name'] . ", Value: " . $score['score_value']);
-    }
 
     // Get midterm categories
     $midtermCategories = supabaseFetch('student_class_standing_categories', [
@@ -79,12 +73,6 @@ try {
         'term_type' => 'final'
     ]);
 
-    // DEBUG: Log categories
-    error_log("Midterm categories: " . ($midtermCategories ? count($midtermCategories) : 0));
-    error_log("Final categories: " . ($finalCategories ? count($finalCategories) : 0));
-
-    // SIMPLIFIED GRADE CALCULATION - More reliable approach
-    
     // Calculate Midterm Grade
     if ($midtermCategories && count($midtermCategories) > 0) {
         $midtermClassStanding = 0;
@@ -203,14 +191,7 @@ try {
         if ($subjectGrade > 100) $subjectGrade = 100;
     }
     
-    // DEBUG: Log final calculated grades
-    error_log("FINAL CALCULATED GRADES:");
-    error_log("Subject Grade: " . $subjectGrade);
-    error_log("Midterm Grade: " . $midtermGrade);
-    error_log("Final Grade: " . $finalGrade);
-    
 } catch (Exception $e) {
-    error_log("Error calculating grades: " . $e->getMessage());
     // If there's an error calculating grades, they will remain 0
 }
 
@@ -230,15 +211,7 @@ function getSubjectRiskDescription($grade) {
     elseif ($grade >= 80) return 'Moderate Risk';
     else return 'High Risk';
 }
-
-// Get detailed risk description for SUBJECT GRADE
-function getSubjectRiskDetailedDescription($grade) {
-    if ($grade >= 85) return 'Excellent/Good Performance';
-    elseif ($grade >= 80) return 'Needs Improvement';
-    else return 'Need to Communicate with Professor';
-}
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -724,25 +697,12 @@ function getSubjectRiskDetailedDescription($grade) {
         <div class="header">
             <div class="header-content">
                 <div class="subject-name"><?php echo htmlspecialchars($subject['subject_code'] . ' - ' . $subject['subject_name']); ?></div>
-                <div style="width: 100px;"></div> 
                 <a href="student-subjects.php" class="back-btn">
                     <i class="fas fa-arrow-left"></i>
                     Back
                 </a>
             </div>
         </div>
-
-        <!-- Optional: Debug Information (remove in production) -->
-        <?php if (isset($_GET['debug'])): ?>
-        <div class="debug-info">
-            <strong>Debug Information:</strong><br>
-            Subject ID: <?php echo $subject_id; ?><br>
-            Student ID: <?php echo $student['id']; ?><br>
-            Midterm Grade: <?php echo $midtermGrade; ?><br>
-            Final Grade: <?php echo $finalGrade; ?><br>
-            Subject Grade: <?php echo $subjectGrade; ?><br>
-        </div>
-        <?php endif; ?>
 
         <div class="card">
             <!-- Overview Section -->
@@ -855,7 +815,6 @@ function getSubjectRiskDetailedDescription($grade) {
     </div>
 
     <script>
-        // Add click handlers for the term cards
         document.querySelectorAll('.term-card').forEach(card => {
             card.addEventListener('click', function() {
                 const url = this.getAttribute('onclick').match(/'([^']+)'/)[1];
