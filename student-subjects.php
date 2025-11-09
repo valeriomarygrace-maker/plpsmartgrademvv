@@ -1276,7 +1276,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
             <?php else: ?>
                 <div class="subjects-grid">
                     <?php foreach ($subjects as $subject): ?>
-                        <div class="subject-card" onclick="window.location.href='termevaluation.php?subject_id=<?php echo $subject['id']; ?>'">
+                        <div class="subject-card" onclick="window.location.href='termevaluations.php?subject_id=<?php echo $subject['id']; ?>'">
                             <div class="subject-header">
                                 <div style="flex: 1;">
                                     <div class="subject-code"><?php echo htmlspecialchars($subject['subject_code']); ?></div>
