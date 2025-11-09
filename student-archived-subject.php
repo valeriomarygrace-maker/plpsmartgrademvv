@@ -104,25 +104,36 @@ try {
             $subject_info = $subject_data && count($subject_data) > 0 ? $subject_data[0] : null;
             
             if ($subject_info) {
+                // First, try to get performance from archived_subject_performance table
                 $archived_performance_data = supabaseFetch('archived_subject_performance', ['archived_subject_id' => $archived_subject['id']]);
-                $archived_performance = $archived_performance_data && count($archived_performance_data) > 0 ? $archived_performance_data[0] : null;
                 
-                $calculated_performance = calculateArchivedSubjectPerformance($archived_subject['id']);
-                
-                $final_performance = $archived_performance ? [
-                    'midterm_grade' => $archived_performance['midterm_grade'] ?? $archived_performance['class_standing'] ?? 0,
-                    'final_grade' => $archived_performance['final_grade'] ?? $archived_performance['exams_score'] ?? 0,
-                    'subject_grade' => $archived_performance['subject_grade'] ?? $archived_performance['overall_grade'] ?? 0,
-                    'risk_level' => $archived_performance['risk_level'] ?? 'no-data',
-                    'risk_description' => $archived_performance['risk_description'] ?? 'No Data Inputted',
-                    'has_scores' => ($archived_performance['subject_grade'] ?? $archived_performance['overall_grade'] ?? 0) > 0
-                ] : $calculated_performance;
-                
-                // DEBUG: Log the performance data
-                error_log("Archived Subject {$archived_subject['id']}: " . 
-                         "Subject Grade: {$final_performance['subject_grade']}, " .
-                         "Midterm: {$final_performance['midterm_grade']}, " .
-                         "Final: {$final_performance['final_grade']}");
+                if ($archived_performance_data && count($archived_performance_data) > 0) {
+                    // Use the pre-calculated performance data
+                    $archived_performance = $archived_performance_data[0];
+                    
+                    $final_performance = [
+                        'midterm_grade' => $archived_performance['class_standing'] ?? 0,
+                        'final_grade' => $archived_performance['exams_score'] ?? 0,
+                        'subject_grade' => $archived_performance['overall_grade'] ?? 0,
+                        'risk_level' => $archived_performance['risk_level'] ?? 'no-data',
+                        'risk_description' => $archived_performance['risk_description'] ?? 'No Data Inputted',
+                        'has_scores' => ($archived_performance['overall_grade'] ?? 0) > 0
+                    ];
+                    
+                    // DEBUG: Log performance data
+                    error_log("Using archived performance for subject {$archived_subject['id']}: " . 
+                             "Overall: {$final_performance['subject_grade']}, " .
+                             "Risk: {$final_performance['risk_level']}");
+                    
+                } else {
+                    // Calculate performance from scores (fallback)
+                    $final_performance = calculateArchivedSubjectPerformance($archived_subject['id']);
+                    
+                    // DEBUG: Log calculated performance
+                    error_log("Calculated performance for subject {$archived_subject['id']}: " . 
+                             "Subject Grade: {$final_performance['subject_grade']}, " .
+                             "Has Scores: " . ($final_performance['has_scores'] ? 'Yes' : 'No'));
+                }
                 
                 // Combine all data
                 $archived_subjects[] = array_merge($archived_subject, [
@@ -135,8 +146,7 @@ try {
                     'subject_grade' => $final_performance['subject_grade'] ?? 0,
                     'risk_level' => $final_performance['risk_level'] ?? 'no-data',
                     'risk_description' => $final_performance['risk_description'] ?? 'No Data Inputted',
-                    'has_scores' => $final_performance['has_scores'] ?? false,
-                    'has_archived_performance' => !empty($archived_performance)
+                    'has_scores' => $final_performance['has_scores'] ?? false
                 ]);
             }
         }
@@ -1571,7 +1581,7 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
                                     <i class="fas fa-chart-line"></i>
                                     <span>
                                         <strong>Final Grade:</strong> 
-                                        <?php if ($subject['has_scores']): ?>
+                                        <?php if ($subject['subject_grade'] > 0): ?>
                                             <span style="color: var(--plp-green); font-weight: 600;">
                                                 <?php echo number_format($subject['subject_grade'], 1); ?>%
                                             </span>
@@ -1774,9 +1784,10 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
             const midtermGradeElement = document.getElementById('modal_midterm_grade');
             const finalGradeElement = document.getElementById('modal_final_grade');
             
-            subjectGradeElement.textContent = hasScores && subjectGradeNum > 0 ? subjectGradeNum.toFixed(1) + '%' : '--';
-            midtermGradeElement.textContent = hasScores && midtermGradeNum > 0 ? midtermGradeNum.toFixed(1) + '%' : '--';
-            finalGradeElement.textContent = hasScores && finalGradeNum > 0 ? finalGradeNum.toFixed(1) + '%' : '--';
+            // Use the actual grade values instead of checking hasScores
+            subjectGradeElement.textContent = subjectGradeNum > 0 ? subjectGradeNum.toFixed(1) + '%' : '--';
+            midtermGradeElement.textContent = midtermGradeNum > 0 ? midtermGradeNum.toFixed(1) + '%' : '--';
+            finalGradeElement.textContent = finalGradeNum > 0 ? finalGradeNum.toFixed(1) + '%' : '--';
             
             // Update descriptions and risk badges
             const subjectRiskElement = document.getElementById('modal_subject_risk');
@@ -1788,7 +1799,7 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
             midtermDescElement.textContent = '';
             finalDescElement.textContent = '';
             
-            if (hasScores && subjectGradeNum > 0) {
+            if (subjectGradeNum > 0) {
                 // Create risk badge for subject grade
                 const riskBadge = document.createElement('span');
                 riskBadge.className = 'risk-badge ' + riskLevel;
@@ -1802,14 +1813,14 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
             }
             
             // Update midterm description
-            if (hasScores && midtermGradeNum > 0) {
+            if (midtermGradeNum > 0) {
                 midtermDescElement.textContent = getTermGradeDescription(midtermGradeNum);
             } else {
                 midtermDescElement.textContent = 'No midterm data';
             }
             
             // Update final description
-            if (hasScores && finalGradeNum > 0) {
+            if (finalGradeNum > 0) {
                 finalDescElement.textContent = getTermGradeDescription(finalGradeNum);
             } else {
                 finalDescElement.textContent = 'No final data';
@@ -1818,15 +1829,6 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
             // Show modal
             document.getElementById('viewModal').classList.add('show');
             document.body.style.overflow = 'hidden';
-        }
-
-        // Helper function to get term grade description
-        function getTermGradeDescription(grade) {
-            if (grade >= 90) return 'Excellent';
-            if (grade >= 85) return 'Very Good';
-            if (grade >= 80) return 'Good';
-            if (grade >= 75) return 'Satisfactory';
-            return 'Needs Improvement';
         }
 
         // Close modal when clicking close button
