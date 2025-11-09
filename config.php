@@ -17,7 +17,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 /**
- * Improved Supabase API Helper Function
+ * Enhanced Supabase API Helper Function with Better Error Handling
  */
 function supabaseFetch($table, $filters = [], $method = 'GET', $data = null) {
     global $supabase_url, $supabase_key;
@@ -50,6 +50,7 @@ function supabaseFetch($table, $filters = [], $method = 'GET', $data = null) {
         CURLOPT_HTTPHEADER => $headers,
         CURLOPT_SSL_VERIFYPEER => false,
         CURLOPT_TIMEOUT => 30,
+        CURLOPT_FAILONERROR => false, // Don't fail on HTTP error codes
     ]);
     
     if ($method === 'POST') {
@@ -67,18 +68,25 @@ function supabaseFetch($table, $filters = [], $method = 'GET', $data = null) {
     $error = curl_error($ch);
     curl_close($ch);
     
+    // Enhanced error logging
     if ($error) {
-        error_log("cURL Error: $error");
+        error_log("cURL Error for table $table: $error");
         return false;
     }
     
     if ($httpCode >= 400) {
-        error_log("HTTP Error $httpCode for table: $table, URL: $url");
+        error_log("HTTP Error $httpCode for table: $table, Method: $method, URL: $url");
+        if ($data) {
+            error_log("Request Data: " . json_encode($data));
+        }
+        if ($response) {
+            error_log("Response: " . $response);
+        }
         return false;
     }
     
     // For DELETE requests, return success if no error
-    if ($method === 'DELETE' && $httpCode === 200) {
+    if ($method === 'DELETE' && ($httpCode === 200 || $httpCode === 204)) {
         return true;
     }
     
@@ -93,22 +101,34 @@ function supabaseFetch($table, $filters = [], $method = 'GET', $data = null) {
 }
 
 /**
- * Insert data into Supabase table
+ * Insert data into Supabase table with enhanced error handling
  */
 function supabaseInsert($table, $data) {
+    // Log the insert operation for debugging
+    error_log("Inserting into $table: " . json_encode($data));
+    
     $result = supabaseFetch($table, [], 'POST', $data);
     
     if ($result && isset($result[0])) {
+        error_log("Insert successful for $table, ID: " . ($result[0]['id'] ?? 'unknown'));
         return $result[0]; // Return the inserted record
     }
     
-    return $result;
+    if ($result === true) {
+        error_log("Insert returned true for $table");
+        return true;
+    }
+    
+    error_log("Insert failed for $table");
+    return false;
 }
 
 /**
  * Update data in Supabase table
  */
 function supabaseUpdate($table, $data, $filters) {
+    error_log("Updating $table with filters: " . json_encode($filters) . " data: " . json_encode($data));
+    
     $result = supabaseFetch($table, $filters, 'PATCH', $data);
     
     if ($result && isset($result[0])) {
@@ -122,6 +142,7 @@ function supabaseUpdate($table, $data, $filters) {
  * Delete data from Supabase table
  */
 function supabaseDelete($table, $filters) {
+    error_log("Deleting from $table with filters: " . json_encode($filters));
     return supabaseFetch($table, $filters, 'DELETE');
 }
 
@@ -141,7 +162,7 @@ function supabaseFetchAll($table, $orderBy = null) {
     $headers = [
         'apikey: ' . $supabase_key,
         'Authorization: Bearer ' . $supabase_key,
-        'Content-Type: application/json'
+        'Content-Type: ' . 'application/json'
     ];
     
     curl_setopt_array($ch, [
@@ -299,6 +320,200 @@ function requireStudentRole() {
 }
 
 /**
+ * Archive Subject Helper Functions
+ */
+function canArchiveSubject($subject_id, $student_id) {
+    try {
+        // Check if subject exists and belongs to student
+        $subject = supabaseFetch('student_subjects', ['id' => $subject_id, 'student_id' => $student_id]);
+        if (!$subject || count($subject) === 0) {
+            return ['success' => false, 'message' => 'Subject not found'];
+        }
+        
+        // Check if already archived
+        if (!empty($subject[0]['deleted_at'])) {
+            return ['success' => false, 'message' => 'Subject already deleted'];
+        }
+        
+        return ['success' => true];
+    } catch (Exception $e) {
+        return ['success' => false, 'message' => 'Error checking subject: ' . $e->getMessage()];
+    }
+}
+
+/**
+ * Enhanced Archive Subject Function
+ */
+function archiveSubjectWithData($subject_record_id, $student_id) {
+    try {
+        error_log("Starting archive process for subject ID: $subject_record_id, student ID: $student_id");
+        
+        // Check if subject can be archived
+        $canArchive = canArchiveSubject($subject_record_id, $student_id);
+        if (!$canArchive['success']) {
+            throw new Exception($canArchive['message']);
+        }
+        
+        // Get subject data
+        $subject_data = supabaseFetch('student_subjects', ['id' => $subject_record_id, 'student_id' => $student_id]);
+        if (!$subject_data || count($subject_data) === 0) {
+            throw new Exception("Subject not found.");
+        }
+        
+        $subject_to_archive = $subject_data[0];
+        error_log("Subject to archive: " . json_encode($subject_to_archive));
+        
+        // Ensure schedule has a value
+        $schedule = !empty($subject_to_archive['schedule']) ? $subject_to_archive['schedule'] : 'Not Set';
+        
+        // Archive the main subject record
+        $archived_subject_data = [
+            'student_id' => $subject_to_archive['student_id'],
+            'subject_id' => $subject_to_archive['subject_id'],
+            'professor_name' => $subject_to_archive['professor_name'],
+            'schedule' => $schedule,
+            'archived_at' => date('Y-m-d H:i:s')
+        ];
+        
+        error_log("Creating archived subject with data: " . json_encode($archived_subject_data));
+        $archived_subject = supabaseInsert('archived_subjects', $archived_subject_data);
+        
+        if (!$archived_subject) {
+            throw new Exception("Failed to create archived subject record.");
+        }
+        
+        $archived_subject_id = $archived_subject['id'];
+        error_log("Archived subject created with ID: $archived_subject_id");
+        
+        // Archive categories and scores
+        $categories = supabaseFetch('student_class_standing_categories', ['student_subject_id' => $subject_record_id]);
+        error_log("Found " . (is_array($categories) ? count($categories) : 0) . " categories to archive");
+        
+        if ($categories && is_array($categories)) {
+            foreach ($categories as $category) {
+                $archived_category_data = [
+                    'archived_subject_id' => $archived_subject_id,
+                    'category_name' => $category['category_name'],
+                    'category_percentage' => $category['category_percentage'],
+                    'archived_at' => date('Y-m-d H:i:s')
+                ];
+                
+                $archived_category = supabaseInsert('archived_class_standing_categories', $archived_category_data);
+                
+                if ($archived_category) {
+                    $archived_category_id = $archived_category['id'];
+                    error_log("Archived category ID: $archived_category_id");
+                    
+                    // Archive scores for this category
+                    $scores = supabaseFetch('student_subject_scores', ['category_id' => $category['id']]);
+                    error_log("Found " . (is_array($scores) ? count($scores) : 0) . " scores for category {$category['id']}");
+                    
+                    if ($scores && is_array($scores)) {
+                        foreach ($scores as $score) {
+                            $archived_score_data = [
+                                'archived_category_id' => $archived_category_id,
+                                'score_type' => $score['score_type'],
+                                'score_name' => $score['score_name'],
+                                'score_value' => $score['score_value'],
+                                'max_score' => $score['max_score'],
+                                'score_date' => $score['score_date'],
+                                'archived_at' => date('Y-m-d H:i:s')
+                            ];
+                            
+                            $score_result = supabaseInsert('archived_subject_scores', $archived_score_data);
+                            
+                            if (!$score_result) {
+                                error_log("Failed to archive score: " . $score['score_name']);
+                            }
+                        }
+                    }
+                } else {
+                    error_log("Failed to archive category: " . $category['category_name']);
+                }
+            }
+        }
+        
+        // Archive exam scores (scores without category_id)
+        $exam_scores = supabaseFetch('student_subject_scores', [
+            'student_subject_id' => $subject_record_id, 
+            'category_id' => NULL
+        ]);
+
+        error_log("Found " . (is_array($exam_scores) ? count($exam_scores) : 0) . " exam scores to archive");
+        
+        if ($exam_scores && is_array($exam_scores)) {
+            // Create a special category for exam scores in archived table
+            $exam_category_data = [
+                'archived_subject_id' => $archived_subject_id,
+                'category_name' => 'Exam Scores',
+                'category_percentage' => 0,
+                'archived_at' => date('Y-m-d H:i:s')
+            ];
+            
+            $exam_category = supabaseInsert('archived_class_standing_categories', $exam_category_data);
+            
+            if ($exam_category) {
+                $exam_category_id = $exam_category['id'];
+                foreach ($exam_scores as $score) {
+                    $archived_exam_score_data = [
+                        'archived_category_id' => $exam_category_id,
+                        'score_type' => $score['score_type'],
+                        'score_name' => $score['score_name'],
+                        'score_value' => $score['score_value'],
+                        'max_score' => $score['max_score'],
+                        'score_date' => $score['score_date'],
+                        'archived_at' => date('Y-m-d H:i:s')
+                    ];
+                    
+                    supabaseInsert('archived_subject_scores', $archived_exam_score_data);
+                }
+            }
+        }
+                
+        // Archive performance data if it exists
+        $performance_data = supabaseFetch('subject_performance', ['student_subject_id' => $subject_record_id]);
+        error_log("Found " . (is_array($performance_data) ? count($performance_data) : 0) . " performance records");
+        
+        if ($performance_data && count($performance_data) > 0) {
+            $performance = $performance_data[0];
+            $archived_performance_data = [
+                'archived_subject_id' => $archived_subject_id,
+                'overall_grade' => $performance['overall_grade'] ?? 0,
+                'gpa' => $performance['gpa'] ?? 0,
+                'class_standing' => $performance['class_standing'] ?? 0,
+                'exams_score' => $performance['exams_score'] ?? 0,
+                'risk_level' => $performance['risk_level'] ?? 'no-data',
+                'risk_description' => $performance['risk_description'] ?? 'No Data Inputted',
+                'archived_at' => date('Y-m-d H:i:s')
+            ];
+            
+            supabaseInsert('archived_subject_performance', $archived_performance_data);
+        }
+        
+        // Delete from active tables (in reverse order to respect foreign keys)
+        error_log("Deleting active records...");
+        supabaseDelete('student_subject_scores', ['student_subject_id' => $subject_record_id]);
+        supabaseDelete('student_class_standing_categories', ['student_subject_id' => $subject_record_id]);
+        supabaseDelete('subject_performance', ['student_subject_id' => $subject_record_id]);
+        
+        // Finally delete the subject record
+        $delete_result = supabaseDelete('student_subjects', ['id' => $subject_record_id]);
+        
+        if ($delete_result) {
+            error_log("Subject archive completed successfully");
+            return ['success' => true, 'message' => 'Subject archived successfully with all records preserved!'];
+        } else {
+            throw new Exception("Failed to delete subject from active records.");
+        }
+        
+    } catch (Exception $e) {
+        error_log("Archive error: " . $e->getMessage());
+        error_log("Archive error trace: " . $e->getTraceAsString());
+        return ['success' => false, 'message' => 'Database error during archiving: ' . $e->getMessage()];
+    }
+}
+
+/**
  * Utility Functions
  */
 function formatDate($date_string, $format = 'M j, Y') {
@@ -326,7 +541,9 @@ function getRiskLevel($gpa) {
     return 'high';
 }
 
-
+/**
+ * Session Management and Security
+ */
 if (isset($_SESSION['created']) && (time() - $_SESSION['created'] > 28800)) {
     session_destroy();
     if (basename($_SERVER['PHP_SELF']) !== 'login.php') {
@@ -335,11 +552,13 @@ if (isset($_SESSION['created']) && (time() - $_SESSION['created'] > 28800)) {
     }
 }
 
+// Clean expired OTPs occasionally
 if (rand(1, 100) === 1) { 
     cleanExpiredOTPs();
 }
 
 function cleanExpiredOTPs() {
     $current_time = date('Y-m-d H:i:s');
+    // This would typically delete expired OTPs, but we'll keep it simple for now
 }
 ?>
