@@ -1458,6 +1458,7 @@ function calculateGWA($grade) {
                                 </form>
                                 <button type="button" class="btn-view" onclick="openViewModal(
                                     <?php echo $subject['overall_grade'] ?? 0; ?>,
+                                    <?php echo $subject['gwa'] ?? 0; ?>,
                                     <?php echo $subject['class_standing'] ?? 0; ?>,
                                     <?php echo $subject['exams_score'] ?? 0; ?>,
                                     '<?php echo $subject['risk_level'] ?? 'no-data'; ?>',
@@ -1485,9 +1486,14 @@ function calculateGWA($grade) {
             <div class="performance-overview">
                 <div class="details-grid">
                     <div class="detail-item">
-                        <div class="detail-label">Subject Grade</div>
-                        <div class="detail-value" id="view_subject_grade" style="font-size: 1.4rem; font-weight: 700; color: var(--plp-green); margin: 0.5rem 0;">--</div>
-                        <div class="detail-label" id="view_grade_description" style="font-size: 0.85rem; color: var(--text-medium);">--</div>
+                        <div class="detail-label">Overall Grade</div>
+                        <div class="detail-value" id="view_overall_grade" style="font-size: 1.4rem; font-weight: 700; color: var(--plp-green); margin: 0.5rem 0;">--</div>
+                    </div>
+                    
+                    <div class="detail-item">
+                        <div class="detail-label">GWA</div>
+                        <div class="detail-value" id="view_gwa" style="font-size: 1.4rem; font-weight: 700; color: var(--plp-green); margin: 0.5rem 0;">--</div>
+                        <div class="risk-badge" id="view_risk_badge" style="display: none; margin-top: 0.2rem;">No Data</div>
                     </div>
                     
                     <div class="detail-item">
@@ -1500,11 +1506,6 @@ function calculateGWA($grade) {
                         <div class="detail-label">Major Exams</div>
                         <div class="detail-value" id="view_exams_score" style="font-size: 1.4rem; font-weight: 700; color: var(--plp-green); margin: 0.5rem 0;">--</div>
                         <div class="detail-label" style="font-size: 0.85rem; color: var(--text-medium);">of 40%</div>
-                    </div>
-                    
-                    <div class="detail-item">
-                        <div class="detail-label">Risk Level</div>
-                        <div class="risk-badge" id="view_risk_badge" style="display: inline-block; margin-top: 0.5rem; padding: 0.5rem 1rem; font-size: 0.9rem;">No Data</div>
                     </div>
                 </div>
             </div>
@@ -1539,149 +1540,181 @@ function calculateGWA($grade) {
     </div>
     
     <script>
-    // Mobile menu functionality
-    const mobileMenuToggle = document.getElementById('mobileMenuToggle');
-    const sidebar = document.querySelector('.sidebar');
-    const mainContent = document.querySelector('.main-content');
+        // Mobile menu functionality
+        const mobileMenuToggle = document.getElementById('mobileMenuToggle');
+        const sidebar = document.querySelector('.sidebar');
+        const mainContent = document.querySelector('.main-content');
 
-    mobileMenuToggle.addEventListener('click', () => {
-        sidebar.classList.toggle('active');
-        document.body.style.overflow = sidebar.classList.contains('active') ? 'hidden' : '';
-    });
+        mobileMenuToggle.addEventListener('click', () => {
+            sidebar.classList.toggle('active');
+            document.body.style.overflow = sidebar.classList.contains('active') ? 'hidden' : '';
+        });
 
-    // Close sidebar when clicking on a link (mobile)
-    const navLinks = document.querySelectorAll('.nav-link');
-    navLinks.forEach(link => {
-        link.addEventListener('click', () => {
-            if (window.innerWidth <= 768) {
+        // Close sidebar when clicking on a link (mobile)
+        const navLinks = document.querySelectorAll('.nav-link');
+        navLinks.forEach(link => {
+            link.addEventListener('click', () => {
+                if (window.innerWidth <= 768) {
+                    sidebar.classList.remove('active');
+                    document.body.style.overflow = '';
+                }
+            });
+        });
+
+        // Close sidebar when clicking outside (mobile)
+        document.addEventListener('click', (e) => {
+            if (window.innerWidth <= 768 && 
+                sidebar.classList.contains('active') && 
+                !sidebar.contains(e.target) && 
+                !mobileMenuToggle.contains(e.target)) {
                 sidebar.classList.remove('active');
                 document.body.style.overflow = '';
             }
         });
-    });
 
-    // Close sidebar when clicking outside (mobile)
-    document.addEventListener('click', (e) => {
-        if (window.innerWidth <= 768 && 
-            sidebar.classList.contains('active') && 
-            !sidebar.contains(e.target) && 
-            !mobileMenuToggle.contains(e.target)) {
-            sidebar.classList.remove('active');
-            document.body.style.overflow = '';
-        }
-    });
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            if (window.innerWidth > 768) {
+                sidebar.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+        });
 
-    // Handle window resize
-    window.addEventListener('resize', () => {
-        if (window.innerWidth > 768) {
-            sidebar.classList.remove('active');
-            document.body.style.overflow = '';
+        function openViewModal(
+            overallGrade = 0, gwa = 0, classStanding = 0, examsScore = 0, riskLevel = 'no-data', 
+            riskDescription = 'No Data Inputted', hasScores = false
+        ) {
+            // Set performance data
+            const overallGradeNum = parseFloat(overallGrade) || 0;
+            const gwaNum = parseFloat(gwa) || 0;
+            const classStandingNum = parseFloat(classStanding) || 0;
+            const examsScoreNum = parseFloat(examsScore) || 0;
+            
+            document.getElementById('view_overall_grade').textContent = hasScores ? overallGradeNum.toFixed(1) + '%' : '--';
+            document.getElementById('view_gwa').textContent = hasScores ? gwaNum.toFixed(2) : '--';
+            document.getElementById('view_class_standing').textContent = hasScores ? classStandingNum.toFixed(1) + '%' : '--';
+            document.getElementById('view_exams_score').textContent = hasScores ? examsScoreNum.toFixed(1) + '%' : '--';
+            document.getElementById('view_risk_description').textContent = riskDescription;
+            
+            // Set risk badge
+            const riskBadge = document.getElementById('view_risk_badge');
+            if (hasScores && riskLevel !== 'no-data') {
+                riskBadge.textContent = riskLevel.charAt(0).toUpperCase() + riskLevel.slice(1) + ' Risk';
+                riskBadge.className = 'risk-badge ' + riskLevel;
+                riskBadge.style.display = 'inline-block';
+            } else {
+                riskBadge.textContent = 'No Data';
+                riskBadge.className = 'risk-badge no-data';
+                riskBadge.style.display = 'inline-block';
+            }
+            
+            // Show modal
+            document.getElementById('viewModal').classList.add('show');
         }
-    });
 
-    function openViewModal(
-        subjectGrade = 0, classStanding = 0, examsScore = 0, riskLevel = 'no-data', 
-        riskDescription = 'No Data Inputted', hasScores = false
-    ) {
-        console.log('Opening modal with data:', { subjectGrade, classStanding, examsScore, riskLevel, riskDescription, hasScores });
-        
-        // Set performance data
-        const subjectGradeNum = parseFloat(subjectGrade) || 0;
-        const classStandingNum = parseFloat(classStanding) || 0;
-        const examsScoreNum = parseFloat(examsScore) || 0;
-        
-        document.getElementById('view_subject_grade').textContent = hasScores ? subjectGradeNum.toFixed(1) + '%' : '--';
-        document.getElementById('view_class_standing').textContent = hasScores ? classStandingNum.toFixed(1) + '%' : '--';
-        document.getElementById('view_exams_score').textContent = hasScores ? examsScoreNum.toFixed(1) + '%' : '--';
-        
-        // Set grade description
-        const gradeDescription = document.getElementById('view_grade_description');
-        if (hasScores) {
-            if (subjectGradeNum >= 90) gradeDescription.textContent = 'Excellent';
-            else if (subjectGradeNum >= 85) gradeDescription.textContent = 'Very Good';
-            else if (subjectGradeNum >= 80) gradeDescription.textContent = 'Good';
-            else if (subjectGradeNum >= 75) gradeDescription.textContent = 'Satisfactory';
-            else if (subjectGradeNum >= 70) gradeDescription.textContent = 'Passing';
-            else gradeDescription.textContent = 'Needs Improvement';
-        } else {
-            gradeDescription.textContent = '--';
-        }
-        
-        // Set risk badge
-        const riskBadge = document.getElementById('view_risk_badge');
-        if (hasScores && riskLevel !== 'no-data') {
-            riskBadge.textContent = riskDescription;
-            riskBadge.className = 'risk-badge ' + riskLevel;
-            riskBadge.style.display = 'inline-block';
-        } else {
-            riskBadge.textContent = 'No Data Inputted';
-            riskBadge.className = 'risk-badge no-data';
-            riskBadge.style.display = 'inline-block';
-        }
-        
-        // Show modal
-        document.getElementById('viewModal').classList.add('show');
-    }
+        document.getElementById('closeViewModal').addEventListener('click', function() {
+            document.getElementById('viewModal').classList.remove('show');
+        });
 
-    // Add event listener for closing the view modal
-    document.addEventListener('DOMContentLoaded', function() {
-        const closeViewModal = document.getElementById('closeViewModal');
-        if (closeViewModal) {
-            closeViewModal.addEventListener('click', function() {
-                document.getElementById('viewModal').classList.remove('show');
-            });
-        }
-        
         // Close modal when clicking outside
         window.addEventListener('click', function(e) {
             if (e.target === document.getElementById('viewModal')) {
                 document.getElementById('viewModal').classList.remove('show');
             }
         });
-    });
 
-    // Logout modal functionality
-    const logoutBtn = document.querySelector('.logout-btn');
-    const logoutModal = document.getElementById('logoutModal');
-    const cancelLogout = document.getElementById('cancelLogout');
-    const confirmLogout = document.getElementById('confirmLogout');
+        // Auto-hide success/error messages
+        setTimeout(() => {
+            const alerts = document.querySelectorAll('.alert-success, .alert-error');
+            alerts.forEach(alert => {
+                alert.style.transition = 'opacity 0.1s ease';
+                alert.style.opacity = '0';
+                setTimeout(() => {
+                    if (alert.parentNode) {
+                        alert.remove();
+                    }
+                }, 100);
+            });
+        }, 1000);
 
-    // Show modal when clicking logout button
-    logoutBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        logoutModal.classList.add('show');
-    });
-
-    // Hide modal when clicking cancel
-    cancelLogout.addEventListener('click', () => {
-        logoutModal.classList.remove('show');
-    });
-
-    // Handle logout confirmation
-    confirmLogout.addEventListener('click', () => {
-        window.location.href = 'logout.php';
-    });
-
-    // Hide modal when clicking outside the modal content
-    window.addEventListener('click', (e) => {
-        if (e.target === logoutModal) {
-            logoutModal.classList.remove('show');
+        function openViewModal(
+            overallGrade = 0, gwa = 0, classStanding = 0, examsScore = 0, riskLevel = 'no-data', 
+            riskDescription = 'No Data Inputted', hasScores = false
+        ) {
+            console.log('Opening modal with data:', { overallGrade, gwa, classStanding, examsScore, riskLevel, riskDescription, hasScores });
+            
+            // Set performance data
+            const overallGradeNum = parseFloat(overallGrade) || 0;
+            const gwaNum = parseFloat(gwa) || 0;
+            const classStandingNum = parseFloat(classStanding) || 0;
+            const examsScoreNum = parseFloat(examsScore) || 0;
+            
+            document.getElementById('view_overall_grade').textContent = hasScores ? overallGradeNum.toFixed(1) + '%' : '--';
+            document.getElementById('view_gwa').textContent = hasScores ? gwaNum.toFixed(2) : '--';
+            document.getElementById('view_class_standing').textContent = hasScores ? classStandingNum.toFixed(1) + '%' : '--';
+            document.getElementById('view_exams_score').textContent = hasScores ? examsScoreNum.toFixed(1) + '%' : '--';
+            
+            // Set risk badge
+            const riskBadge = document.getElementById('view_risk_badge');
+            if (hasScores && riskLevel !== 'no-data') {
+                riskBadge.textContent = riskDescription;
+                riskBadge.className = 'risk-badge ' + riskLevel;
+                riskBadge.style.display = 'inline-block';
+            } else {
+                riskBadge.textContent = 'No Data Inputted';
+                riskBadge.className = 'risk-badge no-data';
+                riskBadge.style.display = 'inline-block';
+            }
+            
+            // Show modal
+            document.getElementById('viewModal').classList.add('show');
         }
-    });
 
-    // Auto-hide success/error messages
-    setTimeout(() => {
-        const alerts = document.querySelectorAll('.alert-success, .alert-error');
-        alerts.forEach(alert => {
-            alert.style.transition = 'opacity 0.1s ease';
-            alert.style.opacity = '0';
-            setTimeout(() => {
-                if (alert.parentNode) {
-                    alert.remove();
+        // Add event listener for closing the view modal
+        document.addEventListener('DOMContentLoaded', function() {
+            const closeViewModal = document.getElementById('closeViewModal');
+            if (closeViewModal) {
+                closeViewModal.addEventListener('click', function() {
+                    document.getElementById('viewModal').classList.remove('show');
+                });
+            }
+            
+            // Close modal when clicking outside
+            window.addEventListener('click', function(e) {
+                if (e.target === document.getElementById('viewModal')) {
+                    document.getElementById('viewModal').classList.remove('show');
                 }
-            }, 100);
+            });
         });
-    }, 5000);
-</script>
+
+        // Logout modal functionality
+        const logoutBtn = document.querySelector('.logout-btn');
+        const logoutModal = document.getElementById('logoutModal');
+        const cancelLogout = document.getElementById('cancelLogout');
+        const confirmLogout = document.getElementById('confirmLogout');
+
+        // Show modal when clicking logout button
+        logoutBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            logoutModal.classList.add('show');
+        });
+
+        // Hide modal when clicking cancel
+        cancelLogout.addEventListener('click', () => {
+            logoutModal.classList.remove('show');
+        });
+
+        // Handle logout confirmation
+        confirmLogout.addEventListener('click', () => {
+            window.location.href = 'logout.php';
+        });
+
+        // Hide modal when clicking outside the modal content
+        window.addEventListener('click', (e) => {
+            if (e.target === logoutModal) {
+                logoutModal.classList.remove('show');
+            }
+        });
+    </script>
 </body>
 </html>
