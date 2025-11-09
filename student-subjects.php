@@ -182,8 +182,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_subject'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
     $subject_record_id = $_POST['subject_record_id'];
     
-    // Use the enhanced archive function
-    $archive_result = archiveSubjectWithData($subject_record_id, $student['id']);
+    // Use the simple archive function
+    $archive_result = archiveSubject($subject_record_id, $student['id']);
     
     if ($archive_result['success']) {
         $success_message = $archive_result['message'];
