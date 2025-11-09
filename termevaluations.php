@@ -767,7 +767,6 @@ function getSubjectRiskDetailedDescription($grade) {
                         </div>
                     </div>
                     
-                    <!-- MIDTERM GRADE - TRADITIONAL GRADING -->
                     <div class="overview-card">
                         <div class="overview-label">MIDTERM GRADE</div>
                         <div class="overview-value">
@@ -778,7 +777,6 @@ function getSubjectRiskDetailedDescription($grade) {
                         </div>
                     </div>
                     
-                    <!-- FINAL GRADE - TRADITIONAL GRADING -->
                     <div class="overview-card">
                         <div class="overview-label">FINAL GRADE</div>
                         <div class="overview-value">
@@ -796,8 +794,6 @@ function getSubjectRiskDetailedDescription($grade) {
                 <!-- Midterm Card -->
                 <div class="term-card midterm" onclick="window.location.href='subject-management.php?subject_id=<?php echo $subject_id; ?>&term=midterm'">
                     <div class="term-title">MIDTERM</div>
-                    
-                    <?php if ($midtermGrade > 0): ?>
                         <div class="term-stats">
                             <div class="stat-item">
                                 <div class="stat-value">60%</div>
@@ -808,9 +804,7 @@ function getSubjectRiskDetailedDescription($grade) {
                                 <div class="stat-label">Midterm Exam</div>
                             </div>
                         </div>
-                    <?php else: ?>
-                        <div class="term-grade no-data">--</div>
-                        <div class="term-grade-description">No midterm data</div>
+            
                         <div class="term-stats">
                             <div class="stat-item">
                                 <div class="stat-value">60%</div>
@@ -821,14 +815,11 @@ function getSubjectRiskDetailedDescription($grade) {
                                 <div class="stat-label">Midterm Exam</div>
                             </div>
                         </div>
-                    <?php endif; ?>
                 </div>
 
                 <!-- Final Card -->
                 <div class="term-card final" onclick="window.location.href='subject-management.php?subject_id=<?php echo $subject_id; ?>&term=final'">
                     <div class="term-title">FINAL</div>
-                    
-                    <?php if ($finalGrade > 0): ?>
                         <div class="term-stats">
                             <div class="stat-item">
                                 <div class="stat-value">60%</div>
@@ -839,9 +830,7 @@ function getSubjectRiskDetailedDescription($grade) {
                                 <div class="stat-label">Final Exam</div>
                             </div>
                         </div>
-                    <?php else: ?>
-                        <div class="term-grade no-data">--</div>
-                        <div class="term-grade-description">No final data</div>
+
                         <div class="term-stats">
                             <div class="stat-item">
                                 <div class="stat-value">60%</div>
@@ -852,7 +841,6 @@ function getSubjectRiskDetailedDescription($grade) {
                                 <div class="stat-label">Final Exam</div>
                             </div>
                         </div>
-                    <?php endif; ?>
                 </div>
             </div>
         </div>

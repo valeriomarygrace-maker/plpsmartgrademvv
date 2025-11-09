@@ -1,3 +1,4 @@
+student-subjects.php
 <?php
 require_once 'config.php';
 
@@ -75,7 +76,6 @@ try {
     $semester_mapping = [
         '1st Semester' => 'First Semester',
         '2nd Semester' => 'Second Semester', 
-        'Summer' => 'Summer',
         '1st' => 'First Semester',
         '2nd' => 'Second Semester'
     ];
@@ -130,21 +130,17 @@ try {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_subject'])) {
     $subject_id = $_POST['subject_id'];
     $professor_name = trim($_POST['professor_name']);
-    $schedule = trim($_POST['schedule']);
     
     if (empty($subject_id)) {
         $error_message = 'Please select a subject.';
     } elseif (empty($professor_name)) {
         $error_message = 'Professor name is required.';
-    } elseif (empty($schedule)) {
-        $error_message = 'Schedule is required.';
     } else {
         try {
             $insert_data = [
                 'student_id' => $student['id'],
                 'subject_id' => $subject_id,
                 'professor_name' => $professor_name,
-                'schedule' => $schedule,
                 'created_at' => date('Y-m-d H:i:s')
             ];
             
@@ -199,7 +195,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
             'student_id' => $subject_to_archive['student_id'],
             'subject_id' => $subject_to_archive['subject_id'],
             'professor_name' => $subject_to_archive['professor_name'],
-            'schedule' => $subject_to_archive['schedule'],
             'archived_at' => date('Y-m-d H:i:s')
         ]);
         
@@ -310,17 +305,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
     $subject_record_id = $_POST['subject_record_id'];
     $professor_name = trim($_POST['professor_name']);
-    $schedule = trim($_POST['schedule']);
     
     if (empty($professor_name)) {
         $error_message = 'Professor name is required.';
-    } elseif (empty($schedule)) {
-        $error_message = 'Schedule is required.';
     } else {
         try {
             $update_data = [
-                'professor_name' => $professor_name,
-                'schedule' => $schedule
+                'professor_name' => $professor_name
             ];
             
             $result = supabaseUpdate('student_subjects', $update_data, ['id' => $subject_record_id, 'student_id' => $student['id']]);
@@ -1284,10 +1275,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
                                     <span><strong>Professor:</strong> <?php echo htmlspecialchars($subject['professor_name']); ?></span>
                                 </div>
                                 <div class="info-item">
-                                    <i class="fas fa-calendar-alt"></i>
-                                    <span><strong>Schedule:</strong> <?php echo htmlspecialchars($subject['schedule']); ?></span>
-                                </div>
-                                <div class="info-item">
                                     <i class="fas fa-calendar"></i>
                                     <span><strong>Semester:</strong> <?php echo htmlspecialchars($subject['semester']); ?></span>
                                 </div>
@@ -1298,7 +1285,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
                             </div>
                             
                             <div class="subject-actions">
-                                <button type="button" class="btn-edit" onclick="openEditModal(<?php echo $subject['id']; ?>, '<?php echo htmlspecialchars($subject['subject_code']); ?> - <?php echo htmlspecialchars($subject['subject_name']); ?>', '<?php echo htmlspecialchars($subject['professor_name']); ?>', '<?php echo htmlspecialchars($subject['schedule']); ?>')">
+                                <button type="button" class="btn-edit" onclick="openEditModal(<?php echo $subject['id']; ?>, '<?php echo htmlspecialchars($subject['subject_code']); ?> - <?php echo htmlspecialchars($subject['subject_name']); ?>', '<?php echo htmlspecialchars($subject['professor_name']); ?>')">
                                     <i class="fas fa-edit"></i> Edit
                                 </button>
                                 <button type="button" class="btn-archive" onclick="openArchiveModal(<?php echo $subject['id']; ?>, '<?php echo htmlspecialchars($subject['subject_code']); ?> - <?php echo htmlspecialchars($subject['subject_name']); ?>')">
@@ -1331,11 +1318,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
                 <div class="edit-form-group">
                     <label for="edit_professor_name" class="edit-form-label">Professor Name</label>
                     <input type="text" name="professor_name" id="edit_professor_name" class="edit-form-input" required>
-                </div>
-                
-                <div class="edit-form-group">
-                    <label for="edit_schedule" class="edit-form-label">Schedule</label>
-                    <input type="text" name="schedule" id="edit_schedule" class="edit-form-input" required>
                 </div>
                 
                 <div class="modal-actions">
@@ -1431,12 +1413,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
                         <input type="text" name="professor_name" id="professor_name" class="form-input" 
                             placeholder="Enter professor's name" required>
                     </div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="schedule" class="form-label">Schedule</label>
-                    <input type="text" name="schedule" id="schedule" class="form-input" 
-                        placeholder="Day-Day Time" required>
                 </div>
                 
                 <div class="modal-actions">
@@ -1552,14 +1528,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
         });
 
         // Edit modal functions
-        function openEditModal(subjectId, subjectInfo, professorName, schedule) {
+        function openEditModal(subjectId, subjectInfo, professorName) {
             // Prevent event from bubbling to the card click
             event.stopPropagation();
             
             document.getElementById('edit_subject_id').value = subjectId;
             document.getElementById('edit_subject_info').value = subjectInfo;
             document.getElementById('edit_professor_name').value = professorName;
-            document.getElementById('edit_schedule').value = schedule;
             editSubjectModal.classList.add('show');
         }
 
