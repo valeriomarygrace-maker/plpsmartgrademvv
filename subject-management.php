@@ -2150,44 +2150,43 @@ function getGradeDescription($grade) {
     </div>
 
 <script>
-    // Add this JavaScript to force refresh and prevent caching
-document.addEventListener('DOMContentLoaded', function() {
-    // Clear any cached form data
-    if (window.history.replaceState) {
-        window.history.replaceState(null, null, window.location.href);
-    }
-    
-    // Force refresh if we have success messages
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.has('success')) {
-        // Remove the success parameter from URL without reloading
-        urlParams.delete('success');
-        urlParams.delete('t');
-        const newUrl = window.location.pathname + '?' + urlParams.toString();
-        window.history.replaceState({}, '', newUrl);
-    }
-    
-    // Add cache busting to all form submissions
-    const forms = document.querySelectorAll('form');
-    forms.forEach(form => {
-        form.addEventListener('submit', function() {
-            // Add timestamp to prevent caching
-            const timestamp = new Date().getTime();
-            const input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = 'cache_buster';
-            input.value = timestamp;
-            this.appendChild(input);
+    document.addEventListener('DOMContentLoaded', function() {
+        // Clear any cached form data
+        if (window.history.replaceState) {
+            window.history.replaceState(null, null, window.location.href);
+        }
+        
+        // Force refresh if we have success messages
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('success')) {
+            // Remove the success parameter from URL without reloading
+            urlParams.delete('success');
+            urlParams.delete('t');
+            const newUrl = window.location.pathname + '?' + urlParams.toString();
+            window.history.replaceState({}, '', newUrl);
+        }
+        
+        // Add cache busting to all form submissions
+        const forms = document.querySelectorAll('form');
+        forms.forEach(form => {
+            form.addEventListener('submit', function() {
+                // Add timestamp to prevent caching
+                const timestamp = new Date().getTime();
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'cache_buster';
+                input.value = timestamp;
+                this.appendChild(input);
+            });
         });
     });
-});
 
-// Prevent browser back button from showing cached form data
-window.onpageshow = function(event) {
-    if (event.persisted) {
-        window.location.reload();
-    }
-};
+    // Prevent browser back button from showing cached form data
+    window.onpageshow = function(event) {
+        if (event.persisted) {
+            window.location.reload();
+        }
+    };
     // Set today's date as default for score date and disable future dates
     document.addEventListener('DOMContentLoaded', function() {
         const today = new Date().toISOString().split('T')[0];

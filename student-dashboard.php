@@ -49,7 +49,7 @@ try {
                         'credits' => $subject_info['credits'],
                         'semester' => $subject_info['semester'],
                         'overall_grade' => $performance['overall_grade'] ?? 0,
-                        'subject_grade' => $performance['overall_grade'] ?? 0,
+                        'gwa' => $performance['gwa'] ?? 0,
                         'risk_level' => $performance['risk_level'] ?? 'no-data',
                         'has_scores' => ($performance && $performance['overall_grade'] > 0)
                     ]);
@@ -61,7 +61,7 @@ try {
         $recent_scores = getRecentScoresForStudent($student['id'], 3);
         
         // Calculate overall performance metrics
-        $performance_metrics = calculateOverallPerformanceMetrics($student['id']);
+        $performance_metrics = calculatePerformanceMetrics($student['id']);
         
         // Get semester risk data for the graph
         $semester_risk_data = getSemesterRiskData($student['id']);
@@ -131,14 +131,14 @@ function getRecentScoresForStudent($student_id, $limit = 3) {
 }
 
 /**
- * Calculate overall performance metrics (RENAMED to avoid conflict)
+ * Calculate overall performance metrics
  */
-function calculateOverallPerformanceMetrics($student_id) {
+function calculatePerformanceMetrics($student_id) {
     $metrics = [
         'total_subjects' => 0,
         'subjects_with_scores' => 0,
         'average_grade' => 0,
-        'average_subject_grade' => 0,
+        'average_gwa' => 0,
         'low_risk_count' => 0,
         'medium_risk_count' => 0,
         'high_risk_count' => 0
@@ -151,7 +151,7 @@ function calculateOverallPerformanceMetrics($student_id) {
         if ($student_subjects && is_array($student_subjects)) {
             $metrics['total_subjects'] = count($student_subjects);
             $total_grade = 0;
-            $total_subject_grade = 0;
+            $total_gwa = 0;
             $subjects_with_data = 0;
             
             foreach ($student_subjects as $subject_record) {
@@ -162,7 +162,7 @@ function calculateOverallPerformanceMetrics($student_id) {
                     if ($performance['overall_grade'] > 0) {
                         $metrics['subjects_with_scores']++;
                         $total_grade += $performance['overall_grade'];
-                        $total_subject_grade += $performance['overall_grade'];
+                        $total_gwa += $performance['gwa'];
                         $subjects_with_data++;
                         
                         // Count risk levels
@@ -183,7 +183,7 @@ function calculateOverallPerformanceMetrics($student_id) {
             
             if ($subjects_with_data > 0) {
                 $metrics['average_grade'] = round($total_grade / $subjects_with_data, 1);
-                $metrics['average_subject_grade'] = round($total_subject_grade / $subjects_with_data, 1);
+                $metrics['average_gwa'] = round($total_gwa / $subjects_with_data, 2);
             }
         }
         
@@ -229,7 +229,23 @@ function getUniqueProfessors($student_id) {
 }
 
 /**
- * Get semester risk data for bar chart
+ * Calculate GWA from grade (Philippine system)
+ */
+function calculateGWA($grade) {
+    if ($grade >= 90) return 1.00;
+    elseif ($grade >= 85) return 1.25;
+    elseif ($grade >= 80) return 1.50;
+    elseif ($grade >= 75) return 1.75;
+    elseif ($grade >= 70) return 2.00;
+    elseif ($grade >= 65) return 2.25;
+    elseif ($grade >= 60) return 2.50;
+    elseif ($grade >= 55) return 2.75;
+    elseif ($grade >= 50) return 3.00;
+    else return 5.00;
+}
+
+/**
+ * Get semester risk data for bar chart - UPDATED FOR DUAL RISK DISPLAY
  */
 function getSemesterRiskData($student_id) {
     $data = [
@@ -282,7 +298,7 @@ function getSemesterRiskData($student_id) {
                         $is_high_risk = ($risk_level === 'high' || $risk_level === 'failed');
                         $is_low_risk = ($risk_level === 'low' || $risk_level === 'medium');
                     } else {
-                        // Calculate performance if not stored
+                        // Calculate performance if not stored (same as archived subjects page)
                         $calculated_performance = calculateArchivedSubjectPerformance($archived_subject['id']);
                         if ($calculated_performance) {
                             $final_grade = $calculated_performance['overall_grade'];
@@ -345,7 +361,7 @@ function getSemesterRiskData($student_id) {
 }
 
 /**
- * Calculate performance for archived subject
+ * Calculate performance for archived subject (same as in student-archived-subject.php)
  */
 function calculateArchivedSubjectPerformance($archived_subject_id) {
     try {
@@ -414,7 +430,7 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
         if (!$hasScores) {
             return [
                 'overall_grade' => 0,
-                'subject_grade' => 0,
+                'gwa' => 0,
                 'class_standing' => 0,
                 'exams_score' => 0,
                 'risk_level' => 'no-data',
@@ -429,17 +445,20 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
             $overallGrade = 100;
         }
         
-        // Calculate risk level based on percentage grade
+        // Calculate GWA (General Weighted Average) - Philippine system
+        $gwa = calculateGWA($overallGrade);
+        
+        // Calculate risk level based on GWA
         $riskLevel = 'no-data';
         $riskDescription = 'No Data Inputted';
 
-        if ($overallGrade >= 85) {
+        if ($gwa <= 1.75) {
             $riskLevel = 'low';
             $riskDescription = 'Low Risk';
-        } elseif ($overallGrade >= 80) {
+        } elseif ($gwa <= 2.50) {
             $riskLevel = 'medium';
             $riskDescription = 'Medium Risk';
-        } elseif ($overallGrade >= 75) {
+        } elseif ($gwa <= 3.00) {
             $riskLevel = 'high';
             $riskDescription = 'High Risk';
         } else {
@@ -449,7 +468,7 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
         
         return [
             'overall_grade' => $overallGrade,
-            'subject_grade' => $overallGrade,
+            'gwa' => $gwa,
             'class_standing' => $totalClassStanding,
             'exams_score' => $midtermScore + $finalScore,
             'risk_level' => $riskLevel,
@@ -1257,9 +1276,12 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
                                         ">
                                             <?php echo number_format($subject['overall_grade'], 1); ?>%
                                         </div>
-                                        <span class="risk-badge <?php echo $subject['risk_level']; ?>">
-                                            <?php echo ucfirst($subject['risk_level']); ?>
-                                        </span>
+                                        <div class="gwa-value">
+                                            GWA: <?php echo number_format($subject['gwa'], 2); ?>
+                                            <span class="risk-badge <?php echo $subject['risk_level']; ?>">
+                                                <?php echo ucfirst($subject['risk_level']); ?>
+                                            </span>
+                                        </div>
                                     <?php else: ?>
                                     <?php endif; ?>
                                 </div>
@@ -1360,9 +1382,9 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
         function initializeCharts() {
             const semesterRiskData = <?php echo json_encode($semester_risk_data); ?>;
             
-            console.log('Risk Data:', semesterRiskData);
+            console.log('Risk Data:', semesterRiskData); // Debug log
             
-            // Risk Overview Chart
+            // Risk Overview Chart (for the 3-column grid)
             const riskOverviewCtx = document.getElementById('riskOverviewChart')?.getContext('2d');
             if (riskOverviewCtx) {
                 // Calculate data for the chart

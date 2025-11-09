@@ -9,8 +9,8 @@ class MLService {
             return [
                 'success' => false, 
                 'source' => 'disabled',
-                'risk_level' => calculateRiskLevel($subjectGrade),
-                'risk_description' => getRiskDescription(calculateRiskLevel($subjectGrade))
+                'performance_level' => calculatePerformanceLevel($subjectGrade),
+                'performance_description' => getPerformanceDescription(calculatePerformanceLevel($subjectGrade))
             ];
         }
         
@@ -53,8 +53,8 @@ class MLService {
         return [
             'success' => false, 
             'source' => 'service_unavailable',
-            'risk_level' => calculateRiskLevel($subjectGrade),
-            'risk_description' => getRiskDescription(calculateRiskLevel($subjectGrade))
+            'performance_level' => calculatePerformanceLevel($subjectGrade),
+            'performance_description' => getPerformanceDescription(calculatePerformanceLevel($subjectGrade))
         ];
     }
     
@@ -64,7 +64,7 @@ class MLService {
 }
 
 /**
- * Intervention System - BASED ON RISK LEVELS
+ * Intervention System - BASED ON INPUTTED SCORES AND SUBJECT GRADE
  */
 class InterventionSystem {
     
@@ -85,7 +85,7 @@ class InterventionSystem {
         }
     }
     
-    public static function getBehavioralInsights($studentId, $subjectId, $currentGrade, $subjectGrade, $riskLevel, $categoryTotals, $term = 'midterm') {
+    public static function getBehavioralInsights($studentId, $subjectId, $currentGrade, $subjectGrade, $categoryTotals, $term = 'midterm') {
         $insights = [];
         
         if ($currentGrade == 0) {
@@ -95,31 +95,6 @@ class InterventionSystem {
                 'source' => 'system'
             ];
             return $insights;
-        }
-        
-        // Risk level based insights
-        switch ($riskLevel) {
-            case 'low_risk':
-                $insights[] = [
-                    'message' => "Low Risk: You're maintaining excellent/good performance. Continue your current study habits.",
-                    'priority' => 'low',
-                    'source' => 'risk_analysis'
-                ];
-                break;
-            case 'moderate_risk':
-                $insights[] = [
-                    'message' => "Moderate Risk: Needs improvement. Focus on strengthening weaker areas.",
-                    'priority' => 'medium',
-                    'source' => 'risk_analysis'
-                ];
-                break;
-            case 'high_risk':
-                $insights[] = [
-                    'message' => "High Risk: Consider communicating with your professor for additional support.",
-                    'priority' => 'high',
-                    'source' => 'risk_analysis'
-                ];
-                break;
         }
         
         // Analyze low scores in categories for behavioral insights
@@ -156,13 +131,61 @@ class InterventionSystem {
             }
         }
         
+        // Subject grade based insights
+        if ($subjectGrade >= 90) {
+            $insights[] = [
+                'message' => "Outstanding subject performance! Your consistent effort across all assessments is paying off.",
+                'priority' => 'low',
+                'source' => 'grade_analysis'
+            ];
+        } elseif ($subjectGrade >= 85) {
+            $insights[] = [
+                'message' => "Very good subject performance. Maintain your study habits for continued success.",
+                'priority' => 'low',
+                'source' => 'grade_analysis'
+            ];
+        } elseif ($subjectGrade >= 80) {
+            $insights[] = [
+                'message' => "Good subject performance. Identify areas where you can gain additional points.",
+                'priority' => 'medium',
+                'source' => 'grade_analysis'
+            ];
+        } elseif ($subjectGrade >= 75) {
+            $insights[] = [
+                'message' => "Satisfactory subject performance. Focus on improving weaker areas to reach higher grades.",
+                'priority' => 'medium',
+                'source' => 'grade_analysis'
+            ];
+        } else {
+            $insights[] = [
+                'message' => "Subject performance needs improvement. Prioritize studying core concepts and seek additional help.",
+                'priority' => 'high',
+                'source' => 'grade_analysis'
+            ];
+        }
+        
+        // Term-specific insights
+        if ($term === 'midterm') {
+            $insights[] = [
+                'message' => "Midterm results provide valuable feedback. Use this information to prepare for final term assessments.",
+                'priority' => 'medium',
+                'source' => 'system'
+            ];
+        } else {
+            $insights[] = [
+                'message' => "Final term completion. Review your overall performance to identify learning patterns.",
+                'priority' => 'medium',
+                'source' => 'system'
+            ];
+        }
+        
         return $insights;
     }
     
-    public static function getInterventions($studentId, $subjectId, $riskLevel, $categoryTotals, $term = 'midterm') {
+    public static function getInterventions($studentId, $subjectId, $performanceLevel, $categoryTotals, $term = 'midterm') {
         $interventions = [];
         
-        if (!$riskLevel || $riskLevel === 'no-data') {
+        if (!$performanceLevel || $performanceLevel === 'no-data') {
             $interventions[] = [
                 'message' => "Start adding your scores to enable personalized intervention planning.",
                 'priority' => 'low'
@@ -170,35 +193,63 @@ class InterventionSystem {
             return $interventions;
         }
         
-        // Risk level based interventions
-        switch ($riskLevel) {
-            case 'low_risk':
+        // Performance level based interventions
+        switch ($performanceLevel) {
+            case 'excellent':
                 $interventions[] = [
-                    'message' => "Maintain current study schedule and performance level",
+                    'message' => "Maintain current study schedule and consider exploring advanced topics",
+                    'priority' => 'low'
+                ];
+                $interventions[] = [
+                    'message' => "Help peers who may be struggling with difficult concepts",
                     'priority' => 'low'
                 ];
                 break;
-            case 'moderate_risk':
+                
+            case 'very_good':
                 $interventions[] = [
-                    'message' => "Increase study time on challenging topics",
+                    'message' => "Review assessments to identify minor areas for improvement",
+                    'priority' => 'low'
+                ];
+                $interventions[] = [
+                    'message' => "Continue consistent study habits for maintained performance",
+                    'priority' => 'low'
+                ];
+                break;
+                
+            case 'good':
+                $interventions[] = [
+                    'message' => "Increase focused study time on challenging topics",
                     'priority' => 'medium'
                 ];
                 $interventions[] = [
-                    'message' => "Join study groups for better understanding",
+                    'message' => "Join study groups for collaborative learning",
                     'priority' => 'medium'
                 ];
                 break;
-            case 'high_risk':
+                
+            case 'satisfactory':
                 $interventions[] = [
-                    'message' => "Schedule meeting with professor for guidance",
+                    'message' => "Create structured study plan with specific learning objectives",
                     'priority' => 'high'
                 ];
                 $interventions[] = [
-                    'message' => "Request academic advising support",
+                    'message' => "Seek clarification on misunderstood concepts from instructor",
+                    'priority' => 'high'
+                ];
+                break;
+                
+            case 'needs_improvement':
+                $interventions[] = [
+                    'message' => "Request immediate academic advising for support plan",
                     'priority' => 'high'
                 ];
                 $interventions[] = [
-                    'message' => "Develop intensive study plan with tutor",
+                    'message' => "Schedule regular tutoring sessions for fundamental concepts",
+                    'priority' => 'high'
+                ];
+                $interventions[] = [
+                    'message' => "Develop intensive catch-up study schedule",
                     'priority' => 'high'
                 ];
                 break;
@@ -217,7 +268,7 @@ class InterventionSystem {
         return $interventions;
     }
     
-    public static function getRecommendations($studentId, $subjectId, $subjectGrade, $riskLevel, $categoryTotals, $term = 'midterm') {
+    public static function getRecommendations($studentId, $subjectId, $subjectGrade, $performanceLevel, $categoryTotals, $term = 'midterm') {
         $recommendations = [];
         
         if ($subjectGrade == 0) {
@@ -234,30 +285,73 @@ class InterventionSystem {
             return $recommendations;
         }
         
-        // Risk level based recommendations
-        switch ($riskLevel) {
-            case 'low_risk':
+        // Performance level based recommendations
+        switch ($performanceLevel) {
+            case 'excellent':
                 $recommendations[] = [
-                    'message' => "Continue effective study strategies for maintained performance",
+                    'message' => "Excellent subject grade! Continue your effective study strategies",
                     'priority' => 'low',
-                    'source' => 'risk_analysis'
+                    'source' => 'grade_analysis'
+                ];
+                $recommendations[] = [
+                    'message' => "Consider exploring advanced applications of course concepts",
+                    'priority' => 'low',
+                    'source' => 'system'
                 ];
                 break;
-            case 'moderate_risk':
+                
+            case 'very_good':
                 $recommendations[] = [
-                    'message' => "Focus on improving consistency across all assessments",
+                    'message' => "Very good subject performance. Target specific areas for minor improvements",
+                    'priority' => 'low',
+                    'source' => 'grade_analysis'
+                ];
+                $recommendations[] = [
+                    'message' => "Maintain consistent study schedule for continued success",
+                    'priority' => 'low',
+                    'source' => 'system'
+                ];
+                break;
+                
+            case 'good':
+                $recommendations[] = [
+                    'message' => "Good subject performance. Focus on improving consistency across all assessments",
                     'priority' => 'medium',
-                    'source' => 'risk_analysis'
+                    'source' => 'grade_analysis'
+                ];
+                $recommendations[] = [
+                    'message' => "Practice with past examination papers under timed conditions",
+                    'priority' => 'medium',
+                    'source' => 'system'
                 ];
                 break;
-            case 'high_risk':
+                
+            case 'satisfactory':
                 $recommendations[] = [
-                    'message' => "Communicate with professor immediately for academic support",
+                    'message' => "Satisfactory subject grade. Prioritize understanding foundational concepts",
                     'priority' => 'high',
-                    'source' => 'risk_analysis'
+                    'source' => 'grade_analysis'
                 ];
                 $recommendations[] = [
-                    'message' => "Utilize all available tutoring and academic resources",
+                    'message' => "Break down complex topics into smaller, manageable learning units",
+                    'priority' => 'high',
+                    'source' => 'system'
+                ];
+                break;
+                
+            case 'needs_improvement':
+                $recommendations[] = [
+                    'message' => "Subject grade needs improvement. Focus on core concepts first",
+                    'priority' => 'high',
+                    'source' => 'grade_analysis'
+                ];
+                $recommendations[] = [
+                    'message' => "Utilize all available academic support resources consistently",
+                    'priority' => 'high',
+                    'source' => 'system'
+                ];
+                $recommendations[] = [
+                    'message' => "Create daily study schedule with specific learning objectives",
                     'priority' => 'high',
                     'source' => 'system'
                 ];
@@ -295,22 +389,41 @@ class InterventionSystem {
             }
         }
         
+        // Term-specific recommendations
+        if ($term === 'midterm') {
+            $recommendations[] = [
+                'message' => "Use midterm feedback to prepare effectively for final term assessments",
+                'priority' => 'medium',
+                'source' => 'system'
+            ];
+        } else {
+            $recommendations[] = [
+                'message' => "Final term results provide insights for future course planning and study strategies",
+                'priority' => 'medium',
+                'source' => 'system'
+            ];
+        }
+        
         return $recommendations;
     }
 }
 
 // Global helper functions
-function calculateRiskLevel($grade) {
-    if ($grade >= 85) return 'low_risk';
-    elseif ($grade >= 80) return 'moderate_risk';
-    else return 'high_risk';
+function calculatePerformanceLevel($grade) {
+    if ($grade >= 90) return 'excellent';
+    elseif ($grade >= 85) return 'very_good';
+    elseif ($grade >= 80) return 'good';
+    elseif ($grade >= 75) return 'satisfactory';
+    else return 'needs_improvement';
 }
 
-function getRiskDescription($riskLevel) {
-    switch ($riskLevel) {
-        case 'low_risk': return 'Excellent/Good Performance';
-        case 'moderate_risk': return 'Needs Improvement';
-        case 'high_risk': return 'Need to Communicate with Professor';
+function getPerformanceDescription($performanceLevel) {
+    switch ($performanceLevel) {
+        case 'excellent': return 'Excellent Performance';
+        case 'very_good': return 'Very Good Performance';
+        case 'good': return 'Good Performance';
+        case 'satisfactory': return 'Satisfactory Performance';
+        case 'needs_improvement': return 'Needs Improvement';
         default: return 'No Data Inputted';
     }
 }

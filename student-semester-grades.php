@@ -66,16 +66,19 @@ try {
                         
                         $has_scores = false;
                         $overall_grade = 0;
+                        $gwa = 0;
                         
                         if ($performance) {
                             $has_scores = true;
                             $overall_grade = $performance['overall_grade'] ?? 0;
+                            $gwa = $performance['gwa'] ?? calculateGWA($overall_grade);
                         } else {
                             // Calculate performance from scores if no performance data exists
                             $calculated_performance = calculateArchivedSubjectPerformance($archived_subject['id']);
                             if ($calculated_performance && $calculated_performance['has_scores']) {
                                 $has_scores = true;
                                 $overall_grade = $calculated_performance['overall_grade'];
+                                $gwa = $calculated_performance['gwa'];
                             }
                         }
                         
@@ -88,6 +91,7 @@ try {
                             'professor_name' => $archived_subject['professor_name'],
                             'archived_at' => $archived_subject['archived_at'],
                             'overall_grade' => $overall_grade,
+                            'gwa' => $gwa,
                             'has_scores' => $has_scores
                         ];
                     }
@@ -103,97 +107,6 @@ try {
 } catch (Exception $e) {
     $error_message = 'Database error: ' . $e->getMessage();
     error_log("Error in student-semester-grades.php: " . $e->getMessage());
-}
-
-/**
- * Calculate performance for archived subject from scores
- */
-function calculateArchivedSubjectPerformance($archived_subject_id) {
-    try {
-        // Get all categories for this archived subject
-        $categories = supabaseFetch('archived_class_standing_categories', ['archived_subject_id' => $archived_subject_id]);
-        
-        if (!$categories || !is_array($categories)) {
-            return null;
-        }
-        
-        $totalClassStanding = 0;
-        $midtermScore = 0;
-        $finalScore = 0;
-        $hasScores = false;
-        
-        // Calculate class standing from categories
-        foreach ($categories as $category) {
-            $scores = supabaseFetch('archived_subject_scores', [
-                'archived_category_id' => $category['id'], 
-                'score_type' => 'class_standing'
-            ]);
-            
-            if ($scores && is_array($scores) && count($scores) > 0) {
-                $hasScores = true;
-                $categoryTotal = 0;
-                $categoryMax = 0;
-                
-                foreach ($scores as $score) {
-                    $categoryTotal += floatval($score['score_value']);
-                    $categoryMax += floatval($score['max_score']);
-                }
-                
-                if ($categoryMax > 0) {
-                    $categoryPercentage = ($categoryTotal / $categoryMax) * 100;
-                    $weightedScore = ($categoryPercentage * floatval($category['category_percentage'])) / 100;
-                    $totalClassStanding += $weightedScore;
-                }
-            }
-        }
-        
-        // Ensure Class Standing doesn't exceed 60%
-        if ($totalClassStanding > 60) {
-            $totalClassStanding = 60;
-        }
-        
-        // Get exam scores from all categories for this archived subject
-        foreach ($categories as $category) {
-            $exam_scores = supabaseFetch('archived_subject_scores', ['archived_category_id' => $category['id']]);
-            
-            if ($exam_scores && is_array($exam_scores)) {
-                foreach ($exam_scores as $exam) {
-                    if (floatval($exam['max_score']) > 0) {
-                        $examPercentage = (floatval($exam['score_value']) / floatval($exam['max_score'])) * 100;
-                        if ($exam['score_type'] === 'midterm_exam') {
-                            $midtermScore = ($examPercentage * 20) / 100;
-                            $hasScores = true;
-                        } elseif ($exam['score_type'] === 'final_exam') {
-                            $finalScore = ($examPercentage * 20) / 100;
-                            $hasScores = true;
-                        }
-                    }
-                }
-            }
-        }
-        
-        if (!$hasScores) {
-            return [
-                'overall_grade' => 0,
-                'has_scores' => false
-            ];
-        }
-        
-        // Calculate overall grade
-        $overallGrade = $totalClassStanding + $midtermScore + $finalScore;
-        if ($overallGrade > 100) {
-            $overallGrade = 100;
-        }
-        
-        return [
-            'overall_grade' => $overallGrade,
-            'has_scores' => true
-        ];
-        
-    } catch (Exception $e) {
-        error_log("Error calculating archived subject performance: " . $e->getMessage());
-        return null;
-    }
 }
 ?>
 <!DOCTYPE html>
@@ -832,7 +745,7 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
                                 <th>Subject Description</th>
                                 <th>Professor</th>
                                 <th>Credits</th>
-                                <th>Subject Grade</th>
+                                <th>GWA</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -846,20 +759,20 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
                                     </td>
                                     <td><?php echo htmlspecialchars($subject['professor_name']); ?></td>
                                     <td class="credits"><?php echo htmlspecialchars($subject['credits']); ?></td>
-                                    <td class="grade 
+                                    <td class="gwa 
                                         <?php if ($subject['has_scores']): ?>
                                             <?php 
-                                            if ($subject['overall_grade'] >= 90) echo 'grade-excellent';
-                                            elseif ($subject['overall_grade'] >= 85) echo 'grade-good';
-                                            elseif ($subject['overall_grade'] >= 80) echo 'grade-average';
-                                            elseif ($subject['overall_grade'] >= 75) echo 'grade-satisfactory';
-                                            else echo 'grade-poor';
+                                            if ($subject['gwa'] <= 1.25) echo 'gwa-excellent';
+                                            elseif ($subject['gwa'] <= 1.75) echo 'gwa-good';
+                                            elseif ($subject['gwa'] <= 2.50) echo 'gwa-average';
+                                            elseif ($subject['gwa'] <= 3.00) echo 'gwa-poor';
+                                            else echo 'gwa-failed';
                                             ?>
                                         <?php else: ?>
-                                            grade-no-data
+                                            gwa-no-data
                                         <?php endif; ?>
                                     ">
-                                        <?php echo $subject['has_scores'] ? number_format($subject['overall_grade'], 1) . '%' : '--'; ?>
+                                        <?php echo $subject['has_scores'] ? number_format($subject['gwa'], 2) : '--'; ?>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
