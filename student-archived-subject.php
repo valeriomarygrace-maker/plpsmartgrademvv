@@ -1554,10 +1554,6 @@ function getTermGradeDescription($grade) {
                                     <span><strong>Professor:</strong> <?php echo htmlspecialchars($subject['professor_name']); ?></span>
                                 </div>
                                 <div class="info-item">
-                                    <i class="fas fa-calendar-alt"></i>
-                                    <span><strong>Schedule:</strong> <?php echo htmlspecialchars($subject['schedule']); ?></span>
-                                </div>
-                                <div class="info-item">
                                     <i class="fas fa-calendar"></i>
                                     <span><strong>Semester:</strong> <?php echo htmlspecialchars($subject['semester']); ?></span>
                                 </div>
