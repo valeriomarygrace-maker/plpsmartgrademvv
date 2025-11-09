@@ -1570,7 +1570,7 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
                                         <strong>Final Grade:</strong> 
                                         <?php if ($subject['has_scores']): ?>
                                             <span style="color: var(--plp-green); font-weight: 600;">
-                                                <?php echo number_format($subject['overall_grade'], 1); ?>%
+                                                <?php echo number_format($subject['subject_grade'], 1); ?>%
                                             </span>
                                             <span class="risk-badge <?php echo $subject['risk_level']; ?>" style="margin-left: 0.5rem;">
                                                 <?php echo $subject['risk_description']; ?>
@@ -1595,8 +1595,7 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
                                     <?php echo $subject['final_grade'] ?? 0; ?>,
                                     '<?php echo $subject['risk_level'] ?? 'no-data'; ?>',
                                     '<?php echo addslashes($subject['risk_description'] ?? 'No Data Inputted'); ?>',
-                                    <?php echo $subject['has_scores'] ? 'true' : 'false'; ?>,
-                                    <?php echo $subject['has_archived_performance'] ? 'true' : 'false'; ?>
+                                    <?php echo $subject['has_scores'] ? 'true' : 'false'; ?>
                                 )">
                                     <i class="fas fa-eye"></i> View Details
                                 </button>
