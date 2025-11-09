@@ -236,14 +236,28 @@ try {
     // If there's an error calculating grades, they will remain 0
 }
 
-// Get grade description
-function getGradeDescription($grade) {
+// Get grade description for MIDTERM and FINAL (traditional grading)
+function getTermGradeDescription($grade) {
     if ($grade >= 90) return 'Excellent';
     elseif ($grade >= 85) return 'Very Good';
     elseif ($grade >= 80) return 'Good';
     elseif ($grade >= 75) return 'Satisfactory';
     elseif ($grade >= 70) return 'Passing';
     else return 'Needs Improvement';
+}
+
+// Get risk level description for SUBJECT GRADE (risk-based)
+function getSubjectRiskDescription($grade) {
+    if ($grade >= 85) return 'Low Risk';
+    elseif ($grade >= 80) return 'Moderate Risk';
+    else return 'High Risk';
+}
+
+// Get detailed risk description for SUBJECT GRADE
+function getSubjectRiskDetailedDescription($grade) {
+    if ($grade >= 85) return 'Excellent/Good Performance';
+    elseif ($grade >= 80) return 'Needs Improvement';
+    else return 'Need to Communicate with Professor';
 }
 ?>
 
@@ -498,7 +512,6 @@ function getGradeDescription($grade) {
             border-radius: var(--border-radius);
             box-shadow: var(--box-shadow);
             text-align: center;
-            border-left: 4px solid var(--plp-green);
         }
 
         .overview-value {
@@ -524,13 +537,37 @@ function getGradeDescription($grade) {
         .subject-grade-card {
             background: var(--plp-green-gradient);
             color: white;
-            border-left: 4px solid var(--plp-gold);
         }
 
         .subject-grade-card .overview-value,
         .subject-grade-card .overview-label,
         .subject-grade-card .overview-description {
             color: white;
+        }
+
+        .risk-badge {
+            display: inline-block;
+            padding: 0.3rem 0.8rem;
+            border-radius: 15px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-align: center;
+            margin-top: 0.5rem;
+        }
+
+        .risk-badge.low {
+            background: #c6f6d5;
+            color: #2f855a;
+        }
+
+        .risk-badge.medium {
+            background: #fef5e7;
+            color: #d69e2e;
+        }
+
+        .risk-badge.high {
+            background: #fed7d7;
+            color: #c53030;
         }
 
         .terms-container {
@@ -559,24 +596,10 @@ function getGradeDescription($grade) {
             border-color: var(--plp-green);
         }
 
-        .term-card.midterm {
-            border-top: 4px solid #3b82f6;
-        }
-
-        .term-card.final {
-            border-top: 4px solid #ef4444;
-        }
-
-        .term-icon {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-            color: var(--plp-green);
-        }
-
         .term-title {
             font-size: 1.5rem;
             font-weight: 700;
-            margin-bottom: 0.5rem;
+            margin-bottom: 1rem;
             color: var(--text-dark);
         }
 
@@ -745,38 +768,49 @@ function getGradeDescription($grade) {
             <!-- Overview Section -->
             <div class="overview-section">
                 <div class="overview-grid">
+                    <!-- SUBJECT GRADE - RISK BASED -->
                     <div class="overview-card subject-grade-card">
                         <div class="overview-label">SUBJECT GRADE</div>
                         <div class="overview-value">
                             <?php echo $subjectGrade > 0 ? number_format($subjectGrade, 1) . '%' : '--'; ?>
                         </div>
                         <div class="overview-description">
-                            <?php echo $subjectGrade > 0 ? getGradeDescription($subjectGrade) : 'No grades calculated'; ?>
+                            <?php if ($subjectGrade > 0): ?>
+                                <?php 
+                                $riskLevel = getSubjectRiskDescription($subjectGrade);
+                                $riskDetail = getSubjectRiskDetailedDescription($subjectGrade);
+                                ?>
+                                <span class="risk-badge <?php echo strtolower(str_replace(' ', '-', $riskLevel)); ?>">
+                                    <?php echo $riskLevel; ?>
+                                </span>
+                                <div style="margin-top: 0.5rem; font-size: 0.75rem;">
+                                    <?php echo $riskDetail; ?>
+                                </div>
+                            <?php else: ?>
+                                No grades calculated
+                            <?php endif; ?>
                         </div>
-                        <?php if ($subjectGrade > 0): ?>
-                            <div class="overview-description">
-                                (Midterm + Final) / 2
-                            </div>
-                        <?php endif; ?>
                     </div>
                     
+                    <!-- MIDTERM GRADE - TRADITIONAL GRADING -->
                     <div class="overview-card">
                         <div class="overview-label">MIDTERM GRADE</div>
                         <div class="overview-value">
                             <?php echo $midtermGrade > 0 ? number_format($midtermGrade, 1) . '%' : '--'; ?>
                         </div>
                         <div class="overview-description">
-                            <?php echo $midtermGrade > 0 ? getGradeDescription($midtermGrade) : 'No midterm data'; ?>
+                            <?php echo $midtermGrade > 0 ? getTermGradeDescription($midtermGrade) : 'No midterm data'; ?>
                         </div>
                     </div>
                     
+                    <!-- FINAL GRADE - TRADITIONAL GRADING -->
                     <div class="overview-card">
                         <div class="overview-label">FINAL GRADE</div>
                         <div class="overview-value">
                             <?php echo $finalGrade > 0 ? number_format($finalGrade, 1) . '%' : '--'; ?>
                         </div>
                         <div class="overview-description">
-                            <?php echo $finalGrade > 0 ? getGradeDescription($finalGrade) : 'No final data'; ?>
+                            <?php echo $finalGrade > 0 ? getTermGradeDescription($finalGrade) : 'No final data'; ?>
                         </div>
                     </div>
                 </div>
@@ -789,6 +823,10 @@ function getGradeDescription($grade) {
                     <div class="term-title">MIDTERM</div>
                     
                     <?php if ($midtermGrade > 0): ?>
+                        <div class="term-grade"><?php echo number_format($midtermGrade, 1); ?>%</div>
+                        <div class="term-grade-description">
+                            <?php echo getTermGradeDescription($midtermGrade); ?>
+                        </div>
                         <div class="term-stats">
                             <div class="stat-item">
                                 <div class="stat-value">60%</div>
@@ -800,6 +838,8 @@ function getGradeDescription($grade) {
                             </div>
                         </div>
                     <?php else: ?>
+                        <div class="term-grade no-data">--</div>
+                        <div class="term-grade-description">No midterm data</div>
                         <div class="term-stats">
                             <div class="stat-item">
                                 <div class="stat-value">60%</div>
@@ -811,6 +851,9 @@ function getGradeDescription($grade) {
                             </div>
                         </div>
                     <?php endif; ?>
+                    <button class="manage-btn">
+                        <i class="fas fa-cog"></i> Manage Midterm
+                    </button>
                 </div>
 
                 <!-- Final Card -->
@@ -818,6 +861,10 @@ function getGradeDescription($grade) {
                     <div class="term-title">FINAL</div>
                     
                     <?php if ($finalGrade > 0): ?>
+                        <div class="term-grade"><?php echo number_format($finalGrade, 1); ?>%</div>
+                        <div class="term-grade-description">
+                            <?php echo getTermGradeDescription($finalGrade); ?>
+                        </div>
                         <div class="term-stats">
                             <div class="stat-item">
                                 <div class="stat-value">60%</div>
@@ -829,6 +876,8 @@ function getGradeDescription($grade) {
                             </div>
                         </div>
                     <?php else: ?>
+                        <div class="term-grade no-data">--</div>
+                        <div class="term-grade-description">No final data</div>
                         <div class="term-stats">
                             <div class="stat-item">
                                 <div class="stat-value">60%</div>
@@ -840,9 +889,32 @@ function getGradeDescription($grade) {
                             </div>
                         </div>
                     <?php endif; ?>
+                    <button class="manage-btn">
+                        <i class="fas fa-cog"></i> Manage Final
+                    </button>
                 </div>
             </div>
         </div>
     </div>
+
+    <script>
+        // Add click handlers for the term cards
+        document.querySelectorAll('.term-card').forEach(card => {
+            card.addEventListener('click', function() {
+                const url = this.getAttribute('onclick').match(/'([^']+)'/)[1];
+                window.location.href = url;
+            });
+        });
+
+        // Add click handlers for manage buttons to prevent double navigation
+        document.querySelectorAll('.manage-btn').forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const card = this.closest('.term-card');
+                const url = card.getAttribute('onclick').match(/'([^']+)'/)[1];
+                window.location.href = url;
+            });
+        });
+    </script>
 </body>
 </html>
