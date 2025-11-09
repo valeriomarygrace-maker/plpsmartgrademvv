@@ -130,7 +130,7 @@ try {
     $available_subjects = [];
 }
 
-// Handle add subject - FIXED: Removed schedule requirement
+// Handle add subject
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_subject'])) {
     $subject_id = $_POST['subject_id'];
     $professor_name = trim($_POST['professor_name']);
@@ -145,7 +145,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_subject'])) {
                 'student_id' => $student['id'],
                 'subject_id' => $subject_id,
                 'professor_name' => $professor_name,
-                'schedule' => 'Not Set', // Default value for required field
+                'schedule' => 'Not Set',
                 'created_at' => date('Y-m-d H:i:s')
             ];
             
@@ -183,7 +183,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_subject'])) {
     }
 }
 
-// Handle archive subject
+// Handle archive subject 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
     $subject_record_id = $_POST['subject_record_id'];
     
@@ -201,10 +201,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
         if (!$subject_info) {
             throw new Exception("Subject information not found.");
         }
-
-        // Get current performance data BEFORE archiving
-        $current_performance = supabaseFetch('subject_performance', ['student_subject_id' => $subject_record_id]);
-        $performance_data = $current_performance && count($current_performance) > 0 ? $current_performance[0] : null;
         
         // Archive the main subject record to archived_subjects
         $archived_subject = supabaseInsert('archived_subjects', [
@@ -225,25 +221,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
         
         $archived_subject_id = $archived_subject['id'];
         
-        // Archive performance data if it exists - THIS IS CRITICAL!
-        if ($performance_data) {
-            $archived_performance = supabaseInsert('archived_subject_performance', [
-                'archived_subject_id' => $archived_subject_id,
-                'overall_grade' => $performance_data['overall_grade'] ?? 0,
-                'gpa' => $performance_data['gpa'] ?? 0,
-                'class_standing' => $performance_data['class_standing'] ?? 0,
-                'exams_score' => $performance_data['exams_score'] ?? 0,
-                'risk_level' => $performance_data['risk_level'] ?? 'no-data',
-                'risk_description' => $performance_data['risk_description'] ?? 'No Data Inputted',
-                'archived_at' => date('Y-m-d H:i:s')
-            ]);
-            
-            if (!$archived_performance) {
-                error_log("Warning: Failed to archive performance data for subject ID: " . $subject_record_id);
-            }
-        }
-        
-        // Archive categories and scores
+        // Archive categories and scores if they exist
         $categories = supabaseFetch('student_class_standing_categories', ['student_subject_id' => $subject_record_id]);
         
         if ($categories && is_array($categories)) {
@@ -252,7 +230,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
                     'archived_subject_id' => $archived_subject_id,
                     'category_name' => $category['category_name'],
                     'category_percentage' => $category['category_percentage'],
-                    'term_type' => $category['term_type'] ?? 'midterm', // ADD THIS LINE
                     'archived_at' => date('Y-m-d H:i:s')
                 ]);
                 
@@ -276,14 +253,75 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
                 }
             }
         }
+        
+        // Archive exam scores (scores without category_id)
+        $exam_scores = supabaseFetch('student_subject_scores', [
+            'student_subject_id' => $subject_record_id, 
+            'category_id' => NULL
+        ]);
 
-        } catch (Exception $e) {
+        if ($exam_scores && is_array($exam_scores)) {
+            // Create a special category for exam scores
+            $exam_category = supabaseInsert('archived_class_standing_categories', [
+                'archived_subject_id' => $archived_subject_id,
+                'category_name' => 'Exam Scores',
+                'category_percentage' => 0,
+                'archived_at' => date('Y-m-d H:i:s')
+            ]);
+            
+            if ($exam_category) {
+                $exam_category_id = $exam_category['id'];
+                foreach ($exam_scores as $score) {
+                    supabaseInsert('archived_subject_scores', [
+                        'archived_category_id' => $exam_category_id,
+                        'score_type' => $score['score_type'],
+                        'score_name' => $score['score_name'],
+                        'score_value' => $score['score_value'],
+                        'max_score' => $score['max_score'],
+                        'score_date' => $score['score_date'],
+                        'archived_at' => date('Y-m-d H:i:s')
+                    ]);
+                }
+            }
+        }
+        
+        // Archive performance data if it exists
+        $performance_data = supabaseFetch('subject_performance', ['student_subject_id' => $subject_record_id]);
+        if ($performance_data && count($performance_data) > 0) {
+            $performance = $performance_data[0];
+            supabaseInsert('archived_subject_performance', [
+                'archived_subject_id' => $archived_subject_id,
+                'overall_grade' => $performance['overall_grade'],
+                'gpa' => $performance['gpa'],
+                'class_standing' => $performance['class_standing'],
+                'exams_score' => $performance['exams_score'],
+                'risk_level' => $performance['risk_level'],
+                'risk_description' => $performance['risk_description'],
+                'archived_at' => date('Y-m-d H:i:s')
+            ]);
+        }
+        
+        // Delete from active tables
+        supabaseDelete('student_subject_scores', ['student_subject_id' => $subject_record_id]);
+        supabaseDelete('student_class_standing_categories', ['student_subject_id' => $subject_record_id]);
+        supabaseDelete('subject_performance', ['student_subject_id' => $subject_record_id]);
+        $delete_result = supabaseDelete('student_subjects', ['id' => $subject_record_id]);
+        
+        if ($delete_result) {
+            $success_message = 'Subject archived successfully! It will now appear in your archived subjects.';
+            header("Location: student-subjects.php");
+            exit;
+        } else {
+            throw new Exception("Failed to delete subject from active records.");
+        }
+        
+    } catch (Exception $e) {
         $error_message = 'Error archiving subject: ' . $e->getMessage();
         error_log("Archive error: " . $e->getMessage());
     }
 }
 
-// Handle update subject - FIXED: Only professor name
+// Handle update subject
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
     $subject_record_id = $_POST['subject_record_id'];
     $professor_name = trim($_POST['professor_name']);
@@ -321,7 +359,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* Your existing CSS styles remain exactly the same */
         :root {
             --plp-green: #006341;
             --plp-green-light: #008856;
@@ -1239,7 +1276,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
             <?php else: ?>
                 <div class="subjects-grid">
                     <?php foreach ($subjects as $subject): ?>
-                        <div class="subject-card" onclick="window.location.href='termevaluations.php?subject_id=<?php echo $subject['id']; ?>'">
+                        <div class="subject-card" onclick="window.location.href='termevaluation.php?subject_id=<?php echo $subject['id']; ?>'">
                             <div class="subject-header">
                                 <div style="flex: 1;">
                                     <div class="subject-code"><?php echo htmlspecialchars($subject['subject_code']); ?></div>
