@@ -1578,7 +1578,7 @@ function getGradeDescription($grade) {
             </div>
         </div>
 
-        <!-- Simplified Performance Overview - REMOVED GWA -->
+        <!-- Simplified Performance Overview  -->
         <div class="performance-overview">
             <div class="performance-grid">
                 <div class="performance-card">
