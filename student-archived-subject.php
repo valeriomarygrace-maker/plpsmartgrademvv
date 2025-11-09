@@ -114,9 +114,9 @@ try {
                     'subject_name' => $subject_info['subject_name'],
                     'credits' => $subject_info['credits'],
                     'semester' => $subject_info['semester'],
-                    'overall_grade' => $calculated_performance['overall_grade'] ?? 0,
-                    'class_standing' => $calculated_performance['class_standing'] ?? 0,
-                    'exams_score' => $calculated_performance['exams_score'] ?? 0,
+                    'midterm_grade' => $calculated_performance['midterm_grade'] ?? 0,
+                    'final_grade' => $calculated_performance['final_grade'] ?? 0,
+                    'subject_grade' => $calculated_performance['subject_grade'] ?? 0,
                     'risk_level' => $calculated_performance['risk_level'] ?? 'no-data',
                     'risk_description' => $calculated_performance['risk_description'] ?? 'No Data Inputted',
                     'has_scores' => $calculated_performance['has_scores'] ?? false
@@ -148,112 +148,196 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
         
         if (!$categories || !is_array($categories)) {
             return [
-                'overall_grade' => 0,
-                'class_standing' => 0,
-                'exams_score' => 0,
+                'midterm_grade' => 0,
+                'final_grade' => 0,
+                'subject_grade' => 0,
                 'risk_level' => 'no-data',
                 'risk_description' => 'No Data Inputted',
                 'has_scores' => false
             ];
         }
         
-        $totalClassStanding = 0;
-        $midtermScore = 0;
-        $finalScore = 0;
+        $midtermGrade = 0;
+        $finalGrade = 0;
+        $subjectGrade = 0;
         $hasScores = false;
         
-        // Calculate class standing from categories
-        foreach ($categories as $category) {
-            // Skip exam scores category for class standing calculation
-            if (strtolower($category['category_name']) === 'exam scores') {
-                continue;
-            }
+        // Separate midterm and final categories
+        $midtermCategories = array_filter($categories, function($cat) {
+            return isset($cat['term_type']) && $cat['term_type'] === 'midterm';
+        });
+        
+        $finalCategories = array_filter($categories, function($cat) {
+            return isset($cat['term_type']) && $cat['term_type'] === 'final';
+        });
+        
+        // Calculate Midterm Grade
+        if (!empty($midtermCategories)) {
+            $midtermClassStandingTotal = 0;
             
-            $scores = supabaseFetch('archived_subject_scores', [
-                'archived_category_id' => $category['id']
-            ]);
-            
-            if ($scores && is_array($scores) && count($scores) > 0) {
-                $hasScores = true;
-                $categoryTotal = 0;
-                $categoryMax = 0;
-                
-                foreach ($scores as $score) {
-                    $categoryTotal += floatval($score['score_value']);
-                    $categoryMax += floatval($score['max_score']);
+            foreach ($midtermCategories as $category) {
+                // Skip exam scores category for class standing calculation
+                if (strtolower($category['category_name']) === 'exam scores') {
+                    continue;
                 }
                 
-                if ($categoryMax > 0) {
-                    $categoryPercentage = ($categoryTotal / $categoryMax) * 100;
-                    $weightedScore = ($categoryPercentage * floatval($category['category_percentage'])) / 100;
-                    $totalClassStanding += $weightedScore;
+                $scores = supabaseFetch('archived_subject_scores', [
+                    'archived_category_id' => $category['id']
+                ]);
+                
+                if ($scores && is_array($scores) && count($scores) > 0) {
+                    $hasScores = true;
+                    $categoryTotal = 0;
+                    $categoryMax = 0;
+                    
+                    foreach ($scores as $score) {
+                        $categoryTotal += floatval($score['score_value']);
+                        $categoryMax += floatval($score['max_score']);
+                    }
+                    
+                    if ($categoryMax > 0) {
+                        $categoryPercentage = ($categoryTotal / $categoryMax) * 100;
+                        $weightedScore = ($categoryPercentage * floatval($category['category_percentage'])) / 100;
+                        $midtermClassStandingTotal += $weightedScore;
+                    }
                 }
             }
-        }
-        
-        // Ensure Class Standing doesn't exceed 60%
-        if ($totalClassStanding > 60) {
-            $totalClassStanding = 60;
-        }
-        
-        // Get exam scores from the "Exam Scores" category
-        foreach ($categories as $category) {
-            if (strtolower($category['category_name']) === 'exam scores') {
-                $exam_scores = supabaseFetch('archived_subject_scores', ['archived_category_id' => $category['id']]);
-                
-                if ($exam_scores && is_array($exam_scores)) {
-                    foreach ($exam_scores as $exam) {
-                        if (floatval($exam['max_score']) > 0) {
-                            $examPercentage = (floatval($exam['score_value']) / floatval($exam['max_score'])) * 100;
-                            if ($exam['score_type'] === 'midterm_exam') {
-                                $midtermScore = ($examPercentage * 20) / 100;
+            
+            // Ensure Class Standing doesn't exceed 60%
+            if ($midtermClassStandingTotal > 60) {
+                $midtermClassStandingTotal = 60;
+            }
+            
+            // Calculate midterm exam score
+            $midtermExamScore = 0;
+            foreach ($midtermCategories as $category) {
+                if (strtolower($category['category_name']) === 'exam scores') {
+                    $exam_scores = supabaseFetch('archived_subject_scores', ['archived_category_id' => $category['id']]);
+                    
+                    if ($exam_scores && is_array($exam_scores)) {
+                        foreach ($exam_scores as $exam) {
+                            if (floatval($exam['max_score']) > 0 && $exam['score_type'] === 'midterm_exam') {
+                                $examPercentage = (floatval($exam['score_value']) / floatval($exam['max_score'])) * 100;
+                                $midtermExamScore = ($examPercentage * 40) / 100;
                                 $hasScores = true;
-                            } elseif ($exam['score_type'] === 'final_exam') {
-                                $finalScore = ($examPercentage * 20) / 100;
-                                $hasScores = true;
+                                break;
                             }
                         }
                     }
                 }
             }
+            
+            $midtermGrade = $midtermClassStandingTotal + $midtermExamScore;
+            if ($midtermGrade > 100) {
+                $midtermGrade = 100;
+            }
+        }
+        
+        // Calculate Final Grade
+        if (!empty($finalCategories)) {
+            $finalClassStandingTotal = 0;
+            
+            foreach ($finalCategories as $category) {
+                // Skip exam scores category for class standing calculation
+                if (strtolower($category['category_name']) === 'exam scores') {
+                    continue;
+                }
+                
+                $scores = supabaseFetch('archived_subject_scores', [
+                    'archived_category_id' => $category['id']
+                ]);
+                
+                if ($scores && is_array($scores) && count($scores) > 0) {
+                    $hasScores = true;
+                    $categoryTotal = 0;
+                    $categoryMax = 0;
+                    
+                    foreach ($scores as $score) {
+                        $categoryTotal += floatval($score['score_value']);
+                        $categoryMax += floatval($score['max_score']);
+                    }
+                    
+                    if ($categoryMax > 0) {
+                        $categoryPercentage = ($categoryTotal / $categoryMax) * 100;
+                        $weightedScore = ($categoryPercentage * floatval($category['category_percentage'])) / 100;
+                        $finalClassStandingTotal += $weightedScore;
+                    }
+                }
+            }
+            
+            // Ensure Class Standing doesn't exceed 60%
+            if ($finalClassStandingTotal > 60) {
+                $finalClassStandingTotal = 60;
+            }
+            
+            // Calculate final exam score
+            $finalExamScore = 0;
+            foreach ($finalCategories as $category) {
+                if (strtolower($category['category_name']) === 'exam scores') {
+                    $exam_scores = supabaseFetch('archived_subject_scores', ['archived_category_id' => $category['id']]);
+                    
+                    if ($exam_scores && is_array($exam_scores)) {
+                        foreach ($exam_scores as $exam) {
+                            if (floatval($exam['max_score']) > 0 && $exam['score_type'] === 'final_exam') {
+                                $examPercentage = (floatval($exam['score_value']) / floatval($exam['max_score'])) * 100;
+                                $finalExamScore = ($examPercentage * 40) / 100;
+                                $hasScores = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            $finalGrade = $finalClassStandingTotal + $finalExamScore;
+            if ($finalGrade > 100) {
+                $finalGrade = 100;
+            }
+        }
+        
+        // Calculate Subject Grade (average of midterm and final)
+        if ($midtermGrade > 0 && $finalGrade > 0) {
+            $subjectGrade = ($midtermGrade + $finalGrade) / 2;
+        } elseif ($midtermGrade > 0) {
+            $subjectGrade = $midtermGrade;
+        } elseif ($finalGrade > 0) {
+            $subjectGrade = $finalGrade;
+        }
+        
+        if ($subjectGrade > 100) {
+            $subjectGrade = 100;
         }
         
         if (!$hasScores) {
             return [
-                'overall_grade' => 0,
-                'class_standing' => 0,
-                'exams_score' => 0,
+                'midterm_grade' => 0,
+                'final_grade' => 0,
+                'subject_grade' => 0,
                 'risk_level' => 'no-data',
                 'risk_description' => 'No Data Inputted',
                 'has_scores' => false
             ];
         }
         
-        // Calculate overall grade
-        $overallGrade = $totalClassStanding + $midtermScore + $finalScore;
-        if ($overallGrade > 100) {
-            $overallGrade = 100;
-        }
-        
-        // Calculate risk level based on grade (using the same logic as active subjects)
+        // Calculate risk level based on subject grade
         $riskLevel = 'no-data';
         $riskDescription = 'No Data Inputted';
 
-        if ($overallGrade >= 85) {
+        if ($subjectGrade >= 85) {
             $riskLevel = 'low';
             $riskDescription = 'Low Risk';
-        } elseif ($overallGrade >= 80) {
+        } elseif ($subjectGrade >= 80) {
             $riskLevel = 'medium';
             $riskDescription = 'Moderate Risk';
-        } elseif ($overallGrade > 0) {
+        } elseif ($subjectGrade > 0) {
             $riskLevel = 'high';
             $riskDescription = 'High Risk';
         }
         
         return [
-            'overall_grade' => $overallGrade,
-            'class_standing' => $totalClassStanding,
-            'exams_score' => $midtermScore + $finalScore,
+            'midterm_grade' => $midtermGrade,
+            'final_grade' => $finalGrade,
+            'subject_grade' => $subjectGrade,
             'risk_level' => $riskLevel,
             'risk_description' => $riskDescription,
             'has_scores' => true
@@ -262,9 +346,9 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
     } catch (Exception $e) {
         error_log("Error calculating archived subject performance: " . $e->getMessage());
         return [
-            'overall_grade' => 0,
-            'class_standing' => 0,
-            'exams_score' => 0,
+            'midterm_grade' => 0,
+            'final_grade' => 0,
+            'subject_grade' => 0,
             'risk_level' => 'no-data',
             'risk_description' => 'Error calculating grades',
             'has_scores' => false
@@ -272,7 +356,6 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
     }
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -816,6 +899,134 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
             transform: translateY(-2px);
         }
 
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            padding: 1rem;
+        }
+
+        .modal.show {
+            display: flex;
+            opacity: 1;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--box-shadow-lg);
+            max-width: 700px;
+            width: 100%;
+            transform: translateY(20px);
+            transition: transform 0.3s ease;
+            max-height: 90vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal.show .modal-content {
+            transform: translateY(0);
+        }
+
+        .modal-title {
+            color: var(--plp-green);
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--plp-green-lighter);
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+            margin-top: 1.5rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--plp-green-lighter);
+            flex-wrap: wrap;
+        }
+
+        .modal-btn {
+            font-size: 1rem;
+            font-weight: 600;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: var(--transition);
+            font-family: 'Poppins', sans-serif;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex: 1;
+            min-width: 120px;
+            justify-content: center;
+        }
+
+        .modal-btn-cancel {
+            background: #f1f5f9;
+            color: var(--text-medium);
+        }
+
+        .modal-btn-cancel:hover {
+            background: #e2e8f0;
+            transform: translateY(-2px);
+        }
+
+        .performance-overview {
+            margin-bottom: 1.5rem;
+        }
+
+        .details-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .detail-item {
+            text-align: center;
+            padding: 1rem;
+            background: var(--plp-green-pale);
+            border-radius: var(--border-radius);
+        }
+
+        .detail-label {
+            font-size: 0.8rem;
+            color: var(--text-light);
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .detail-value {
+            font-size: 1rem;
+            color: var(--text-dark);
+            font-weight: 500;
+        }
+
+        .grade-value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--plp-green);
+            margin: 0.5rem 0;
+        }
+
         .performance-overview {
             margin-bottom: 1.5rem;
         }
@@ -1267,31 +1478,32 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
         </div>
     </div>
 
-    <!-- View Details Modal -->
+    <!-- View Details Modal-->
     <div class="modal" id="viewModal">
         <div class="modal-content">
             <h3 class="modal-title">
                 <i class="fas fa-chart-line"></i>
-                Final Grade Summary
+                Subject Grades Summary
             </h3>
             
             <div class="performance-overview">
                 <div class="details-grid">
                     <div class="detail-item">
-                        <div class="detail-label">Overall Grade</div>
-                        <div class="grade-value" id="view_overall_grade">--</div>
+                        <div class="detail-label">Subject Grade</div>
+                        <div class="grade-value" id="view_subject_grade">--</div>
+                        <div class="detail-label" style="font-size: 0.85rem; color: var(--text-medium);">Overall Grade</div>
                     </div>
                     
                     <div class="detail-item">
-                        <div class="detail-label">Class Standing</div>
-                        <div class="grade-value" id="view_class_standing">--</div>
-                        <div class="detail-label" style="font-size: 0.85rem; color: var(--text-medium);">of 60%</div>
+                        <div class="detail-label">Midterm Grade</div>
+                        <div class="grade-value" id="view_midterm_grade">--</div>
+                        <div class="detail-label" style="font-size: 0.85rem; color: var(--text-medium);">Midterm Period</div>
                     </div>
                     
                     <div class="detail-item">
-                        <div class="detail-label">Major Exams</div>
-                        <div class="grade-value" id="view_exams_score">--</div>
-                        <div class="detail-label" style="font-size: 0.85rem; color: var(--text-medium);">of 40%</div>
+                        <div class="detail-label">Final Grade</div>
+                        <div class="grade-value" id="view_final_grade">--</div>
+                        <div class="detail-label" style="font-size: 0.85rem; color: var(--text-medium);">Final Period</div>
                     </div>
                 </div>
                 
@@ -1375,19 +1587,19 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
         });
 
         function openViewModal(
-            overallGrade = 0, classStanding = 0, examsScore = 0, riskLevel = 'no-data', 
+            subjectGrade = 0, midtermGrade = 0, finalGrade = 0, riskLevel = 'no-data', 
             riskDescription = 'No Data Inputted', hasScores = false
         ) {
-            console.log('Opening modal with data:', { overallGrade, classStanding, examsScore, riskLevel, riskDescription, hasScores });
+            console.log('Opening modal with data:', { subjectGrade, midtermGrade, finalGrade, riskLevel, riskDescription, hasScores });
             
-            // Set performance data
-            const overallGradeNum = parseFloat(overallGrade) || 0;
-            const classStandingNum = parseFloat(classStanding) || 0;
-            const examsScoreNum = parseFloat(examsScore) || 0;
+            // Set grade data
+            const subjectGradeNum = parseFloat(subjectGrade) || 0;
+            const midtermGradeNum = parseFloat(midtermGrade) || 0;
+            const finalGradeNum = parseFloat(finalGrade) || 0;
             
-            document.getElementById('view_overall_grade').textContent = hasScores ? overallGradeNum.toFixed(1) + '%' : '--';
-            document.getElementById('view_class_standing').textContent = hasScores ? classStandingNum.toFixed(1) + '%' : '--';
-            document.getElementById('view_exams_score').textContent = hasScores ? examsScoreNum.toFixed(1) + '%' : '--';
+            document.getElementById('view_subject_grade').textContent = hasScores ? subjectGradeNum.toFixed(1) + '%' : '--';
+            document.getElementById('view_midterm_grade').textContent = hasScores ? midtermGradeNum.toFixed(1) + '%' : '--';
+            document.getElementById('view_final_grade').textContent = hasScores ? finalGradeNum.toFixed(1) + '%' : '--';
             document.getElementById('view_risk_description').textContent = riskDescription;
             
             // Set risk badge

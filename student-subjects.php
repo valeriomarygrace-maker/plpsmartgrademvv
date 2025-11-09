@@ -183,11 +183,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_subject'])) {
     }
 }
 
-// Handle archive subject - FIXED: Removed schedule reference
+// Handle archive subject
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
     $subject_record_id = $_POST['subject_record_id'];
     
     try {
+        // Get the subject data from student_subjects
         $subject_data = supabaseFetch('student_subjects', ['id' => $subject_record_id, 'student_id' => $student['id']]);
         if (!$subject_data || count($subject_data) === 0) {
             throw new Exception("Subject not found.");
@@ -195,12 +196,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
         
         $subject_to_archive = $subject_data[0];
         
-        // Archive the main subject record
+        // Get subject info from subjects table
+        $subject_info = getSubjectById($subject_to_archive['subject_id']);
+        if (!$subject_info) {
+            throw new Exception("Subject information not found.");
+        }
+        
+        // Archive the main subject record to archived_subjects
         $archived_subject = supabaseInsert('archived_subjects', [
             'student_id' => $subject_to_archive['student_id'],
             'subject_id' => $subject_to_archive['subject_id'],
             'professor_name' => $subject_to_archive['professor_name'],
-            'schedule' => 'Not Set', // Default value
+            'schedule' => $subject_to_archive['schedule'] ?? 'Not Set',
+            'subject_code' => $subject_info['subject_code'],
+            'subject_name' => $subject_info['subject_name'],
+            'credits' => $subject_info['credits'],
+            'semester' => $subject_info['semester'],
             'archived_at' => date('Y-m-d H:i:s')
         ]);
         
@@ -210,7 +221,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
         
         $archived_subject_id = $archived_subject['id'];
         
-        // Archive categories and scores
+        // Archive categories and scores if they exist
         $categories = supabaseFetch('student_class_standing_categories', ['student_subject_id' => $subject_record_id]);
         
         if ($categories && is_array($categories)) {
@@ -273,8 +284,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
                 }
             }
         }
-                
-        // Archive performance data
+        
+        // Archive performance data if it exists
         $performance_data = supabaseFetch('subject_performance', ['student_subject_id' => $subject_record_id]);
         if ($performance_data && count($performance_data) > 0) {
             $performance = $performance_data[0];
@@ -297,7 +308,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
         $delete_result = supabaseDelete('student_subjects', ['id' => $subject_record_id]);
         
         if ($delete_result) {
-            $success_message = 'Subject archived successfully with all records preserved!';
+            $success_message = 'Subject archived successfully! It will now appear in your archived subjects.';
             header("Location: student-subjects.php");
             exit;
         } else {
@@ -305,7 +316,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
         }
         
     } catch (Exception $e) {
-        $error_message = 'Database error during archiving: ' . $e->getMessage();
+        $error_message = 'Error archiving subject: ' . $e->getMessage();
         error_log("Archive error: " . $e->getMessage());
     }
 }
