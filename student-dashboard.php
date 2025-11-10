@@ -245,7 +245,7 @@ function calculateGWA($grade) {
 }
 
 /**
- * Get semester risk data for bar chart - INCLUDES ACTIVE SUBJECTS
+ * Get semester risk data for bar chart - IMPROVED VERSION
  */
 function getSemesterRiskData($student_id) {
     $data = [
@@ -264,30 +264,31 @@ function getSemesterRiskData($student_id) {
         'total_archived_subjects' => 0,
         'total_high_risk' => 0,
         'total_low_risk' => 0,
-        'total_active_subjects' => 0, // Add active subjects count
-        'active_high_risk' => 0,      // Add active high risk count
-        'active_low_risk' => 0        // Add active low risk count
+        'total_active_subjects' => 0,
+        'active_high_risk' => 0,
+        'active_low_risk' => 0,
+        'debug_info' => [] // Add debug info
     ];
     
     try {
-        // Get active subjects first
-        $active_subjects = supabaseFetch('student_subjects', [
+        // Get ALL subjects (both active and archived)
+        $all_subjects = supabaseFetch('student_subjects', [
             'student_id' => $student_id, 
-            'deleted_at' => null,
-            'archived' => false
+            'deleted_at' => null
         ]);
         
-        if ($active_subjects && is_array($active_subjects)) {
-            $data['total_active_subjects'] = count($active_subjects);
-            
-            foreach ($active_subjects as $subject_record) {
-                // Get subject info to determine semester
+        $data['debug_info']['total_subjects_found'] = $all_subjects ? count($all_subjects) : 0;
+        
+        if ($all_subjects && is_array($all_subjects)) {
+            foreach ($all_subjects as $subject_record) {
+                // Get subject info
                 $subject_data = supabaseFetch('subjects', ['id' => $subject_record['subject_id']]);
                 
                 if ($subject_data && count($subject_data) > 0) {
                     $subject_info = $subject_data[0];
+                    $is_archived = $subject_record['archived'] === true || $subject_record['archived'] === 'true';
                     
-                    // Get performance data for active subject
+                    // Get performance data
                     $performance_data = supabaseFetch('subject_performance', ['student_subject_id' => $subject_record['id']]);
                     
                     $is_high_risk = false;
@@ -297,98 +298,88 @@ function getSemesterRiskData($student_id) {
                     
                     if ($performance_data && count($performance_data) > 0) {
                         $performance = $performance_data[0];
-                        $final_grade = $performance['overall_grade'];
-                        $risk_level = $performance['risk_level'];
+                        $final_grade = $performance['overall_grade'] ?? 0;
+                        $risk_level = $performance['risk_level'] ?? 'no-data';
                         
-                        // Use risk level definition
-                        $is_high_risk = ($risk_level === 'high' || $risk_level === 'failed');
-                        $is_low_risk = ($risk_level === 'low' || $risk_level === 'medium');
-                    }
-                    
-                    if ($is_high_risk) {
-                        $data['active_high_risk']++;
-                        $data['total_high_risk']++;
-                    }
-                    if ($is_low_risk) {
-                        $data['active_low_risk']++;
-                        $data['total_low_risk']++;
-                    }
-                }
-            }
-        }
-        
-        // Then get archived subjects (existing code)
-        $archived_subjects = supabaseFetch('student_subjects', [
-            'student_id' => $student_id,
-            'archived' => true
-        ]);
-        
-        if ($archived_subjects && is_array($archived_subjects)) {
-            $data['total_archived_subjects'] = count($archived_subjects);
-            
-            foreach ($archived_subjects as $archived_subject) {
-                // Get subject info to determine semester
-                $subject_data = supabaseFetch('subjects', ['id' => $archived_subject['subject_id']]);
-                
-                if ($subject_data && count($subject_data) > 0) {
-                    $subject_info = $subject_data[0];
-                    $semester = strtolower($subject_info['semester']);
-                    
-                    // Get performance data for archived subject
-                    $performance_data = supabaseFetch('subject_performance', ['student_subject_id' => $archived_subject['id']]);
-                    
-                    $is_high_risk = false;
-                    $is_low_risk = false;
-                    $final_grade = 0;
-                    $risk_level = 'no-data';
-                    
-                    if ($performance_data && count($performance_data) > 0) {
-                        $performance = $performance_data[0];
-                        $final_grade = $performance['overall_grade'];
-                        $risk_level = $performance['risk_level'];
-                        
-                        $is_high_risk = ($risk_level === 'high' || $risk_level === 'failed');
-                        $is_low_risk = ($risk_level === 'low' || $risk_level === 'medium');
+                        // Determine risk level
+                        if ($final_grade > 0) {
+                            if ($final_grade >= 80) {
+                                $is_low_risk = true;
+                            } else {
+                                $is_high_risk = true;
+                            }
+                        }
                     } else {
-                        $calculated_performance = calculateArchivedSubjectPerformance($archived_subject['id']);
-                        if ($calculated_performance) {
-                            $final_grade = $calculated_performance['overall_grade'];
-                            $risk_level = $calculated_performance['risk_level'];
-                            $is_high_risk = ($risk_level === 'high' || $risk_level === 'failed');
-                            $is_low_risk = ($risk_level === 'low' || $risk_level === 'medium');
+                        // If no performance data, try to calculate from scores
+                        $calculated_grade = calculateSubjectGradeFromScores($subject_record['id']);
+                        if ($calculated_grade > 0) {
+                            $final_grade = $calculated_grade;
+                            if ($calculated_grade >= 80) {
+                                $is_low_risk = true;
+                                $risk_level = 'low';
+                            } else {
+                                $is_high_risk = true;
+                                $risk_level = 'high';
+                            }
                         }
                     }
                     
-                    if ($is_high_risk) {
-                        $data['total_high_risk']++;
-                    }
-                    if ($is_low_risk) {
-                        $data['total_low_risk']++;
+                    // Add to counts based on archived status
+                    if ($is_archived) {
+                        $data['total_archived_subjects']++;
+                        if ($is_high_risk) {
+                            $data['total_high_risk']++;
+                        }
+                        if ($is_low_risk) {
+                            $data['total_low_risk']++;
+                        }
+                    } else {
+                        $data['total_active_subjects']++;
+                        if ($is_high_risk) {
+                            $data['active_high_risk']++;
+                        }
+                        if ($is_low_risk) {
+                            $data['active_low_risk']++;
+                        }
                     }
                     
-                    // Categorize by semester
-                    if (strpos($semester, 'first') !== false || strpos($semester, '1') !== false) {
-                        $data['first_semester']['total_subjects']++;
-                        if ($is_high_risk) {
-                            $data['first_semester']['high_risk_count']++;
-                        }
-                        if ($is_low_risk) {
-                            $data['first_semester']['low_risk_count']++;
-                        }
-                    } elseif (strpos($semester, 'second') !== false || strpos($semester, '2') !== false) {
-                        $data['second_semester']['total_subjects']++;
-                        if ($is_high_risk) {
-                            $data['second_semester']['high_risk_count']++;
-                        }
-                        if ($is_low_risk) {
-                            $data['second_semester']['low_risk_count']++;
+                    // Categorize by semester for archived subjects only
+                    if ($is_archived) {
+                        $semester = strtolower($subject_info['semester']);
+                        
+                        if (strpos($semester, 'first') !== false || strpos($semester, '1') !== false) {
+                            $data['first_semester']['total_subjects']++;
+                            if ($is_high_risk) {
+                                $data['first_semester']['high_risk_count']++;
+                            }
+                            if ($is_low_risk) {
+                                $data['first_semester']['low_risk_count']++;
+                            }
+                        } elseif (strpos($semester, 'second') !== false || strpos($semester, '2') !== false) {
+                            $data['second_semester']['total_subjects']++;
+                            if ($is_high_risk) {
+                                $data['second_semester']['high_risk_count']++;
+                            }
+                            if ($is_low_risk) {
+                                $data['second_semester']['low_risk_count']++;
+                            }
                         }
                     }
+                    
+                    // Add debug info for this subject
+                    $data['debug_info']['subjects'][] = [
+                        'subject_code' => $subject_info['subject_code'],
+                        'archived' => $is_archived,
+                        'grade' => $final_grade,
+                        'risk_level' => $risk_level,
+                        'has_performance_data' => !empty($performance_data)
+                    ];
                 }
             }
         }
         
     } catch (Exception $e) {
+        $data['debug_info']['error'] = $e->getMessage();
         error_log("Error getting semester risk data: " . $e->getMessage());
     }
     
@@ -396,35 +387,44 @@ function getSemesterRiskData($student_id) {
 }
 
 /**
- * Calculate performance for archived subject (same as in student-archived-subject.php)
+ * Calculate subject grade from scores if performance data is missing
  */
-function calculateArchivedSubjectPerformance($archived_subject_id) {
+function calculateSubjectGradeFromScores($student_subject_id) {
     try {
-        // Get all categories for this archived subject
-        $categories = supabaseFetch('archived_class_standing_categories', ['archived_subject_id' => $archived_subject_id]);
-        
-        if (!$categories || !is_array($categories)) {
-            return null;
+        $allScores = supabaseFetch('student_subject_scores', ['student_subject_id' => $student_subject_id]);
+        if (!$allScores || empty($allScores)) {
+            return 0;
         }
         
-        $totalClassStanding = 0;
-        $midtermScore = 0;
-        $finalScore = 0;
-        $hasScores = false;
+        $midtermGrade = 0;
+        $finalGrade = 0;
         
-        // Calculate class standing from categories
-        foreach ($categories as $category) {
-            $scores = supabaseFetch('archived_subject_scores', [
-                'archived_category_id' => $category['id'], 
-                'score_type' => 'class_standing'
-            ]);
+        // Get midterm categories
+        $midtermCategories = supabaseFetch('student_class_standing_categories', [
+            'student_subject_id' => $student_subject_id,
+            'term_type' => 'midterm'
+        ]);
+        
+        // Get final categories
+        $finalCategories = supabaseFetch('student_class_standing_categories', [
+            'student_subject_id' => $student_subject_id,
+            'term_type' => 'final'
+        ]);
+        
+        // Calculate Midterm Grade
+        if ($midtermCategories && count($midtermCategories) > 0) {
+            $midtermClassStanding = 0;
+            $midtermExamScore = 0;
             
-            if ($scores && is_array($scores) && count($scores) > 0) {
-                $hasScores = true;
+            foreach ($midtermCategories as $category) {
+                $categoryScores = array_filter($allScores, function($score) use ($category) {
+                    return $score['category_id'] == $category['id'] && $score['score_type'] === 'class_standing';
+                });
+                
                 $categoryTotal = 0;
                 $categoryMax = 0;
                 
-                foreach ($scores as $score) {
+                foreach ($categoryScores as $score) {
                     $categoryTotal += floatval($score['score_value']);
                     $categoryMax += floatval($score['max_score']);
                 }
@@ -432,88 +432,84 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
                 if ($categoryMax > 0) {
                     $categoryPercentage = ($categoryTotal / $categoryMax) * 100;
                     $weightedScore = ($categoryPercentage * floatval($category['category_percentage'])) / 100;
-                    $totalClassStanding += $weightedScore;
+                    $midtermClassStanding += $weightedScore;
                 }
             }
-        }
-        
-        // Ensure Class Standing doesn't exceed 60%
-        if ($totalClassStanding > 60) {
-            $totalClassStanding = 60;
-        }
-        
-        // Get exam scores from all categories for this archived subject
-        foreach ($categories as $category) {
-            $exam_scores = supabaseFetch('archived_subject_scores', ['archived_category_id' => $category['id']]);
             
-            if ($exam_scores && is_array($exam_scores)) {
-                foreach ($exam_scores as $exam) {
-                    if (floatval($exam['max_score']) > 0) {
-                        $examPercentage = (floatval($exam['score_value']) / floatval($exam['max_score'])) * 100;
-                        if ($exam['score_type'] === 'midterm_exam') {
-                            $midtermScore = ($examPercentage * 20) / 100;
-                            $hasScores = true;
-                        } elseif ($exam['score_type'] === 'final_exam') {
-                            $finalScore = ($examPercentage * 20) / 100;
-                            $hasScores = true;
-                        }
-                    }
+            if ($midtermClassStanding > 60) $midtermClassStanding = 60;
+            
+            $midtermExams = array_filter($allScores, function($score) {
+                return $score['score_type'] === 'midterm_exam';
+            });
+            
+            if (!empty($midtermExams)) {
+                $midtermExam = reset($midtermExams);
+                if (floatval($midtermExam['max_score']) > 0) {
+                    $midtermExamPercentage = (floatval($midtermExam['score_value']) / floatval($midtermExam['max_score'])) * 100;
+                    $midtermExamScore = ($midtermExamPercentage * 40) / 100;
                 }
             }
+            
+            $midtermGrade = $midtermClassStanding + $midtermExamScore;
         }
         
-        if (!$hasScores) {
-            return [
-                'overall_grade' => 0,
-                'gwa' => 0,
-                'class_standing' => 0,
-                'exams_score' => 0,
-                'risk_level' => 'no-data',
-                'risk_description' => 'No Data Inputted',
-                'has_scores' => false
-            ];
+        // Calculate Final Grade
+        if ($finalCategories && count($finalCategories) > 0) {
+            $finalClassStanding = 0;
+            $finalExamScore = 0;
+            
+            foreach ($finalCategories as $category) {
+                $categoryScores = array_filter($allScores, function($score) use ($category) {
+                    return $score['category_id'] == $category['id'] && $score['score_type'] === 'class_standing';
+                });
+                
+                $categoryTotal = 0;
+                $categoryMax = 0;
+                
+                foreach ($categoryScores as $score) {
+                    $categoryTotal += floatval($score['score_value']);
+                    $categoryMax += floatval($score['max_score']);
+                }
+                
+                if ($categoryMax > 0) {
+                    $categoryPercentage = ($categoryTotal / $categoryMax) * 100;
+                    $weightedScore = ($categoryPercentage * floatval($category['category_percentage'])) / 100;
+                    $finalClassStanding += $weightedScore;
+                }
+            }
+            
+            if ($finalClassStanding > 60) $finalClassStanding = 60;
+            
+            $finalExams = array_filter($allScores, function($score) {
+                return $score['score_type'] === 'final_exam';
+            });
+            
+            if (!empty($finalExams)) {
+                $finalExam = reset($finalExams);
+                if (floatval($finalExam['max_score']) > 0) {
+                    $finalExamPercentage = (floatval($finalExam['score_value']) / floatval($finalExam['max_score'])) * 100;
+                    $finalExamScore = ($finalExamPercentage * 40) / 100;
+                }
+            }
+            
+            $finalGrade = $finalClassStanding + $finalExamScore;
         }
         
-        // Calculate overall grade
-        $overallGrade = $totalClassStanding + $midtermScore + $finalScore;
-        if ($overallGrade > 100) {
-            $overallGrade = 100;
+        // Calculate Subject Grade
+        $grades = array_filter([$midtermGrade, $finalGrade], function($grade) {
+            return $grade > 0;
+        });
+        
+        if (!empty($grades)) {
+            $subjectGrade = array_sum($grades) / count($grades);
+            return min($subjectGrade, 100);
         }
         
-        // Calculate GWA (General Weighted Average) - Philippine system
-        $gwa = calculateGWA($overallGrade);
-        
-        // Calculate risk level based on GWA
-        $riskLevel = 'no-data';
-        $riskDescription = 'No Data Inputted';
-
-        if ($gwa <= 1.75) {
-            $riskLevel = 'low';
-            $riskDescription = 'Low Risk';
-        } elseif ($gwa <= 2.50) {
-            $riskLevel = 'medium';
-            $riskDescription = 'Medium Risk';
-        } elseif ($gwa <= 3.00) {
-            $riskLevel = 'high';
-            $riskDescription = 'High Risk';
-        } else {
-            $riskLevel = 'failed';
-            $riskDescription = 'Failed';
-        }
-        
-        return [
-            'overall_grade' => $overallGrade,
-            'gwa' => $gwa,
-            'class_standing' => $totalClassStanding,
-            'exams_score' => $midtermScore + $finalScore,
-            'risk_level' => $riskLevel,
-            'risk_description' => $riskDescription,
-            'has_scores' => true
-        ];
+        return 0;
         
     } catch (Exception $e) {
-        error_log("Error calculating archived subject performance: " . $e->getMessage());
-        return null;
+        error_log("Error calculating grade from scores: " . $e->getMessage());
+        return 0;
     }
 }
 ?>
@@ -1413,10 +1409,27 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
                             <div style="font-size: 0.8rem; color: var(--text-medium);">No Data</div>
                         </div>
                     </div>
-                    <?php if (($semester_risk_data['total_archived_subjects'] ?? 0) === 0): ?>
+                    
+                    <!-- Show helpful message based on what we found -->
+                    <?php 
+                    $totalArchived = $semester_risk_data['total_archived_subjects'] ?? 0;
+                    $totalActive = $semester_risk_data['total_active_subjects'] ?? 0;
+                    ?>
+                    
+                    <?php if ($totalArchived === 0 && $totalActive === 0): ?>
+                        <div style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--text-light);">
+                            <i class="fas fa-info-circle"></i>
+                            No subjects found
+                        </div>
+                    <?php elseif ($totalArchived === 0): ?>
                         <div style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--text-light);">
                             <i class="fas fa-info-circle"></i>
                             Showing active subjects (no archived subjects yet)
+                        </div>
+                    <?php else: ?>
+                        <div style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--text-light);">
+                            <i class="fas fa-info-circle"></i>
+                            Showing <?php echo $totalArchived; ?> archived and <?php echo $totalActive; ?> active subjects
                         </div>
                     <?php endif; ?>
                 </div>
