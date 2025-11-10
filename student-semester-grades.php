@@ -618,8 +618,10 @@ if (isset($_GET['export']) && $_GET['export'] === 'excel') {
 <body>
     <div class="sidebar">
         <div class="sidebar-header">
-            <div class="logo">
-                <img src="plplogo.png" alt="PLP Logo">
+            <div class="logo-container">
+                <div class="logo">
+                    <img src="plplogo.png" alt="PLP Logo">
+                </div>
             </div>
             <div class="portal-title">PLPSMARTGRADE</div>
             <div class="student-email"><?php echo htmlspecialchars($student['email']); ?></div>

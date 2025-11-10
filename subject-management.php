@@ -599,7 +599,6 @@ function getGradeDescription($grade) {
     else return 'Needs Improvement';
 }
 
-// New helper functions for generating insights
 function generateBehavioralInsights($termGrade, $categoryTotals, $term, $studentId, $subjectId) {
     $insights = [];
     
@@ -612,7 +611,6 @@ function generateBehavioralInsights($termGrade, $categoryTotals, $term, $student
         return $insights;
     }
     
-    // Grade-based behavioral insights
     if ($termGrade >= 90) {
         $insights[] = [
             'message' => "Excellent {$term} performance! Your consistent effort and time management are paying off.",
@@ -645,38 +643,52 @@ function generateBehavioralInsights($termGrade, $categoryTotals, $term, $student
         ];
     }
     
-    // Category-specific behavioral insights
+    $lowCategories = [];
     foreach ($categoryTotals as $categoryId => $category) {
         if ($category['percentage_score'] < 75 && !empty($category['low_scores'])) {
+            $lowCategories[] = $category;
+        }
+    }
+    
+    if (!empty($lowCategories)) {
+        $worstCategory = $lowCategories[0]; 
+        
+        $insights[] = [
+            'message' => "Low performance in {$worstCategory['name']}. Consider spending more time reviewing related modules.",
+            'priority' => 'high',
+            'source' => 'score_analysis'
+        ];
+        
+        // Category-type specific insights
+        if (stripos($worstCategory['name'], 'quiz') !== false) {
             $insights[] = [
-                'message' => "Low performance in {$category['name']}. Consider spending more time reviewing related modules.",
-                'priority' => 'high',
+                'message' => "Low quiz scores suggest need for better module reading before assessments.",
+                'priority' => 'medium',
                 'source' => 'score_analysis'
             ];
-            
-            // Specific insights based on category type
-            if (stripos($category['name'], 'quiz') !== false) {
-                $insights[] = [
-                    'message' => "Low quiz scores suggest need for better module reading before assessments.",
-                    'priority' => 'medium',
-                    'source' => 'score_analysis'
-                ];
-            } elseif (stripos($category['name'], 'assignment') !== false) {
-                $insights[] = [
-                    'message' => "Assignment scores indicate time management improvements needed for deadlines.",
-                    'priority' => 'medium',
-                    'source' => 'score_analysis'
-                ];
-            } elseif (stripos($category['name'], 'project') !== false) {
-                $insights[] = [
-                    'message' => "Project performance shows need for better planning and milestone tracking.",
-                    'priority' => 'medium',
-                    'source' => 'score_analysis'
-                ];
-            }
+        } elseif (stripos($worstCategory['name'], 'assignment') !== false) {
+            $insights[] = [
+                'message' => "Assignment scores indicate time management improvements needed for deadlines.",
+                'priority' => 'medium',
+                'source' => 'score_analysis'
+            ];
+        } elseif (stripos($worstCategory['name'], 'project') !== false) {
+            $insights[] = [
+                'message' => "Project performance shows need for better planning and milestone tracking.",
+                'priority' => 'medium',
+                'source' => 'score_analysis'
+            ];
+        } elseif (stripos($worstCategory['name'], 'attendance') !== false) {
+            $insights[] = [
+                'message' => "Low attendance affects learning. Regular class participation improves understanding.",
+                'priority' => 'high',
+                'source' => 'attendance_analysis'
+            ];
         }
-        
-        // Check for consistency issues
+    }
+    
+    $inconsistentCategories = [];
+    foreach ($categoryTotals as $categoryId => $category) {
         if (count($category['scores']) > 2) {
             $scores = array_map(function($score) {
                 return ($score['score_value'] / $score['max_score']) * 100;
@@ -684,16 +696,19 @@ function generateBehavioralInsights($termGrade, $categoryTotals, $term, $student
             
             $stdDev = standard_deviation($scores);
             if ($stdDev > 20) {
-                $insights[] = [
-                    'message' => "Inconsistent performance in {$category['name']}. Improve study consistency.",
-                    'priority' => 'medium',
-                    'source' => 'consistency_analysis'
-                ];
+                $inconsistentCategories[] = $category['name'];
             }
         }
     }
     
-    // Time management insights based on score patterns
+    if (!empty($inconsistentCategories)) {
+        $insights[] = [
+            'message' => "Inconsistent performance in " . implode(', ', $inconsistentCategories) . ". Improve study consistency.",
+            'priority' => 'medium',
+            'source' => 'consistency_analysis'
+        ];
+    }
+    
     if ($termGrade < 80) {
         $insights[] = [
             'message' => "Consider creating a study schedule to better manage your time for module review.",
@@ -702,13 +717,12 @@ function generateBehavioralInsights($termGrade, $categoryTotals, $term, $student
         ];
     }
     
-    // Module reading insights
     $lowScoreCount = 0;
     foreach ($categoryTotals as $category) {
         if ($category['percentage_score'] < 75) $lowScoreCount++;
     }
     
-    if ($lowScoreCount >= 2) {
+    if ($lowScoreCount >= 2 && $termGrade < 80) {
         $insights[] = [
             'message' => "Multiple low scores suggest need for more thorough module reading and comprehension.",
             'priority' => 'high',
@@ -716,223 +730,12 @@ function generateBehavioralInsights($termGrade, $categoryTotals, $term, $student
         ];
     }
     
-    return $insights;
-}
-
-function generateInterventions($riskLevel, $categoryTotals, $term) {
-    $interventions = [];
+    usort($insights, function($a, $b) {
+        $priorityOrder = ['high' => 3, 'medium' => 2, 'low' => 1];
+        return $priorityOrder[$b['priority']] - $priorityOrder[$a['priority']];
+    });
     
-    if (!$riskLevel || $riskLevel === 'no-data') {
-        $interventions[] = [
-            'message' => "Start adding your scores to enable personalized intervention planning.",
-            'priority' => 'low'
-        ];
-        return $interventions;
-    }
-    
-    // Risk level based interventions
-    switch ($riskLevel) {
-        case 'low_risk':
-            $interventions[] = [
-                'message' => "Maintain current study schedule and time management practices.",
-                'priority' => 'low'
-            ];
-            $interventions[] = [
-                'message' => "Continue regular module review to sustain performance.",
-                'priority' => 'low'
-            ];
-            break;
-            
-        case 'moderate_risk':
-            $interventions[] = [
-                'message' => "Increase focused study time on challenging topics.",
-                'priority' => 'medium'
-            ];
-            $interventions[] = [
-                'message' => "Join study groups for collaborative learning and better time management.",
-                'priority' => 'medium'
-            ];
-            $interventions[] = [
-                'message' => "Schedule regular module reading sessions each week.",
-                'priority' => 'medium'
-            ];
-            break;
-            
-        case 'high_risk':
-            $interventions[] = [
-                'message' => "Request immediate academic advising for time management support.",
-                'priority' => 'high'
-            ];
-            $interventions[] = [
-                'message' => "Schedule regular tutoring sessions for fundamental concepts.",
-                'priority' => 'high'
-            ];
-            $interventions[] = [
-                'message' => "Develop intensive catch-up study schedule with daily module review.",
-                'priority' => 'high'
-            ];
-            $interventions[] = [
-                'message' => "Communicate with professor about academic challenges and time constraints.",
-                'priority' => 'high'
-            ];
-            break;
-    }
-    
-    // Category-specific interventions
-    foreach ($categoryTotals as $categoryId => $category) {
-        if ($category['percentage_score'] < 75 && !empty($category['low_scores'])) {
-            $interventions[] = [
-                'message' => "Focus on improving {$category['name']} through additional practice and review.",
-                'priority' => 'high'
-            ];
-            
-            if (stripos($category['name'], 'attendance') !== false) {
-                $interventions[] = [
-                    'message' => "Improve class attendance for better understanding of modules.",
-                    'priority' => 'high'
-                ];
-            }
-        }
-    }
-    
-    return $interventions;
-}
-
-function generateRecommendations($termGrade, $categoryTotals, $riskLevel, $term) {
-    $recommendations = [];
-    
-    if ($termGrade == 0) {
-        $recommendations[] = [
-            'message' => "Start tracking your quizzes, assignments, and projects to monitor your progress.",
-            'priority' => 'low',
-            'source' => 'system'
-        ];
-        $recommendations[] = [
-            'message' => "Add attendance records regularly to track engagement patterns.",
-            'priority' => 'low',
-            'source' => 'system'
-        ];
-        return $recommendations;
-    }
-    
-    // Grade-based recommendations
-    if ($termGrade >= 90) {
-        $recommendations[] = [
-            'message' => "Excellent {$term} grade! Continue your effective time management and module review strategies.",
-            'priority' => 'low',
-            'source' => 'grade_analysis'
-        ];
-    } elseif ($termGrade >= 85) {
-        $recommendations[] = [
-            'message' => "Very good {$term} performance. Continue regular module reading and time allocation.",
-            'priority' => 'low',
-            'source' => 'grade_analysis'
-        ];
-    } elseif ($termGrade >= 80) {
-        $recommendations[] = [
-            'message' => "Good {$term} performance. Improve consistency in module review and time management.",
-            'priority' => 'medium',
-            'source' => 'grade_analysis'
-        ];
-    } elseif ($termGrade >= 75) {
-        $recommendations[] = [
-            'message' => "Satisfactory {$term} grade. Prioritize understanding foundational concepts through better module reading.",
-            'priority' => 'high',
-            'source' => 'grade_analysis'
-        ];
-    } else {
-        $recommendations[] = [
-            'message' => "{$term} grade needs improvement. Focus on core concepts and time management first.",
-            'priority' => 'high',
-            'source' => 'grade_analysis'
-        ];
-    }
-    
-    // Risk-based recommendations
-    if ($riskLevel === 'high_risk') {
-        $recommendations[] = [
-            'message' => "Utilize all available academic support resources for time management and study skills.",
-            'priority' => 'high',
-            'source' => 'risk_analysis'
-        ];
-        $recommendations[] = [
-            'message' => "Create daily study schedule with specific time allocated for each module.",
-            'priority' => 'high',
-            'source' => 'risk_analysis'
-        ];
-    }
-    
-    // Category-specific recommendations
-    foreach ($categoryTotals as $categoryId => $category) {
-        if ($category['percentage_score'] < 75) {
-            $recommendations[] = [
-                'message' => "For low {$category['name']} scores: Increase time spent reviewing related modules.",
-                'priority' => 'high',
-                'source' => 'score_analysis'
-            ];
-            
-            if (stripos($category['name'], 'quiz') !== false) {
-                $recommendations[] = [
-                    'message' => "Read modules thoroughly and create summary notes before attempting quizzes.",
-                    'priority' => 'high',
-                    'source' => 'score_analysis'
-                ];
-            } elseif (stripos($category['name'], 'assignment') !== false) {
-                $recommendations[] = [
-                    'message' => "Start assignments early and manage time effectively to meet deadlines.",
-                    'priority' => 'high',
-                    'source' => 'score_analysis'
-                ];
-            }
-        }
-    }
-    
-    // Time management recommendations
-    if ($termGrade < 80) {
-        $recommendations[] = [
-            'message' => "Allocate specific time slots each day for module reading and review.",
-            'priority' => 'medium',
-            'source' => 'time_management'
-        ];
-        $recommendations[] = [
-            'message' => "Use a planner to track assignment deadlines and study sessions.",
-            'priority' => 'medium',
-            'source' => 'time_management'
-        ];
-    }
-    
-    // Term-specific recommendations
-    if ($term === 'midterm') {
-        $recommendations[] = [
-            'message' => "Use midterm feedback to adjust your study schedule and time management for final term.",
-            'priority' => 'medium',
-            'source' => 'system'
-        ];
-    } else {
-        $recommendations[] = [
-            'message' => "Review your time management and study strategies for future course planning.",
-            'priority' => 'medium',
-            'source' => 'system'
-        ];
-    }
-    
-    return $recommendations;
-}
-
-// Helper function to calculate standard deviation
-function standard_deviation($array) {
-    $n = count($array);
-    if ($n == 0) return 0;
-    
-    $mean = array_sum($array) / $n;
-    $carry = 0.0;
-    
-    foreach ($array as $val) {
-        $d = ((double) $val) - $mean;
-        $carry += $d * $d;
-    }
-    
-    return sqrt($carry / $n);
+    return array_slice($insights, 0, 2); 
 }
 ?>
 <!DOCTYPE html>
