@@ -1,712 +1,277 @@
 <?php
 require_once 'config.php';
 
-// Start session if not already started
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
-// Check if user is logged in
-if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || $_SESSION['user_type'] !== 'student') {
+if (!isset($_SESSION['logged_in']) || $_SESSION['user_type'] !== 'student') {
     header('Location: login.php');
     exit;
 }
 
-// Get student information
-$userEmail = $_SESSION['user_email'] ?? '';
-$userId = $_SESSION['user_id'] ?? null;
-
-// Fetch student data from Supabase
-try {
-    $student_data = supabaseFetch('students', ['id' => $userId, 'email' => $userEmail]);
-    if (!$student_data || count($student_data) === 0) {
-        $_SESSION['error_message'] = "Student account not found";
-        header('Location: login.php');
-        exit;
-    }
-    $student = $student_data[0];
-} catch (Exception $e) {
-    $_SESSION['error_message'] = "Database error: " . $e->getMessage();
-    header('Location: login.php');
-    exit;
-}
-
+// Initialize variables
 $success_message = '';
 $error_message = '';
+$student = null;
+$archived_subjects = [];
 
-// Handle subject restoration
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_subject'])) {
-    $archived_subject_id = $_POST['archived_subject_id'];
-    
-    try {
-        // Get the archived subject details
-        $archived_subject_data = supabaseFetch('archived_subjects', ['id' => $archived_subject_id, 'student_id' => $student['id']]);
-        if (!$archived_subject_data || count($archived_subject_data) === 0) {
-            throw new Exception("Archived subject not found.");
-        }
-        
-        $archived_subject = $archived_subject_data[0];
-        
-        // Check if subject already exists in active subjects
-        $existing_subject = supabaseFetch('student_subjects', [
-            'student_id' => $student['id'], 
-            'subject_id' => $archived_subject['subject_id'],
-            'deleted_at' => null
-        ]);
-        
-        if ($existing_subject && count($existing_subject) > 0) {
-            throw new Exception("This subject is already in your active subjects.");
-        }
-        
-        // Restore to student_subjects
-        $restore_data = [
-            'student_id' => $archived_subject['student_id'],
-            'subject_id' => $archived_subject['subject_id'],
-            'professor_name' => $archived_subject['professor_name'],
-            'schedule' => $archived_subject['schedule'],
-            'created_at' => date('Y-m-d H:i:s'),
-            'deleted_at' => null
-        ];
-        
-        $restored_subject = supabaseInsert('student_subjects', $restore_data);
-        
-        if (!$restored_subject) {
-            throw new Exception("Failed to restore subject.");
-        }
-        
-        $new_subject_id = $restored_subject[0]['id'] ?? null;
-        
-        if (!$new_subject_id) {
-            throw new Exception("Failed to get new subject ID.");
-        }
-        
-        // Restore performance data
-        $archived_performance = supabaseFetch('archived_subject_performance', ['archived_subject_id' => $archived_subject_id]);
-        if ($archived_performance && count($archived_performance) > 0) {
-            $performance = $archived_performance[0];
-            $new_performance = [
-                'student_subject_id' => $new_subject_id,
-                'overall_grade' => $performance['overall_grade'] ?? 0,
-                'gpa' => $performance['gpa'] ?? 0,
-                'class_standing' => $performance['class_standing'] ?? 0,
-                'exams_score' => $performance['exams_score'] ?? 0,
-                'risk_level' => $performance['risk_level'] ?? 'no-data',
-                'risk_description' => $performance['risk_description'] ?? 'No Data Inputted',
-                'created_at' => date('Y-m-d H:i:s')
-            ];
-            supabaseInsert('subject_performance', $new_performance);
-        }
-        
-        // Restore categories and scores
-        $archived_categories = supabaseFetch('archived_class_standing_categories', ['archived_subject_id' => $archived_subject_id]);
-        if ($archived_categories) {
-            foreach ($archived_categories as $category) {
-                $new_category = [
-                    'student_subject_id' => $new_subject_id,
-                    'category_name' => $category['category_name'],
-                    'category_percentage' => $category['category_percentage'],
-                    'term_type' => $category['term_type'] ?? 'midterm',
-                    'created_at' => date('Y-m-d H:i:s')
-                ];
-                
-                $restored_category = supabaseInsert('student_class_standing_categories', $new_category);
-                
-                if ($restored_category && isset($restored_category[0]['id'])) {
-                    $new_category_id = $restored_category[0]['id'];
-                    
-                    // Restore scores for this category
-                    $archived_scores = supabaseFetch('archived_subject_scores', ['archived_category_id' => $category['id']]);
-                    if ($archived_scores) {
-                        foreach ($archived_scores as $score) {
-                            $new_score = [
-                                'student_subject_id' => $new_subject_id,
-                                'category_id' => $new_category_id,
-                                'score_type' => $score['score_type'],
-                                'score_name' => $score['score_name'],
-                                'score_value' => $score['score_value'],
-                                'max_score' => $score['max_score'],
-                                'score_date' => $score['score_date'],
-                                'created_at' => date('Y-m-d H:i:s')
-                            ];
-                            supabaseInsert('student_subject_scores', $new_score);
-                        }
-                    }
-                }
-            }
-        }
-        
-        // Delete the archived subject and all its related data
-        // First delete scores
-        $archived_categories = supabaseFetch('archived_class_standing_categories', ['archived_subject_id' => $archived_subject_id]);
-        if ($archived_categories) {
-            foreach ($archived_categories as $category) {
-                supabaseDelete('archived_subject_scores', ['archived_category_id' => $category['id']]);
-            }
-            // Delete categories
-            supabaseDelete('archived_class_standing_categories', ['archived_subject_id' => $archived_subject_id]);
-        }
-        
-        // Delete performance
-        supabaseDelete('archived_subject_performance', ['archived_subject_id' => $archived_subject_id]);
-        
-        // Finally delete the subject
-        $delete_result = supabaseDelete('archived_subjects', ['id' => $archived_subject_id]);
-        
-        if ($delete_result) {
-            $success_message = 'Subject restored successfully with all grades and data!';
-            header("Location: student-archived-subject.php");
-            exit;
-        } else {
-            throw new Exception("Failed to delete archived subject.");
-        }
-        
-    } catch (Exception $e) {
-        $error_message = 'Error restoring subject: ' . $e->getMessage();
-        error_log("Restore error: " . $e->getMessage());
-    }
-}
-
-// Handle AJAX request for term evaluation data
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'get_term_evaluation') {
-    $archived_subject_id = $_POST['archived_subject_id'] ?? 0;
-    
-    if ($archived_subject_id) {
-        displayFullTermEvaluationForArchivedSubject($archived_subject_id);
-    }
-    exit;
-}
-
-// Fetch archived subjects
 try {
-    $archived_subjects_data = supabaseFetch('archived_subjects', ['student_id' => $student['id']]);
+    $student = getStudentByEmail($_SESSION['user_email']);
     
-    $archived_subjects = [];
+    if (!$student) {
+        $error_message = 'Student record not found.';
+    }
+} catch (Exception $e) {
+    $error_message = 'Database error: ' . $e->getMessage();
+}
+
+// Get student's archived subjects
+try {
+    $archived_result = supabaseFetch('student_subjects', [
+        'student_id' => $student['id'],
+        'archived' => 'true'
+    ]);
     
-    if ($archived_subjects_data && is_array($archived_subjects_data)) {
-        foreach ($archived_subjects_data as $archived_subject) {
-            // Get subject details
-            $subject_data = supabaseFetch('subjects', ['id' => $archived_subject['subject_id']]);
-            $subject_info = $subject_data && count($subject_data) > 0 ? $subject_data[0] : null;
-            
+    if ($archived_result) {
+        foreach ($archived_result as $subject_record) {
+            $subject_info = supabaseFetch('subjects', ['id' => $subject_record['subject_id']]);
             if ($subject_info) {
-                // Calculate performance data
-                $calculated_performance = calculateArchivedSubjectPerformance($archived_subject['id']);
+                $subject_info = $subject_info[0];
                 
-                // Combine all data
-                $archived_subjects[] = array_merge($archived_subject, [
+                // Get subject performance data
+                $performance_data = supabaseFetch('subject_performance', [
+                    'student_subject_id' => $subject_record['id']
+                ]);
+                
+                $archived_subjects[] = array_merge($subject_record, [
                     'subject_code' => $subject_info['subject_code'],
                     'subject_name' => $subject_info['subject_name'],
                     'credits' => $subject_info['credits'],
                     'semester' => $subject_info['semester'],
-                    'midterm_grade' => $calculated_performance['midterm_grade'],
-                    'final_grade' => $calculated_performance['final_grade'],
-                    'subject_grade' => $calculated_performance['subject_grade'],
-                    'risk_level' => $calculated_performance['risk_level'],
-                    'risk_description' => $calculated_performance['risk_description'],
-                    'has_scores' => $calculated_performance['has_scores']
+                    'performance' => $performance_data ? $performance_data[0] : null
                 ]);
             }
         }
     }
-    
-    // Sort by archived date descending
-    usort($archived_subjects, function($a, $b) {
-        return strtotime($b['archived_at']) - strtotime($a['archived_at']);
-    });
-    
-    $total_archived = count($archived_subjects);
-    
 } catch (Exception $e) {
-    $archived_subjects = [];
-    $total_archived = 0;
-    error_log("Error fetching archived subjects: " . $e->getMessage());
+    $error_message = 'Database error: ' . $e->getMessage();
 }
 
-/**
- * Calculate performance for archived subject from scores
- */
-function calculateArchivedSubjectPerformance($archived_subject_id) {
-    try {
-        // Get all categories for this archived subject
-        $categories = supabaseFetch('archived_class_standing_categories', ['archived_subject_id' => $archived_subject_id]);
-        
-        if (!$categories || !is_array($categories) || count($categories) === 0) {
-            return [
-                'midterm_grade' => 0,
-                'final_grade' => 0,
-                'subject_grade' => 0,
-                'risk_level' => 'no-data',
-                'risk_description' => 'No Data Inputted',
-                'has_scores' => false
-            ];
-        }
-        
-        $midtermGrade = 0;
-        $finalGrade = 0;
-        $subjectGrade = 0;
-        $hasScores = false;
-        
-        // Separate midterm and final categories
-        $midtermCategories = array_filter($categories, function($cat) {
-            return isset($cat['term_type']) && $cat['term_type'] === 'midterm';
-        });
-        
-        $finalCategories = array_filter($categories, function($cat) {
-            return isset($cat['term_type']) && $cat['term_type'] === 'final';
-        });
-        
-        // Calculate Midterm Grade
-        if (!empty($midtermCategories)) {
-            $midtermClassStandingTotal = 0;
-            $midtermExamScore = 0;
-            
-            foreach ($midtermCategories as $category) {
-                $scores = supabaseFetch('archived_subject_scores', [
-                    'archived_category_id' => $category['id']
-                ]);
-                
-                if ($scores && is_array($scores) && count($scores) > 0) {
-                    $hasScores = true;
-                    
-                    // Check if this category is for exams
-                    if (strtolower($category['category_name']) === 'exam scores' || strpos(strtolower($category['category_name']), 'exam') !== false) {
-                        // Handle exam scores
-                        foreach ($scores as $score) {
-                            if ($score['score_type'] === 'midterm_exam' && floatval($score['max_score']) > 0) {
-                                $examPercentage = (floatval($score['score_value']) / floatval($score['max_score'])) * 100;
-                                $midtermExamScore = ($examPercentage * 40) / 100;
-                                break;
-                            }
-                        }
-                    } else {
-                        // Handle class standing
-                        $categoryTotal = 0;
-                        $categoryMax = 0;
-                        
-                        foreach ($scores as $score) {
-                            if ($score['score_type'] === 'class_standing') {
-                                $categoryTotal += floatval($score['score_value']);
-                                $categoryMax += floatval($score['max_score']);
-                            }
-                        }
-                        
-                        if ($categoryMax > 0) {
-                            $categoryPercentage = ($categoryTotal / $categoryMax) * 100;
-                            $weightedScore = ($categoryPercentage * floatval($category['category_percentage'])) / 100;
-                            $midtermClassStandingTotal += $weightedScore;
-                        }
-                    }
-                }
-            }
-            
-            // Ensure Class Standing doesn't exceed 60%
-            if ($midtermClassStandingTotal > 60) {
-                $midtermClassStandingTotal = 60;
-            }
-            
-            $midtermGrade = $midtermClassStandingTotal + $midtermExamScore;
-            if ($midtermGrade > 100) {
-                $midtermGrade = 100;
-            }
-        }
-        
-        // Calculate Final Grade
-        if (!empty($finalCategories)) {
-            $finalClassStandingTotal = 0;
-            $finalExamScore = 0;
-            
-            foreach ($finalCategories as $category) {
-                $scores = supabaseFetch('archived_subject_scores', [
-                    'archived_category_id' => $category['id']
-                ]);
-                
-                if ($scores && is_array($scores) && count($scores) > 0) {
-                    $hasScores = true;
-                    
-                    // Check if this category is for exams
-                    if (strtolower($category['category_name']) === 'exam scores' || strpos(strtolower($category['category_name']), 'exam') !== false) {
-                        // Handle exam scores
-                        foreach ($scores as $score) {
-                            if ($score['score_type'] === 'final_exam' && floatval($score['max_score']) > 0) {
-                                $examPercentage = (floatval($score['score_value']) / floatval($score['max_score'])) * 100;
-                                $finalExamScore = ($examPercentage * 40) / 100;
-                                break;
-                            }
-                        }
-                    } else {
-                        // Handle class standing
-                        $categoryTotal = 0;
-                        $categoryMax = 0;
-                        
-                        foreach ($scores as $score) {
-                            if ($score['score_type'] === 'class_standing') {
-                                $categoryTotal += floatval($score['score_value']);
-                                $categoryMax += floatval($score['max_score']);
-                            }
-                        }
-                        
-                        if ($categoryMax > 0) {
-                            $categoryPercentage = ($categoryTotal / $categoryMax) * 100;
-                            $weightedScore = ($categoryPercentage * floatval($category['category_percentage'])) / 100;
-                            $finalClassStandingTotal += $weightedScore;
-                        }
-                    }
-                }
-            }
-            
-            // Ensure Class Standing doesn't exceed 60%
-            if ($finalClassStandingTotal > 60) {
-                $finalClassStandingTotal = 60;
-            }
-            
-            $finalGrade = $finalClassStandingTotal + $finalExamScore;
-            if ($finalGrade > 100) {
-                $finalGrade = 100;
-            }
-        }
-        
-        // Calculate Subject Grade (average of midterm and final)
-        $validGrades = array_filter([$midtermGrade, $finalGrade], function($grade) {
-            return $grade > 0;
-        });
-        
-        if (!empty($validGrades)) {
-            $subjectGrade = array_sum($validGrades) / count($validGrades);
-            if ($subjectGrade > 100) {
-                $subjectGrade = 100;
-            }
-        }
-        
-        if (!$hasScores) {
-            return [
-                'midterm_grade' => 0,
-                'final_grade' => 0,
-                'subject_grade' => 0,
-                'risk_level' => 'no-data',
-                'risk_description' => 'No Data Inputted',
-                'has_scores' => false
-            ];
-        }
-        
-        // Calculate risk level based on subject grade
-        $riskLevel = 'no-data';
-        $riskDescription = 'No Data Inputted';
-
-        if ($subjectGrade >= 85) {
-            $riskLevel = 'low';
-            $riskDescription = 'Low Risk';
-        } elseif ($subjectGrade >= 80) {
-            $riskLevel = 'medium';
-            $riskDescription = 'Moderate Risk';
-        } elseif ($subjectGrade > 0) {
-            $riskLevel = 'high';
-            $riskDescription = 'High Risk';
-        }
-        
-        return [
-            'midterm_grade' => $midtermGrade,
-            'final_grade' => $finalGrade,
-            'subject_grade' => $subjectGrade,
-            'risk_level' => $riskLevel,
-            'risk_description' => $riskDescription,
-            'has_scores' => true
-        ];
-        
-    } catch (Exception $e) {
-        error_log("Error calculating archived subject performance: " . $e->getMessage());
-        return [
-            'midterm_grade' => 0,
-            'final_grade' => 0,
-            'subject_grade' => 0,
-            'risk_level' => 'no-data',
-            'risk_description' => 'Error calculating grades',
-            'has_scores' => false
-        ];
-    }
-}
-
-/**
- * Display FULL term evaluation interface for archived subject (like termevaluations.php)
- */
-function displayFullTermEvaluationForArchivedSubject($archived_subject_id) {
-    try {
-        // Get archived subject data
-        $archived_subject_data = supabaseFetch('archived_subjects', ['id' => $archived_subject_id]);
-        
-        if (!$archived_subject_data || count($archived_subject_data) === 0) {
-            echo '<div class="alert-error">Subject not found.</div>';
-            return;
-        }
-        
-        $archived_subject = $archived_subject_data[0];
-        
-        // Calculate grades using the same logic as termevaluations.php
-        $grades = calculateDetailedGradesForArchivedSubject($archived_subject_id);
-        
-        // Get all scores for this archived subject
-        $allScores = [];
-        $categories = supabaseFetch('archived_class_standing_categories', ['archived_subject_id' => $archived_subject_id]);
-        if ($categories) {
-            foreach ($categories as $category) {
-                $scores = supabaseFetch('archived_subject_scores', ['archived_category_id' => $category['id']]);
-                if ($scores) {
-                    foreach ($scores as $score) {
-                        $score['category_id'] = $category['id'];
-                        $allScores[] = $score;
-                    }
-                }
-            }
-        }
-        
-        // Get midterm and final categories
-        $midtermCategories = array_filter($categories, function($cat) {
-            return isset($cat['term_type']) && $cat['term_type'] === 'midterm';
-        });
-        
-        $finalCategories = array_filter($categories, function($cat) {
-            return isset($cat['term_type']) && $cat['term_type'] === 'final';
-        });
-
-        // Display the FULL term evaluation interface (like termevaluations.php)
-        ?>
-        <!-- Overview Section -->
-        <div class="overview-section">
-            <div class="overview-grid">
-                <div class="overview-card subject-grade-card">
-                    <div class="overview-label">SUBJECT GRADE</div>
-                    <div class="overview-value">
-                        <?php echo $grades['subject_grade'] > 0 ? number_format($grades['subject_grade'], 1) . '%' : '--'; ?>
-                    </div>
-                    <div class="overview-description">
-                        <?php if ($grades['subject_grade'] > 0): ?>
-                            <?php 
-                            $riskLevel = getSubjectRiskDescription($grades['subject_grade']);
-                            ?>
-                            <span class="risk-badge <?php echo strtolower(str_replace(' ', '-', $riskLevel)); ?>">
-                                <?php echo $riskLevel; ?>
-                            </span>
-                        <?php else: ?>
-                            No grades calculated
-                        <?php endif; ?>
-                    </div>
-                </div>
-                
-                <div class="overview-card">
-                    <div class="overview-label">MIDTERM GRADE</div>
-                    <div class="overview-value">
-                        <?php echo $grades['midterm_grade'] > 0 ? number_format($grades['midterm_grade'], 1) . '%' : '--'; ?>
-                    </div>
-                    <div class="overview-description">
-                        <?php if ($grades['midterm_grade'] > 0): ?>
-                            <?php echo getTermGradeDescription($grades['midterm_grade']); ?>
-                        <?php else: ?>
-                            No midterm data
-                        <?php endif; ?>
-                    </div>
-                </div>
-                
-                <div class="overview-card">
-                    <div class="overview-label">FINAL GRADE</div>
-                    <div class="overview-value">
-                        <?php echo $grades['final_grade'] > 0 ? number_format($grades['final_grade'], 1) . '%' : '--'; ?>
-                    </div>
-                    <div class="overview-description">
-                        <?php if ($grades['final_grade'] > 0): ?>
-                            <?php echo getTermGradeDescription($grades['final_grade']); ?>
-                        <?php else: ?>
-                            No final data
-                        <?php endif; ?>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Terms Section -->
-        <div class="terms-container">
-            <!-- Midterm Card -->
-            <div class="term-card midterm">
-                <div class="term-title">MIDTERM</div>
-                <div class="term-stats">
-                    <div class="stat-item">
-                        <div class="stat-value">60%</div>
-                        <div class="stat-label">Class Standing</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value">40%</div>
-                        <div class="stat-label">Midterm Exam</div>
-                    </div>
-                </div>
-                
-                <!-- Midterm Categories Details -->
-                <?php if (!empty($midtermCategories)): ?>
-                    <div class="categories-section" style="margin-top: 1rem;">
-                        <h4 style="color: var(--text-medium); font-size: 0.9rem; margin-bottom: 0.5rem;">Midterm Categories:</h4>
-                        <?php foreach ($midtermCategories as $category): ?>
-                            <div style="background: var(--plp-green-pale); padding: 1rem; border-radius: 8px; margin-bottom: 0.75rem;">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                                    <span style="font-weight: 600; color: var(--plp-green);"><?php echo htmlspecialchars($category['category_name']); ?></span>
-                                    <span style="color: var(--plp-green); font-weight: 600; background: white; padding: 0.25rem 0.5rem; border-radius: 4px;">
-                                        <?php echo $category['category_percentage']; ?>%
-                                    </span>
-                                </div>
-                                
-                                <!-- Show scores for this category -->
-                                <?php 
-                                $categoryScores = array_filter($allScores, function($score) use ($category) {
-                                    return $score['category_id'] == $category['id'];
-                                });
-                                ?>
-                                <?php if (!empty($categoryScores)): ?>
-                                    <div style="font-size: 0.8rem; color: var(--text-medium);">
-                                        <strong>Scores:</strong>
-                                        <div style="margin-top: 0.25rem;">
-                                            <?php foreach ($categoryScores as $score): ?>
-                                                <div style="display: flex; justify-content: space-between; padding: 0.1rem 0;">
-                                                    <span><?php echo htmlspecialchars($score['score_name']); ?></span>
-                                                    <span><?php echo $score['score_value']; ?>/<?php echo $score['max_score']; ?></span>
-                                                </div>
-                                            <?php endforeach; ?>
-                                        </div>
-                                    </div>
-                                <?php else: ?>
-                                    <div style="font-size: 0.8rem; color: var(--text-light); font-style: italic;">
-                                        No scores recorded
-                                    </div>
-                                <?php endif; ?>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php else: ?>
-                    <div style="text-align: center; color: var(--text-light); font-style: italic; margin-top: 1rem;">
-                        No midterm categories defined
-                    </div>
-                <?php endif; ?>
-            </div>
-
-            <!-- Final Card -->
-            <div class="term-card final">
-                <div class="term-title">FINAL</div>
-                <div class="term-stats">
-                    <div class="stat-item">
-                        <div class="stat-value">60%</div>
-                        <div class="stat-label">Class Standing</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value">40%</div>
-                        <div class="stat-label">Final Exam</div>
-                    </div>
-                </div>
-                
-                <!-- Final Categories Details -->
-                <?php if (!empty($finalCategories)): ?>
-                    <div class="categories-section" style="margin-top: 1rem;">
-                        <h4 style="color: var(--text-medium); font-size: 0.9rem; margin-bottom: 0.5rem;">Final Categories:</h4>
-                        <?php foreach ($finalCategories as $category): ?>
-                            <div style="background: var(--plp-green-pale); padding: 1rem; border-radius: 8px; margin-bottom: 0.75rem;">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                                    <span style="font-weight: 600; color: var(--plp-green);"><?php echo htmlspecialchars($category['category_name']); ?></span>
-                                    <span style="color: var(--plp-green); font-weight: 600; background: white; padding: 0.25rem 0.5rem; border-radius: 4px;">
-                                        <?php echo $category['category_percentage']; ?>%
-                                    </span>
-                                </div>
-                                
-                                <!-- Show scores for this category -->
-                                <?php 
-                                $categoryScores = array_filter($allScores, function($score) use ($category) {
-                                    return $score['category_id'] == $category['id'];
-                                });
-                                ?>
-                                <?php if (!empty($categoryScores)): ?>
-                                    <div style="font-size: 0.8rem; color: var(--text-medium);">
-                                        <strong>Scores:</strong>
-                                        <div style="margin-top: 0.25rem;">
-                                            <?php foreach ($categoryScores as $score): ?>
-                                                <div style="display: flex; justify-content: space-between; padding: 0.1rem 0;">
-                                                    <span><?php echo htmlspecialchars($score['score_name']); ?></span>
-                                                    <span><?php echo $score['score_value']; ?>/<?php echo $score['max_score']; ?></span>
-                                                </div>
-                                            <?php endforeach; ?>
-                                        </div>
-                                    </div>
-                                <?php else: ?>
-                                    <div style="font-size: 0.8rem; color: var(--text-light); font-style: italic;">
-                                        No scores recorded
-                                    </div>
-                                <?php endif; ?>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php else: ?>
-                    <div style="text-align: center; color: var(--text-light); font-style: italic; margin-top: 1rem;">
-                        No final categories defined
-                    </div>
-                <?php endif; ?>
-            </div>
-        </div>
-
-        <!-- Subject Information -->
-        <div class="subject-info-card" style="background: var(--plp-green-pale); padding: 1.5rem; border-radius: var(--border-radius); margin-top: 1.5rem;">
-            <h4 style="color: var(--plp-green); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
-                <i class="fas fa-info-circle"></i> Subject Information
-            </h4>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
-                <div>
-                    <strong>Professor:</strong><br>
-                    <?php echo htmlspecialchars($archived_subject['professor_name']); ?>
-                </div>
-                <div>
-                    <strong>Schedule:</strong><br>
-                    <?php echo htmlspecialchars($archived_subject['schedule']); ?>
-                </div>
-                <div>
-                    <strong>Semester:</strong><br>
-                    <?php echo htmlspecialchars($archived_subject['semester']); ?>
-                </div>
-                <div>
-                    <strong>Credits:</strong><br>
-                    <?php echo htmlspecialchars($archived_subject['credits']); ?> credits
-                </div>
-                <div>
-                    <strong>Archived Date:</strong><br>
-                    <?php echo date('M j, Y g:i A', strtotime($archived_subject['archived_at'])); ?>
-                </div>
-            </div>
-        </div>
-        <?php
-        
-    } catch (Exception $e) {
-        echo '<div class="alert-error">Error loading subject details: ' . htmlspecialchars($e->getMessage()) . '</div>';
-    }
-}
-
-/**
- * Calculate detailed grades for archived subject
- */
-function calculateDetailedGradesForArchivedSubject($archived_subject_id) {
-    $performance = calculateArchivedSubjectPerformance($archived_subject_id);
+// Handle restore subject
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_subject'])) {
+    $subject_record_id = $_POST['subject_record_id'];
     
-    return [
-        'midterm_grade' => $performance['midterm_grade'],
-        'final_grade' => $performance['final_grade'],
-        'subject_grade' => $performance['subject_grade']
-    ];
+    try {
+        $update_data = [
+            'archived' => false,
+            'archived_at' => null
+        ];
+        
+        $result = supabaseUpdate('student_subjects', $update_data, [
+            'id' => $subject_record_id, 
+            'student_id' => $student['id']
+        ]);
+        
+        if ($result) {
+            $success_message = 'Subject restored successfully!';
+            header("Location: student-archived-subject.php");
+            exit;
+        } else {
+            $error_message = 'Failed to restore subject.';
+        }
+    } catch (Exception $e) {
+        $error_message = 'Database error: ' . $e->getMessage();
+    }
 }
 
-function getSubjectRiskDescription($grade) {
-    if ($grade >= 85) return 'Low Risk';
-    elseif ($grade >= 80) return 'Moderate Risk';
-    else return 'High Risk';
-}
-
-function getTermGradeDescription($grade) {
-    if ($grade >= 90) return 'Excellent';
-    elseif ($grade >= 85) return 'Very Good';
-    elseif ($grade >= 80) return 'Good';
-    elseif ($grade >= 75) return 'Satisfactory';
-    elseif ($grade >= 70) return 'Passing';
-    else return 'Needs Improvement';
+// Handle get subject details for modal
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['get_subject_details'])) {
+    $subject_record_id = $_GET['subject_record_id'];
+    
+    try {
+        // Get subject basic info
+        $subject_record = supabaseFetch('student_subjects', [
+            'id' => $subject_record_id,
+            'student_id' => $student['id']
+        ]);
+        
+        if ($subject_record && count($subject_record) > 0) {
+            $subject_record = $subject_record[0];
+            $subject_info = supabaseFetch('subjects', ['id' => $subject_record['subject_id']]);
+            
+            if ($subject_info) {
+                $subject_info = $subject_info[0];
+                
+                // Get performance data
+                $performance_data = supabaseFetch('subject_performance', [
+                    'student_subject_id' => $subject_record_id
+                ]);
+                
+                // Get all scores for grade calculation
+                $allScores = supabaseFetch('student_subject_scores', [
+                    'student_subject_id' => $subject_record_id
+                ]);
+                
+                if (!$allScores) $allScores = [];
+                
+                // Calculate grades (same logic as termevaluations.php)
+                $midtermGrade = 0;
+                $finalGrade = 0;
+                $subjectGrade = 0;
+                
+                // Get midterm categories
+                $midtermCategories = supabaseFetch('student_class_standing_categories', [
+                    'student_subject_id' => $subject_record_id,
+                    'term_type' => 'midterm'
+                ]);
+                
+                // Get final categories
+                $finalCategories = supabaseFetch('student_class_standing_categories', [
+                    'student_subject_id' => $subject_record_id,
+                    'term_type' => 'final'
+                ]);
+                
+                // Calculate Midterm Grade
+                if ($midtermCategories && count($midtermCategories) > 0) {
+                    $midtermClassStanding = 0;
+                    $midtermExamScore = 0;
+                    
+                    foreach ($midtermCategories as $category) {
+                        $categoryScores = array_filter($allScores, function($score) use ($category) {
+                            return $score['category_id'] == $category['id'] && $score['score_type'] === 'class_standing';
+                        });
+                        
+                        $categoryTotal = 0;
+                        $categoryMax = 0;
+                        
+                        foreach ($categoryScores as $score) {
+                            if (strtolower($category['category_name']) === 'attendance') {
+                                $scoreValue = ($score['score_name'] === 'Present') ? 1 : 0;
+                                $categoryTotal += $scoreValue;
+                                $categoryMax += 1;
+                            } else {
+                                $categoryTotal += floatval($score['score_value']);
+                                $categoryMax += floatval($score['max_score']);
+                            }
+                        }
+                        
+                        if ($categoryMax > 0) {
+                            $categoryPercentage = ($categoryTotal / $categoryMax) * 100;
+                            $weightedScore = ($categoryPercentage * floatval($category['category_percentage'])) / 100;
+                            $midtermClassStanding += $weightedScore;
+                        }
+                    }
+                    
+                    if ($midtermClassStanding > 60) {
+                        $midtermClassStanding = 60;
+                    }
+                    
+                    $midtermExams = array_filter($allScores, function($score) {
+                        return $score['score_type'] === 'midterm_exam';
+                    });
+                    
+                    if (!empty($midtermExams)) {
+                        $midtermExam = reset($midtermExams);
+                        if (floatval($midtermExam['max_score']) > 0) {
+                            $midtermExamPercentage = (floatval($midtermExam['score_value']) / floatval($midtermExam['max_score'])) * 100;
+                            $midtermExamScore = ($midtermExamPercentage * 40) / 100;
+                        }
+                    }
+                    
+                    $midtermGrade = $midtermClassStanding + $midtermExamScore;
+                    if ($midtermGrade > 100) $midtermGrade = 100;
+                }
+                
+                // Calculate Final Grade
+                if ($finalCategories && count($finalCategories) > 0) {
+                    $finalClassStanding = 0;
+                    $finalExamScore = 0;
+                    
+                    foreach ($finalCategories as $category) {
+                        $categoryScores = array_filter($allScores, function($score) use ($category) {
+                            return $score['category_id'] == $category['id'] && $score['score_type'] === 'class_standing';
+                        });
+                        
+                        $categoryTotal = 0;
+                        $categoryMax = 0;
+                        
+                        foreach ($categoryScores as $score) {
+                            if (strtolower($category['category_name']) === 'attendance') {
+                                $scoreValue = ($score['score_name'] === 'Present') ? 1 : 0;
+                                $categoryTotal += $scoreValue;
+                                $categoryMax += 1;
+                            } else {
+                                $categoryTotal += floatval($score['score_value']);
+                                $categoryMax += floatval($score['max_score']);
+                            }
+                        }
+                        
+                        if ($categoryMax > 0) {
+                            $categoryPercentage = ($categoryTotal / $categoryMax) * 100;
+                            $weightedScore = ($categoryPercentage * floatval($category['category_percentage'])) / 100;
+                            $finalClassStanding += $weightedScore;
+                        }
+                    }
+                    
+                    if ($finalClassStanding > 60) {
+                        $finalClassStanding = 60;
+                    }
+                    
+                    $finalExams = array_filter($allScores, function($score) {
+                        return $score['score_type'] === 'final_exam';
+                    });
+                    
+                    if (!empty($finalExams)) {
+                        $finalExam = reset($finalExams);
+                        if (floatval($finalExam['max_score']) > 0) {
+                            $finalExamPercentage = (floatval($finalExam['score_value']) / floatval($finalExam['max_score'])) * 100;
+                            $finalExamScore = ($finalExamPercentage * 40) / 100;
+                        }
+                    }
+                    
+                    $finalGrade = $finalClassStanding + $finalExamScore;
+                    if ($finalGrade > 100) $finalGrade = 100;
+                }
+                
+                // Calculate Subject Grade
+                $grades = array_filter([$midtermGrade, $finalGrade], function($grade) {
+                    return $grade > 0;
+                });
+                
+                if (!empty($grades)) {
+                    $subjectGrade = array_sum($grades) / count($grades);
+                    if ($subjectGrade > 100) $subjectGrade = 100;
+                }
+                
+                // Prepare response
+                $response = [
+                    'success' => true,
+                    'subject' => array_merge($subject_record, $subject_info),
+                    'grades' => [
+                        'subject_grade' => $subjectGrade,
+                        'midterm_grade' => $midtermGrade,
+                        'final_grade' => $finalGrade
+                    ],
+                    'performance' => $performance_data ? $performance_data[0] : null,
+                    'has_data' => !empty($allScores)
+                ];
+                
+                header('Content-Type: application/json');
+                echo json_encode($response);
+                exit;
+            }
+        }
+        
+        // If we reach here, subject not found
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => 'Subject not found']);
+        exit;
+        
+    } catch (Exception $e) {
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => 'Database error']);
+        exit;
+    }
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -716,7 +281,6 @@ function getTermGradeDescription($grade) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* Your existing CSS styles here - they are correct */
         :root {
             --plp-green: #006341;
             --plp-green-light: #008856;
@@ -887,7 +451,6 @@ function getTermGradeDescription($grade) {
             max-width: 100%;
             margin: 0 auto;
             width: 100%;
-            overflow-y: auto;
         }
 
         .header {
@@ -907,21 +470,6 @@ function getTermGradeDescription($grade) {
             font-size: 1.5rem;
             font-weight: 700;
             letter-spacing: 0.5px;
-            line-height: 1.2;
-        }
-
-        .subject-count {
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            font-weight: 600;
-            font-size: 0.9rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
         }
 
         .card {
@@ -946,11 +494,62 @@ function getTermGradeDescription($grade) {
             background: var(--plp-green-gradient);
         }
 
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--plp-green-lighter);
+        }
+
+        .card-title {
+            color: var(--plp-green);
+            font-size: 1.4rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin: 0;
+            padding: 0;
+            border: none;
+        }
+
+        .card-title i {
+            font-size: 1.2rem;
+            width: 32px;
+            height: 32px;
+            background: var(--plp-green-pale);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .card-actions {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .subject-count {
+            background: var(--plp-green-gradient);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            box-shadow: 0 2px 8px rgba(0, 99, 65, 0.2);
+        }
+
         .subjects-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
             gap: 1.5rem;
-            margin-top: 0.10rem;
+            margin-top: 1.5rem;
         }
 
         .subject-card {
@@ -958,7 +557,7 @@ function getTermGradeDescription($grade) {
             padding: 1.5rem;
             border-radius: var(--border-radius);
             box-shadow: var(--box-shadow);
-            border-left: 4px solid var(--plp-green);
+            border-left: 4px solid #6c757d;
             transition: var(--transition);
             position: relative;
             display: flex;
@@ -971,30 +570,23 @@ function getTermGradeDescription($grade) {
             box-shadow: var(--box-shadow-lg);
         }
 
-        .subject-status {
-            position: absolute;
-            top: 1rem;
-            right: 1rem;
-            font-size: 0.7rem;
-            padding: 0.3rem 0.8rem;
-            border-radius: 10px;
-            font-weight: 600;
-            background: var(--plp-green);
-            color: white;
-        }
-
         .subject-header {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
             margin-bottom: 1rem;
-            gap: 1rem;
         }
 
         .subject-code {
             font-size: 0.8rem;
-            color: var(--plp-green);
+            color: #6c757d;
             font-weight: 600;
+        }
+
+        .credits {
+            font-size: 0.85rem;
+            color: #6c757d;
+            font-weight: 1000;
         }
 
         .subject-name {
@@ -1003,13 +595,6 @@ function getTermGradeDescription($grade) {
             color: var(--text-dark);
             margin: 0.5rem 0;
             line-height: 1.3;
-        }
-
-        .credits {
-            font-size: 0.85rem;
-            color: var(--plp-green);
-            font-weight: 1000;
-            white-space: nowrap;
         }
 
         .subject-info {
@@ -1028,66 +613,73 @@ function getTermGradeDescription($grade) {
         }
 
         .info-item i {
-            color: var(--plp-green);
+            color: #6c757d;
             width: 14px;
             margin-top: 0.1rem;
             flex-shrink: 0;
         }
 
+        .info-item span {
+            flex: 1;
+        }
+
+        .archived-badge {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            font-size: 0.7rem;
+            padding: 0.2rem 0.6rem;
+            border-radius: 10px;
+            font-weight: 600;
+            background: #6c757d;
+            color: white;
+        }
+
         .subject-actions {
             display: flex;
-            justify-content: flex-end;
+            justify-content: space-between;
             gap: 0.75rem;
             margin-top: 1rem;
             padding-top: 1rem;
             border-top: 1px solid var(--plp-green-lighter);
-            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-weight: 500;
+            text-decoration: none;
         }
 
         .btn-restore {
-            background: var(--plp-green);
+            background: var(--plp-green-gradient);
             color: white;
-            padding: 0.5rem 1rem;
-            border: none;
-            border-radius: 6px;
-            font-size: 0.85rem;
-            cursor: pointer;
-            transition: var(--transition);
-            display: inline-flex;
-            align-items: center;
-            gap: 0.4rem;
-            font-weight: 500;
-            flex: 1;
-            min-width: 120px;
-            justify-content: center;
+            box-shadow: 0 4px 12px rgba(0, 99, 65, 0.3);
         }
 
         .btn-restore:hover {
-            background: var(--plp-green-light);
             transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 99, 65, 0.4);
         }
 
-        .btn-view {
-            background: var(--plp-dark-green);
-            color: white;
-            padding: 0.5rem 1rem;
-            border: none;
-            border-radius: 6px;
-            font-size: 0.85rem;
-            cursor: pointer;
-            transition: var(--transition);
-            display: inline-flex;
-            align-items: center;
-            gap: 0.4rem;
-            font-weight: 500;
-            flex: 1;
-            min-width: 120px;
-            justify-content: center;
+        .btn-details {
+            background: var(--plp-green-lighter);
+            color: var(--plp-green);
+            box-shadow: 0 4px 12px rgba(0, 99, 65, 0.3);
         }
 
-        .btn-view:hover {
+        .btn-details:hover {
             background: var(--plp-green);
+            color: white;
             transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 99, 65, 0.4);
         }
 
         .empty-state {
@@ -1102,62 +694,9 @@ function getTermGradeDescription($grade) {
             color: var(--plp-green-lighter);
         }
 
-        .alert-success {
-            background: #c6f6d5;
-            color: #2f855a;
-            padding: 1rem;
-            border-radius: var(--border-radius);
-            margin-bottom: 1rem;
-            border-left: 4px solid #38a169;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-
-        .alert-error {
-            background: #fed7d7;
-            color: #c53030;
-            padding: 1rem;
-            border-radius: var(--border-radius);
-            margin-bottom: 1rem;
-            border-left: 4px solid #e53e3e;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-
-        .risk-badge {
-            display: inline-block;
-            padding: 0.3rem 0.8rem;
-            border-radius: 15px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            margin-top: 0.5rem;
-        }
-
-        .risk-badge.low {
-            background: #c6f6d5;
-            color: #2f855a;
-        }
-
-        .risk-badge.medium {
-            background: #fef5e7;
-            color: #d69e2e;
-        }
-
-        .risk-badge.high {
-            background: #fed7d7;
-            color: #c53030;
-        }
-
-        .risk-badge.failed {
-            background: #7f1d1d;
-            color: #fecaca;
-        }
-
-        .risk-badge.no-data {
-            background: #e2e8f0;
-            color: #718096;
+        .empty-state p {
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
         }
 
         /* Modal styles */
@@ -1170,12 +709,11 @@ function getTermGradeDescription($grade) {
             height: 100%;
             background: rgba(0, 0, 0, 0.5);
             backdrop-filter: blur(4px);
-            z-index: 2000;
+            z-index: 1000;
             align-items: center;
             justify-content: center;
             opacity: 0;
             transition: opacity 0.3s ease;
-            padding: 1rem;
         }
 
         .modal.show {
@@ -1185,17 +723,15 @@ function getTermGradeDescription($grade) {
 
         .modal-content {
             background: white;
-            padding: 2rem;
+            padding: 2.5rem;
             border-radius: var(--border-radius-lg);
             box-shadow: var(--box-shadow-lg);
-            max-width: 700px;
-            width: 100%;
+            max-width: 600px;
+            width: 90%;
             transform: translateY(20px);
             transition: transform 0.3s ease;
             max-height: 90vh;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
+            overflow-y: auto;
         }
 
         .modal.show .modal-content {
@@ -1204,7 +740,7 @@ function getTermGradeDescription($grade) {
 
         .modal-title {
             color: var(--plp-green);
-            font-size: 1.5rem;
+            font-size: 1.50rem;
             font-weight: 700;
             margin-bottom: 1.5rem;
             display: flex;
@@ -1219,9 +755,6 @@ function getTermGradeDescription($grade) {
             justify-content: flex-end;
             gap: 1rem;
             margin-top: 1.5rem;
-            padding-top: 1rem;
-            border-top: 1px solid var(--plp-green-lighter);
-            flex-wrap: wrap;
         }
 
         .modal-btn {
@@ -1236,254 +769,139 @@ function getTermGradeDescription($grade) {
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
-            flex: 1;
-            min-width: 120px;
-            justify-content: center;
         }
 
-        .modal-btn-cancel {
+        .modal-btn-close {
             background: #f1f5f9;
             color: var(--text-medium);
         }
 
-        .modal-btn-cancel:hover {
+        .modal-btn-close:hover {
             background: #e2e8f0;
             transform: translateY(-2px);
         }
 
-        .performance-overview {
-            margin-bottom: 1.5rem;
-        }
-
-        .details-grid {
+        .grades-overview {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 0.75rem;
-            margin-bottom: 1rem;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin: 1.5rem 0;
         }
 
-        .detail-item {
-            text-align: center;
-            padding: 1rem;
+        .grade-card {
             background: var(--plp-green-pale);
+            padding: 1rem;
             border-radius: var(--border-radius);
-        }
-
-        .detail-label {
-            font-size: 0.8rem;
-            color: var(--text-light);
-            font-weight: 600;
-            margin-bottom: 0.25rem;
-        }
-
-        .detail-value {
-            font-size: 1rem;
-            color: var(--text-dark);
-            font-weight: 500;
+            text-align: center;
+            border: 1px solid var(--plp-green-lighter);
         }
 
         .grade-value {
-            font-size: 1.4rem;
+            font-size: 1.5rem;
             font-weight: 700;
             color: var(--plp-green);
-            margin: 0.5rem 0;
+            margin-bottom: 0.5rem;
         }
 
-        /* Mobile Menu Toggle */
-        .mobile-menu-toggle {
-            display: none;
-            position: fixed;
-            top: 1rem;
-            left: 1rem;
-            background: var(--plp-green);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            padding: 0.75rem;
-            z-index: 3000;
-            cursor: pointer;
-            font-size: 1.2rem;
-            transition: var(--transition);
+        .grade-label {
+            font-size: 0.85rem;
+            color: var(--text-medium);
+            font-weight: 500;
         }
 
-        .mobile-menu-toggle:hover {
-            background: var(--plp-green-light);
-            transform: scale(1.05);
+        .no-data-message {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-light);
+            font-style: italic;
         }
 
-        /* Responsive Styles */
+        .alert-error {
+            background: #fed7d7;
+            color: #c53030;
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            margin-bottom: 1.5rem;
+            border-left: 4px solid #e53e3e;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            animation: slideIn 0.3s ease;
+        }
+
+        .alert-success {
+            background: #c6f6d5;
+            color: #2f855a;
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            margin-bottom: 1.5rem;
+            border-left: 4px solid #38a169;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
         @media (max-width: 768px) {
             body {
                 flex-direction: column;
             }
             
-            .mobile-menu-toggle {
-                display: block;
-            }
-            
             .sidebar {
-                width: 280px;
-                transform: translateX(-100%);
-                z-index: 2000;
-            }
-            
-            .sidebar.active {
-                transform: translateX(0);
+                width: 100%;
+                height: auto;
+                position: relative;
             }
             
             .main-content {
-                margin-left: 0;
                 max-width: 100%;
-                padding: 1rem;
-                margin-top: 60px;
+                padding: 1.5rem;
             }
             
             .header {
                 flex-direction: column;
                 gap: 1rem;
                 text-align: center;
-                padding: 1rem;
+            }
+            
+            .card-header {
+                flex-direction: column;
+                gap: 1rem;
+                align-items: flex-start;
+            }
+            
+            .card-actions {
+                width: 100%;
+                justify-content: space-between;
             }
             
             .subjects-grid {
                 grid-template-columns: 1fr;
-                gap: 1rem;
+            }
+            
+            .modal-content {
+                padding: 1.5rem;
+                margin: 1rem;
             }
             
             .subject-actions {
                 flex-direction: column;
-                gap: 0.5rem;
             }
-            
-            .btn-restore,
-            .btn-view {
-                flex: none;
-                width: 100%;
-            }
-        }
-
-        .overview-section {
-            margin-bottom: 2rem;
-        }
-
-        .overview-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .overview-card {
-            background: white;
-            padding: 1.5rem;
-            border-radius: var(--border-radius);
-            box-shadow: var(--box-shadow);
-            border-left: 4px solid var(--plp-green);
-            text-align: center;
-            transition: var(--transition);
-        }
-
-        .overview-card:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--box-shadow-lg);
-        }
-
-        .subject-grade-card {
-            border-left: 4px solid var(--plp-green);
-        }
-
-        .overview-label {
-            font-size: 0.8rem;
-            color: var(--text-light);
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-        }
-
-        .overview-value {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--plp-green);
-            margin: 0.5rem 0;
-        }
-
-        .overview-description {
-            font-size: 0.85rem;
-            color: var(--text-medium);
-        }
-
-        .terms-container {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1rem;
-        }
-
-        .term-card {
-            background: white;
-            padding: 1.5rem;
-            border-radius: var(--border-radius);
-            box-shadow: var(--box-shadow);
-            cursor: pointer;
-            transition: var(--transition);
-        }
-
-        .term-card:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--box-shadow-lg);
-        }
-
-        .term-card.midterm {
-            border-left: 4px solid #3B82F6;
-        }
-
-        .term-card.final {
-            border-left: 4px solid #10B981;
-        }
-
-        .term-title {
-            font-size: 1.1rem;
-            font-weight: 700;
-            margin-bottom: 1rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .term-card.midterm .term-title {
-            color: #3B82F6;
-        }
-
-        .term-card.final .term-title {
-            color: #10B981;
-        }
-
-        .term-stats {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .stat-item {
-            text-align: center;
-        }
-
-        .stat-value {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--plp-green);
-        }
-
-        .stat-label {
-            font-size: 0.8rem;
-            color: var(--text-light);
         }
     </style>
 </head>
 <body>
-    <button class="mobile-menu-toggle" id="mobileMenuToggle">
-        <i class="fas fa-bars"></i>
-    </button>
-
     <div class="sidebar">
         <div class="sidebar-header">
             <div class="logo-container">
@@ -1554,27 +972,39 @@ function getTermGradeDescription($grade) {
         <div class="header">
             <div class="welcome">Archived Subjects</div>
             <div class="subject-count">
-                <i class="fas fa-layer-group"></i>
-                <?php echo $total_archived; ?> Archived Subjects
+                <i class="fas fa-archive"></i>
+                <?php echo count($archived_subjects); ?> Archived Subjects
             </div>
         </div>
 
         <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <i class="fas fa-archive"></i>
+                    My Archived Subjects
+                </div>
+                <div class="card-actions">
+                    <a href="student-subjects.php" class="btn btn-restore">
+                        <i class="fas fa-arrow-left"></i>
+                        Back to Current Subjects
+                    </a>
+                </div>
+            </div>
+            
             <?php if (empty($archived_subjects)): ?>
                 <div class="empty-state">
                     <i class="fas fa-archive"></i>
                     <p>No archived subjects found</p>
-                    <small>Subjects will appear here once you archive them from your active subjects list</small>
-                    <br>
-                    <a href="student-subjects.php" class="btn-restore" style="margin-top: 1rem; border-radius: 10px; text-decoration: none;">
-                        <i class="fas fa-book"></i> Go to Active Subjects
-                    </a>
+                    <small>Subjects you archive will appear here</small>
                 </div>
             <?php else: ?>
                 <div class="subjects-grid">
                     <?php foreach ($archived_subjects as $subject): ?>
                         <div class="subject-card">
-                            <div class="subject-status">Archived</div>
+                            <div class="archived-badge">
+                                Archived
+                            </div>
+                            
                             <div class="subject-header">
                                 <div style="flex: 1;">
                                     <div class="subject-code"><?php echo htmlspecialchars($subject['subject_code']); ?></div>
@@ -1596,41 +1026,22 @@ function getTermGradeDescription($grade) {
                                 </div>
                                 <div class="info-item">
                                     <i class="fas fa-clock"></i>
-                                    <span><strong>Archived:</strong> <?php echo date('M j, Y g:i A', strtotime($subject['archived_at'])); ?></span>
-                                </div>
-                                
-                                <!-- Grade Summary -->
-                                <div class="info-item">
-                                    <i class="fas fa-chart-line"></i>
-                                    <span>
-                                        <strong>Final Grade:</strong> 
-                                        <?php if ($subject['subject_grade'] > 0): ?>
-                                            <span style="color: var(--plp-green); font-weight: 600;">
-                                                <?php echo number_format($subject['subject_grade'], 1); ?>%
-                                            </span>
-                                            <span class="risk-badge <?php echo $subject['risk_level']; ?>" style="margin-left: 0.5rem;">
-                                                <?php echo $subject['risk_description']; ?>
-                                            </span>
-                                        <?php else: ?>
-                                            <span style="color: var(--text-light);">No grades recorded</span>
-                                        <?php endif; ?>
+                                    <span><strong>Archived:</strong> 
+                                        <?php echo $subject['archived_at'] ? date('M j, Y', strtotime($subject['archived_at'])) : 'Unknown'; ?>
                                     </span>
                                 </div>
                             </div>
                             
                             <div class="subject-actions">
                                 <form action="student-archived-subject.php" method="POST" style="display: inline;">
-                                    <input type="hidden" name="archived_subject_id" value="<?php echo $subject['id']; ?>">
-                                    <button type="submit" name="restore_subject" class="btn-restore" onclick="return confirm('Are you sure you want to restore this subject?')">
+                                    <input type="hidden" name="subject_record_id" value="<?php echo $subject['id']; ?>">
+                                    <button type="submit" name="restore_subject" class="btn btn-restore">
                                         <i class="fas fa-undo"></i> Restore
                                     </button>
                                 </form>
-                                <button type="button" class="btn-view" 
-                                    onclick="openViewModal(
-                                        '<?php echo $subject['id']; ?>',
-                                        '<?php echo htmlspecialchars($subject['subject_code']); ?>',
-                                        '<?php echo htmlspecialchars($subject['subject_name']); ?>'
-                                    )">
+                                
+                                <button type="button" class="btn btn-details" 
+                                        onclick="openDetailsModal(<?php echo $subject['id']; ?>)">
                                     <i class="fas fa-eye"></i> View Details
                                 </button>
                             </div>
@@ -1641,151 +1052,198 @@ function getTermGradeDescription($grade) {
         </div>
     </div>
 
-    <!-- View Details Modal -->
-    <div class="modal" id="viewModal">
-        <div class="modal-content" style="max-width: 1000px; height: 90vh; display: flex; flex-direction: column;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--plp-green-lighter);">
-                <h3 class="modal-title" style="margin: 0;">
-                    <i class="fas fa-chart-line"></i>
-                    <span id="modal_subject_title">Subject Performance</span>
-                </h3>
-                <button type="button" class="modal-btn modal-btn-cancel" id="closeViewModal" style="padding: 0.5rem 1rem; font-size: 0.9rem;">
+    <!-- Subject Details Modal -->
+    <div class="modal" id="subjectDetailsModal">
+        <div class="modal-content">
+            <h3 class="modal-title">
+                <i class="fas fa-info-circle"></i>
+                Subject Details
+            </h3>
+            
+            <div id="modalContent">
+                <!-- Content will be loaded via AJAX -->
+            </div>
+            
+            <div class="modal-actions">
+                <button type="button" class="modal-btn modal-btn-close" id="closeDetailsModal">
                     <i class="fas fa-times"></i> Close
                 </button>
             </div>
-            
-            <div id="modalContent" style="flex: 1; overflow-y: auto; padding: 0.5rem;">
-                <!-- Content will be loaded dynamically -->
-                <div style="text-align: center; padding: 2rem; color: var(--text-light);">
-                    <i class="fas fa-spinner fa-spin" style="font-size: 2rem; margin-bottom: 1rem;"></i>
-                    <p>Loading subject details...</p>
-                </div>
+        </div>
+    </div>
+
+    <!-- Logout Modal -->
+    <div class="modal" id="logoutModal">
+        <div class="modal-content" style="max-width: 450px; text-align: center;">
+            <h3 style="color: var(--plp-green); font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem;">
+                Confirm Logout
+            </h3>
+            <div style="color: var(--text-medium); margin-bottom: 2rem; line-height: 1.6;">
+                Are you sure you want to logout? You'll need<br>
+                to log in again to access your account.
+            </div>
+            <div style="display: flex; justify-content: center; gap: 1rem;">
+                <button class="modal-btn modal-btn-close" id="cancelLogout" style="min-width: 120px;">
+                    Cancel
+                </button>
+                <button class="modal-btn btn-restore" id="confirmLogout" style="min-width: 120px;">
+                    Yes, Logout
+                </button>
             </div>
         </div>
     </div>
 
     <script>
-        // Mobile menu functionality
-        const mobileMenuToggle = document.getElementById('mobileMenuToggle');
-        const sidebar = document.querySelector('.sidebar');
+        const detailsModal = document.getElementById('subjectDetailsModal');
+        const closeDetailsModal = document.getElementById('closeDetailsModal');
+        const modalContent = document.getElementById('modalContent');
 
-        mobileMenuToggle.addEventListener('click', () => {
-            sidebar.classList.toggle('active');
-            document.body.style.overflow = sidebar.classList.contains('active') ? 'hidden' : '';
+        const logoutBtn = document.querySelector('.logout-btn');
+        const logoutModal = document.getElementById('logoutModal');
+        const cancelLogout = document.getElementById('cancelLogout');
+        const confirmLogout = document.getElementById('confirmLogout');
+
+        // Open details modal
+        function openDetailsModal(subjectId) {
+            // Show loading state
+            modalContent.innerHTML = `
+                <div style="text-align: center; padding: 2rem;">
+                    <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--plp-green);"></i>
+                    <p style="margin-top: 1rem; color: var(--text-medium);">Loading subject details...</p>
+                </div>
+            `;
+            
+            detailsModal.classList.add('show');
+            
+            // Fetch subject details via AJAX
+            fetch(`student-archived-subject.php?get_subject_details=1&subject_record_id=${subjectId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        displaySubjectDetails(data);
+                    } else {
+                        modalContent.innerHTML = `
+                            <div class="alert-error">
+                                <i class="fas fa-exclamation-circle"></i>
+                                ${data.message || 'Failed to load subject details'}
+                            </div>
+                        `;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    modalContent.innerHTML = `
+                        <div class="alert-error">
+                            <i class="fas fa-exclamation-circle"></i>
+                            Error loading subject details
+                        </div>
+                    `;
+                });
+        }
+
+        // Display subject details in modal
+        function displaySubjectDetails(data) {
+            const subject = data.subject;
+            const grades = data.grades;
+            const hasData = data.has_data;
+            
+            let content = `
+                <div class="subject-info">
+                    <div class="info-item">
+                        <i class="fas fa-code"></i>
+                        <span><strong>Subject Code:</strong> ${subject.subject_code}</span>
+                    </div>
+                    <div class="info-item">
+                        <i class="fas fa-book"></i>
+                        <span><strong>Subject Name:</strong> ${subject.subject_name}</span>
+                    </div>
+                    <div class="info-item">
+                        <i class="fas fa-user-tie"></i>
+                        <span><strong>Professor:</strong> ${subject.professor_name}</span>
+                    </div>
+                    <div class="info-item">
+                        <i class="fas fa-calendar"></i>
+                        <span><strong>Semester:</strong> ${subject.semester}</span>
+                    </div>
+                    <div class="info-item">
+                        <i class="fas fa-graduation-cap"></i>
+                        <span><strong>Credits:</strong> ${subject.credits}</span>
+                    </div>
+                </div>
+            `;
+            
+            if (hasData) {
+                content += `
+                    <div class="grades-overview">
+                        <div class="grade-card">
+                            <div class="grade-value">${grades.subject_grade > 0 ? grades.subject_grade.toFixed(1) + '%' : '--'}</div>
+                            <div class="grade-label">Subject Grade</div>
+                        </div>
+                        <div class="grade-card">
+                            <div class="grade-value">${grades.midterm_grade > 0 ? grades.midterm_grade.toFixed(1) + '%' : '--'}</div>
+                            <div class="grade-label">Midterm Grade</div>
+                        </div>
+                        <div class="grade-card">
+                            <div class="grade-value">${grades.final_grade > 0 ? grades.final_grade.toFixed(1) + '%' : '--'}</div>
+                            <div class="grade-label">Final Grade</div>
+                        </div>
+                    </div>
+                    <p style="color: var(--text-light); font-size: 0.85rem; text-align: center;">
+                        These grades are calculated using the same formula as in Term Evaluations
+                    </p>
+                `;
+            } else {
+                content += `
+                    <div class="no-data-message">
+                        <i class="fas fa-chart-line" style="font-size: 2rem; margin-bottom: 1rem;"></i>
+                        <p>No grade data available for this subject</p>
+                        <small>This subject was archived without any grade records</small>
+                    </div>
+                `;
+            }
+            
+            modalContent.innerHTML = content;
+        }
+
+        // Close details modal
+        closeDetailsModal.addEventListener('click', () => {
+            detailsModal.classList.remove('show');
         });
 
-        // Close sidebar when clicking on a link (mobile)
-        const navLinks = document.querySelectorAll('.nav-link');
-        navLinks.forEach(link => {
-            link.addEventListener('click', () => {
-                if (window.innerWidth <= 768) {
-                    sidebar.classList.remove('active');
-                    document.body.style.overflow = '';
+        // Show modal when clicking logout button
+        logoutBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            logoutModal.classList.add('show');
+        });
+
+        // Hide modal when clicking cancel
+        cancelLogout.addEventListener('click', () => {
+            logoutModal.classList.remove('show');
+        });
+
+        // Handle logout confirmation
+        confirmLogout.addEventListener('click', () => {
+            window.location.href = 'logout.php';
+        });
+
+        // Hide modal when clicking outside the modal content
+        const modals = [detailsModal, logoutModal];
+        modals.forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.remove('show');
                 }
             });
         });
 
-        // Close sidebar when clicking outside (mobile)
-        document.addEventListener('click', (e) => {
-            if (window.innerWidth <= 768 && 
-                sidebar.classList.contains('active') && 
-                !sidebar.contains(e.target) && 
-                !mobileMenuToggle.contains(e.target)) {
-                sidebar.classList.remove('active');
-                document.body.style.overflow = '';
-            }
-        });
-
-        // Handle window resize
-        window.addEventListener('resize', () => {
-            if (window.innerWidth > 768) {
-                sidebar.classList.remove('active');
-                document.body.style.overflow = '';
-            }
-        });
-
-        function openViewModal(archivedSubjectId, subjectCode, subjectName) {
-            console.log('Opening modal for archived subject:', archivedSubjectId);
-            
-            // Update modal title
-            document.getElementById('modal_subject_title').textContent = subjectCode + ' - ' + subjectName;
-            
-            // Show loading state
-            const modalContent = document.getElementById('modalContent');
-            modalContent.innerHTML = `
-                <div style="text-align: center; padding: 2rem; color: var(--text-light);">
-                    <i class="fas fa-spinner fa-spin" style="font-size: 2rem; margin-bottom: 1rem;"></i>
-                    <p>Loading subject details...</p>
-                </div>
-            `;
-            
-            // Show modal
-            document.getElementById('viewModal').classList.add('show');
-            document.body.style.overflow = 'hidden';
-            
-            // Load term evaluation content
-            loadTermEvaluationContent(archivedSubjectId);
-        }
-
-        function loadTermEvaluationContent(archivedSubjectId) {
-            // Create a form to fetch the archived subject data
-            const formData = new FormData();
-            formData.append('archived_subject_id', archivedSubjectId);
-            formData.append('action', 'get_term_evaluation');
-            
-            fetch('student-archived-subject.php', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.text())
-            .then(html => {
-                document.getElementById('modalContent').innerHTML = html;
-            })
-            .catch(error => {
-                console.error('Error loading term evaluation:', error);
-                document.getElementById('modalContent').innerHTML = `
-                    <div class="alert-error">
-                        <i class="fas fa-exclamation-circle"></i>
-                        Error loading subject details. Please try again.
-                    </div>
-                `;
-            });
-        }
-
-        // Close modal when clicking close button
-        document.getElementById('closeViewModal').addEventListener('click', function() {
-            closeViewModal();
-        });
-
-        // Close modal when clicking outside
-        document.getElementById('viewModal').addEventListener('click', function(e) {
-            if (e.target === this) {
-                closeViewModal();
-            }
-        });
-
-        // Close modal with Escape key
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                closeViewModal();
-            }
-        });
-
-        function closeViewModal() {
-            document.getElementById('viewModal').classList.remove('show');
-            document.body.style.overflow = '';
-        }
-
-        // Auto-hide success/error messages
+        // Auto-hide success/error messages after 5 seconds
         setTimeout(() => {
             const alerts = document.querySelectorAll('.alert-success, .alert-error');
             alerts.forEach(alert => {
                 alert.style.transition = 'opacity 0.1s ease';
                 alert.style.opacity = '0';
                 setTimeout(() => {
-                    if (alert.parentNode) {
-                        alert.remove();
-                    }
+                    alert.remove();
                 }, 100);
             });
         }, 5000);

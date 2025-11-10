@@ -225,57 +225,6 @@ function getStudentSubjects($student_id) {
     return supabaseFetch('student_subjects', ['student_id' => $student_id]);
 }
 
-/**
- * Simple Archive Function - Direct to archived_subjects table
- */
-function archiveSubject($subject_record_id, $student_id) {
-    try {
-        // Get the subject data
-        $subject_data = supabaseFetch('student_subjects', ['id' => $subject_record_id, 'student_id' => $student_id]);
-        if (!$subject_data || count($subject_data) === 0) {
-            return ['success' => false, 'message' => 'Subject not found.'];
-        }
-        
-        $subject_to_archive = $subject_data[0];
-        
-        // Get subject info
-        $subject_info = getSubjectById($subject_to_archive['subject_id']);
-        if (!$subject_info) {
-            return ['success' => false, 'message' => 'Subject information not found.'];
-        }
-        
-        // Insert into archived_subjects table
-        $archived_data = [
-            'student_id' => $subject_to_archive['student_id'],
-            'subject_id' => $subject_to_archive['subject_id'],
-            'professor_name' => $subject_to_archive['professor_name'],
-            'schedule' => $subject_to_archive['schedule'] ?? 'Not Set',
-            'subject_code' => $subject_info['subject_code'],
-            'subject_name' => $subject_info['subject_name'],
-            'credits' => $subject_info['credits'],
-            'semester' => $subject_info['semester'],
-            'archived_at' => date('Y-m-d H:i:s')
-        ];
-        
-        $archived_subject = supabaseInsert('archived_subjects', $archived_data);
-        
-        if (!$archived_subject) {
-            return ['success' => false, 'message' => 'Failed to archive subject.'];
-        }
-        
-        // Delete from active subjects
-        $delete_result = supabaseDelete('student_subjects', ['id' => $subject_record_id]);
-        
-        if ($delete_result) {
-            return ['success' => true, 'message' => 'Subject archived successfully!'];
-        } else {
-            return ['success' => false, 'message' => 'Subject archived but failed to remove from active subjects.'];
-        }
-        
-    } catch (Exception $e) {
-        return ['success' => false, 'message' => 'Database error: ' . $e->getMessage()];
-    }
-}
 
 /**
  * Session Security Functions
