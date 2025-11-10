@@ -983,12 +983,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['get_subject_details']))
                     <i class="fas fa-archive"></i>
                     My Archived Subjects
                 </div>
-                <div class="card-actions">
-                    <a href="student-subjects.php" class="btn btn-restore">
-                        <i class="fas fa-arrow-left"></i>
-                        Back to Current Subjects
-                    </a>
-                </div>
             </div>
             
             <?php if (empty($archived_subjects)): ?>
@@ -1061,7 +1055,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['get_subject_details']))
             </h3>
             
             <div id="modalContent">
-                <!-- Content will be loaded via AJAX -->
             </div>
             
             <div class="modal-actions">
@@ -1147,31 +1140,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['get_subject_details']))
             const grades = data.grades;
             const hasData = data.has_data;
             
-            let content = `
-                <div class="subject-info">
-                    <div class="info-item">
-                        <i class="fas fa-code"></i>
-                        <span><strong>Subject Code:</strong> ${subject.subject_code}</span>
-                    </div>
-                    <div class="info-item">
-                        <i class="fas fa-book"></i>
-                        <span><strong>Subject Name:</strong> ${subject.subject_name}</span>
-                    </div>
-                    <div class="info-item">
-                        <i class="fas fa-user-tie"></i>
-                        <span><strong>Professor:</strong> ${subject.professor_name}</span>
-                    </div>
-                    <div class="info-item">
-                        <i class="fas fa-calendar"></i>
-                        <span><strong>Semester:</strong> ${subject.semester}</span>
-                    </div>
-                    <div class="info-item">
-                        <i class="fas fa-graduation-cap"></i>
-                        <span><strong>Credits:</strong> ${subject.credits}</span>
-                    </div>
-                </div>
-            `;
-            
             if (hasData) {
                 content += `
                     <div class="grades-overview">
@@ -1188,9 +1156,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['get_subject_details']))
                             <div class="grade-label">Final Grade</div>
                         </div>
                     </div>
-                    <p style="color: var(--text-light); font-size: 0.85rem; text-align: center;">
-                        These grades are calculated using the same formula as in Term Evaluations
-                    </p>
                 `;
             } else {
                 content += `
