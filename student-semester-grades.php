@@ -41,7 +41,7 @@ try {
                     'student_subject_id' => $subject_record['id']
                 ]);
                 
-                // Calculate subject grade using the same logic as archived subjects
+                // Calculate subject grade
                 $subject_grade = 0;
                 if ($performance_data && isset($performance_data[0]['overall_grade'])) {
                     $subject_grade = $performance_data[0]['overall_grade'];
@@ -55,23 +55,21 @@ try {
                         $midtermGrade = 0;
                         $finalGrade = 0;
                         
-                        // Get midterm categories
+                        // Calculate Midterm Grade
                         $midtermCategories = supabaseFetch('student_class_standing_categories', [
                             'student_subject_id' => $subject_record['id'],
                             'term_type' => 'midterm'
                         ]);
                         
-                        // Get final categories
+                        // Calculate Final Grade
                         $finalCategories = supabaseFetch('student_class_standing_categories', [
                             'student_subject_id' => $subject_record['id'],
                             'term_type' => 'final'
                         ]);
                         
-                        // Calculate Midterm Grade
+                        // Simplified grade calculation
                         if ($midtermCategories && count($midtermCategories) > 0) {
                             $midtermClassStanding = 0;
-                            $midtermExamScore = 0;
-                            
                             foreach ($midtermCategories as $category) {
                                 $categoryScores = array_filter($allScores, function($score) use ($category) {
                                     return $score['category_id'] == $category['id'] && $score['score_type'] === 'class_standing';
@@ -81,14 +79,8 @@ try {
                                 $categoryMax = 0;
                                 
                                 foreach ($categoryScores as $score) {
-                                    if (strtolower($category['category_name']) === 'attendance') {
-                                        $scoreValue = ($score['score_name'] === 'Present') ? 1 : 0;
-                                        $categoryTotal += $scoreValue;
-                                        $categoryMax += 1;
-                                    } else {
-                                        $categoryTotal += floatval($score['score_value']);
-                                        $categoryMax += floatval($score['max_score']);
-                                    }
+                                    $categoryTotal += floatval($score['score_value']);
+                                    $categoryMax += floatval($score['max_score']);
                                 }
                                 
                                 if ($categoryMax > 0) {
@@ -113,14 +105,10 @@ try {
                             }
                             
                             $midtermGrade = $midtermClassStanding + $midtermExamScore;
-                            if ($midtermGrade > 100) $midtermGrade = 100;
                         }
                         
-                        // Calculate Final Grade
                         if ($finalCategories && count($finalCategories) > 0) {
                             $finalClassStanding = 0;
-                            $finalExamScore = 0;
-                            
                             foreach ($finalCategories as $category) {
                                 $categoryScores = array_filter($allScores, function($score) use ($category) {
                                     return $score['category_id'] == $category['id'] && $score['score_type'] === 'class_standing';
@@ -130,14 +118,8 @@ try {
                                 $categoryMax = 0;
                                 
                                 foreach ($categoryScores as $score) {
-                                    if (strtolower($category['category_name']) === 'attendance') {
-                                        $scoreValue = ($score['score_name'] === 'Present') ? 1 : 0;
-                                        $categoryTotal += $scoreValue;
-                                        $categoryMax += 1;
-                                    } else {
-                                        $categoryTotal += floatval($score['score_value']);
-                                        $categoryMax += floatval($score['max_score']);
-                                    }
+                                    $categoryTotal += floatval($score['score_value']);
+                                    $categoryMax += floatval($score['max_score']);
                                 }
                                 
                                 if ($categoryMax > 0) {
@@ -162,10 +144,9 @@ try {
                             }
                             
                             $finalGrade = $finalClassStanding + $finalExamScore;
-                            if ($finalGrade > 100) $finalGrade = 100;
                         }
                         
-                        // Calculate Subject Grade (average of midterm and final)
+                        // Calculate Subject Grade
                         $grades = array_filter([$midtermGrade, $finalGrade], function($grade) {
                             return $grade > 0;
                         });
@@ -183,8 +164,7 @@ try {
                     'professor_name' => $subject_record['professor_name'],
                     'credits' => $subject_info['credits'],
                     'semester' => $subject_info['semester'],
-                    'subject_grade' => $subject_grade,
-                    'archived_at' => $subject_record['archived_at']
+                    'subject_grade' => $subject_grade
                 ];
             }
         }
@@ -238,8 +218,6 @@ if (isset($_GET['export']) && $_GET['export'] === 'excel') {
     echo "</table>";
     exit;
 }
-
-
 ?>
 
 <!DOCTYPE html>
@@ -257,22 +235,15 @@ if (isset($_GET['export']) && $_GET['export'] === 'excel') {
             --plp-green-lighter: #e0f2e9;
             --plp-green-pale: #f5fbf8;
             --plp-green-gradient: linear-gradient(135deg, #006341 0%, #008856 100%);
-            --plp-gold: #FFD700;
-            --plp-dark-green: #004d33;
-            --plp-light-green: #f8fcf9;
-            --plp-pale-green: #e8f5e9;
             --text-dark: #2d3748;
             --text-medium: #4a5568;
             --text-light: #718096;
-            --border-radius: 12px;
-            --border-radius-lg: 16px;
-            --box-shadow: 0 4px 12px rgba(0, 99, 65, 0.1);
-            --box-shadow-lg: 0 8px 24px rgba(0, 99, 65, 0.15);
-            --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            --border-radius: 8px;
+            --box-shadow: 0 2px 8px rgba(0, 99, 65, 0.1);
+            --transition: all 0.3s ease;
             --danger: #dc3545;
             --warning: #ffc107;
             --success: #28a745;
-            --info: #17a2b8;
         }
 
         * {
@@ -287,14 +258,13 @@ if (isset($_GET['export']) && $_GET['export'] === 'excel') {
             display: flex;
             min-height: 100vh;
             color: var(--text-dark);
-            line-height: 1.6;
+            line-height: 1.5;
         }
 
         .sidebar {
-            width: 320px;
+            width: 280px;
             background: white;
-            box-shadow: var(--box-shadow);
-            padding: 1.5rem;
+            padding: 1rem;
             display: flex;
             flex-direction: column;
             height: 100vh;
@@ -305,129 +275,98 @@ if (isset($_GET['export']) && $_GET['export'] === 'excel') {
 
         .sidebar-header {
             text-align: center;
+            padding-bottom: 1rem;
             border-bottom: 1px solid rgba(0, 99, 65, 0.1);
         }
 
-        .logo-container {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
         .logo {
-            width: 130px;
-            height: 130px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-            transition: var(--transition);
-        }
-
-        .logo:hover {
-            transform: scale(1.05);
+            width: 100px;
+            height: 100px;
+            margin: 0 auto;
         }
 
         .logo img {
             width: 100%;
             height: 100%;
             object-fit: contain;
-            padding: 5px;
         }
 
         .portal-title {
             color: var(--plp-green);
-            font-size: 1.3rem;
+            font-size: 1.1rem;
             font-weight: 700;
-            letter-spacing: 0.5px;
+            margin: 0.5rem 0;
         }
 
         .student-email {
             color: var(--text-medium);
-            font-size: 0.85rem;
-            margin-bottom: 1rem;
-            word-break: break-all;
-            padding: 0.5rem;
-            border-radius: 6px;
-            font-weight: 500;
+            font-size: 0.8rem;
         }
 
         .nav-menu {
             list-style: none;
-            flex-grow: 0.30;
-            margin-top: 0.7rem;
+            margin: 1rem 0;
         }
 
         .nav-item {
-            margin-bottom: 0.7rem;
-            position: relative;
+            margin-bottom: 0.5rem;
         }
 
         .nav-link {
             display: flex;
             align-items: center;
-            gap: 0.75rem;
-            padding: 0.50rem;
+            gap: 0.5rem;
+            padding: 0.5rem;
             color: var(--text-medium);
             text-decoration: none;
             border-radius: var(--border-radius);
             transition: var(--transition);
             font-weight: 500;
+            font-size: 0.9rem;
         }
 
         .nav-link:hover:not(.active) {
             background: var(--plp-green-lighter);
             color: var(--plp-green);
-            transform: translateY(-3px);
         }
 
         .nav-link.active {
             background: var(--plp-green-gradient);
             color: white;
-            box-shadow: var(--box-shadow);
-        }
-
-        .sidebar-footer {
-            border-top: 3px solid rgba(0, 99, 65, 0.1);
         }
 
         .logout-btn {
-            margin-top:1rem;
             background: transparent;
             color: var(--text-medium);
-            padding: 0.75rem 1rem;
+            padding: 0.5rem;
             border: none;
             border-radius: var(--border-radius);
             cursor: pointer;
             text-decoration: none;
             display: flex;
             align-items: center;
-            gap: 0.75rem;
+            gap: 0.5rem;
             width: 100%;
             font-weight: 500;
             transition: var(--transition);
+            font-size: 0.9rem;
         }
 
         .logout-btn:hover {
             background: #fee2e2;
             color: #b91c1c;
-            transform: translateX(5px);
         }
 
         .main-content {
             flex: 1;
-            padding: 1rem 2.5rem; 
+            padding: 1rem;
             background: var(--plp-green-pale);
-            max-width: 100%;
-            margin: 0 auto;
-            width: 100%;
         }
 
         .header {
             background: white;
-            padding: 1rem 2rem;
+            padding: 1rem;
             border-radius: var(--border-radius);
-            box-shadow: var(--box-shadow);
             margin-bottom: 1rem;
             background: var(--plp-green-gradient);
             color: white;
@@ -437,204 +376,105 @@ if (isset($_GET['export']) && $_GET['export'] === 'excel') {
         }
 
         .welcome {
-            font-size: 1.5rem;
+            font-size: 1.2rem;
             font-weight: 700;
-            letter-spacing: 0.5px;
+        }
+
+        .subject-count {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 0.3rem 0.8rem;
+            border-radius: 15px;
+            font-weight: 600;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
         }
 
         .card {
             background: white;
-            padding: 2rem;
-            border-radius: var(--border-radius-lg);
+            padding: 1rem;
+            border-radius: var(--border-radius);
             box-shadow: var(--box-shadow);
-            border-top: 4px solid var(--plp-green);
-            transition: var(--transition);
-            position: relative;
-            overflow: hidden;
-            margin-bottom: 2rem;
         }
 
-        .card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 4px;
-            background: var(--plp-green-gradient);
-        }
-
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1.5rem;
-            padding-bottom: 0.75rem;
-            border-bottom: 1px solid var(--plp-green-lighter);
-        }
-
-        .card-title {
-            color: var(--plp-green);
-            font-size: 1.4rem;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            margin: 0;
-            padding: 0;
-            border: none;
-        }
-
-        .card-title i {
-            font-size: 1.2rem;
-            width: 32px;
-            height: 32px;
-            background: var(--plp-green-pale);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .card-actions {
-            display: flex;
-            gap: 1rem;
-            align-items: center;
-        }
-
-        .subject-count {
-            background: var(--plp-green-gradient);
-            color: white;
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            font-weight: 600;
-            font-size: 0.9rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            box-shadow: 0 2px 8px rgba(0, 99, 65, 0.2);
-        }
-
-        /* Filter and Export Controls */
         .controls-container {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 1.5rem;
+            margin-bottom: 1rem;
             gap: 1rem;
         }
 
         .filter-group {
             display: flex;
             align-items: center;
-            gap: 1rem;
+            gap: 0.5rem;
         }
 
         .filter-label {
             font-weight: 600;
             color: var(--text-medium);
-            white-space: nowrap;
+            font-size: 0.9rem;
         }
 
         .filter-select {
-            padding: 0.5rem 1rem;
-            border: 2px solid var(--plp-green-lighter);
+            padding: 0.4rem 0.8rem;
+            border: 1px solid var(--plp-green-lighter);
             border-radius: var(--border-radius);
             font-size: 0.9rem;
             background: white;
             color: var(--text-dark);
-            min-width: 180px;
-        }
-
-        .filter-select:focus {
-            outline: none;
-            border-color: var(--plp-green);
         }
 
         .export-btn {
             background: var(--plp-green-gradient);
             color: white;
             border: none;
-            padding: 0.5rem 1.5rem;
+            padding: 0.4rem 1rem;
             border-radius: var(--border-radius);
             font-weight: 600;
             cursor: pointer;
             transition: var(--transition);
             display: inline-flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 0.3rem;
             text-decoration: none;
             font-size: 0.9rem;
         }
 
         .export-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0, 99, 65, 0.3);
+            transform: translateY(-1px);
         }
 
-        /* Statistics Cards */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-            margin-bottom: 2rem;
-        }
-
-        .stat-card {
-            background: var(--plp-green-pale);
-            padding: 1.5rem;
-            border-radius: var(--border-radius);
-            text-align: center;
-            border: 1px solid var(--plp-green-lighter);
-        }
-
-        .stat-value {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--plp-green);
-            margin-bottom: 0.5rem;
-        }
-
-        .stat-label {
-            font-size: 0.9rem;
-            color: var(--text-medium);
-            font-weight: 500;
-        }
-
-        /* Table Styles */
         .table-container {
             overflow-x: auto;
             border-radius: var(--border-radius);
-            box-shadow: var(--box-shadow);
         }
 
         .history-table {
             width: 100%;
             border-collapse: collapse;
             background: white;
+            font-size: 0.85rem;
         }
 
         .history-table th {
             background: var(--plp-green);
             color: white;
-            padding: 1rem;
+            padding: 0.8rem;
             text-align: left;
             font-weight: 600;
-            font-size: 0.9rem;
         }
 
         .history-table td {
-            padding: 1rem;
+            padding: 0.8rem;
             border-bottom: 1px solid var(--plp-green-lighter);
-            font-size: 0.9rem;
         }
 
         .history-table tr:hover {
             background: var(--plp-green-pale);
-        }
-
-        .history-table tr:last-child td {
-            border-bottom: none;
         }
 
         .grade-cell {
@@ -655,59 +495,42 @@ if (isset($_GET['export']) && $_GET['export'] === 'excel') {
 
         .empty-state {
             text-align: center;
-            padding: 3rem;
+            padding: 2rem;
             color: var(--text-medium);
         }
 
         .empty-state i {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-            color: var(--plp-green-lighter);
-        }
-
-        .empty-state p {
-            font-size: 1.1rem;
+            font-size: 2rem;
             margin-bottom: 0.5rem;
+            color: var(--plp-green-lighter);
         }
 
         .alert-error {
             background: #fed7d7;
             color: #c53030;
-            padding: 1rem;
+            padding: 0.8rem;
             border-radius: var(--border-radius);
-            margin-bottom: 1.5rem;
+            margin-bottom: 1rem;
             border-left: 4px solid #e53e3e;
             display: flex;
             align-items: center;
-            gap: 0.75rem;
-            animation: slideIn 0.3s ease;
+            gap: 0.5rem;
+            font-size: 0.9rem;
         }
 
         .alert-success {
             background: #c6f6d5;
             color: #2f855a;
-            padding: 1rem;
+            padding: 0.8rem;
             border-radius: var(--border-radius);
-            margin-bottom: 1.5rem;
+            margin-bottom: 1rem;
             border-left: 4px solid #38a169;
             display: flex;
             align-items: center;
-            gap: 0.75rem;
-            animation: slideIn 0.3s ease;
+            gap: 0.5rem;
+            font-size: 0.9rem;
         }
 
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        /* Responsive Design */
         @media (max-width: 768px) {
             body {
                 flex-direction: column;
@@ -720,25 +543,13 @@ if (isset($_GET['export']) && $_GET['export'] === 'excel') {
             }
             
             .main-content {
-                max-width: 100%;
-                padding: 1.5rem;
+                padding: 0.8rem;
             }
             
             .header {
                 flex-direction: column;
-                gap: 1rem;
+                gap: 0.5rem;
                 text-align: center;
-            }
-            
-            .card-header {
-                flex-direction: column;
-                gap: 1rem;
-                align-items: flex-start;
-            }
-            
-            .card-actions {
-                width: 100%;
-                justify-content: space-between;
             }
             
             .controls-container {
@@ -750,106 +561,22 @@ if (isset($_GET['export']) && $_GET['export'] === 'excel') {
                 justify-content: space-between;
             }
             
-            .stats-grid {
-                grid-template-columns: 1fr;
-            }
-            
             .history-table {
                 font-size: 0.8rem;
             }
             
             .history-table th,
             .history-table td {
-                padding: 0.75rem 0.5rem;
+                padding: 0.6rem 0.4rem;
             }
-        }
-
-        @media (max-width: 480px) {
-            .filter-group {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            
-            .filter-select {
-                min-width: auto;
-            }
-        }
-        /* Modal styles for logout */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(4px);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
-        .modal.show {
-            display: flex;
-            opacity: 1;
-        }
-
-        .modal-content {
-            background: white;
-            padding: 2.5rem;
-            border-radius: var(--border-radius-lg);
-            box-shadow: var(--box-shadow-lg);
-            max-width: 600px;
-            width: 90%;
-            transform: translateY(20px);
-            transition: transform 0.3s ease;
-        }
-
-        .modal.show .modal-content {
-            transform: translateY(0);
-        }
-
-        .modal-btn {
-            font-size: 1rem;
-            font-weight: 600;
-            border: none;
-            padding: 0.75rem 1.5rem;
-            border-radius: 50px;
-            cursor: pointer;
-            transition: var(--transition);
-            font-family: 'Poppins', sans-serif;
-        }
-
-        .modal-btn-cancel {
-            background: #f1f5f9;
-            color: var(--text-medium);
-        }
-
-        .modal-btn-cancel:hover {
-            background: #e2e8f0;
-            transform: translateY(-2px);
-        }
-
-        .modal-btn-confirm {
-            background: var(--plp-green-gradient);
-            color: white;
-            box-shadow: 0 4px 12px rgba(0, 99, 65, 0.3);
-        }
-
-        .modal-btn-confirm:hover {
-            transform: translateY(-2px);
         }
     </style>
 </head>
 <body>
     <div class="sidebar">
         <div class="sidebar-header">
-            <div class="logo-container">
-                <div class="logo">
-                    <img src="plplogo.png" alt="PLP Logo">
-                </div>
+            <div class="logo">
+                <img src="plplogo.png" alt="PLP Logo">
             </div>
             <div class="portal-title">PLPSMARTGRADE</div>
             <div class="student-email"><?php echo htmlspecialchars($student['email']); ?></div>
@@ -888,12 +615,10 @@ if (isset($_GET['export']) && $_GET['export'] === 'excel') {
             </li>
         </ul>
 
-        <div class="sidebar-footer">
-            <a href="logout.php" class="logout-btn">
-                <i class="fas fa-sign-out-alt"></i>
-                Logout
-            </a>
-        </div>
+        <a href="logout.php" class="logout-btn">
+            <i class="fas fa-sign-out-alt"></i>
+            Logout
+        </a>
     </div>
 
     <div class="main-content">
@@ -920,14 +645,6 @@ if (isset($_GET['export']) && $_GET['export'] === 'excel') {
         </div>
 
         <div class="card">
-            <div class="card-header">
-                <div class="card-title">
-                    <i class="fas fa-history"></i>
-                    Academic History
-                </div>
-            </div>
-
-            <!-- Controls -->
             <div class="controls-container">
                 <div class="filter-group">
                     <span class="filter-label">Filter by Semester:</span>
@@ -950,7 +667,6 @@ if (isset($_GET['export']) && $_GET['export'] === 'excel') {
                 <?php endif; ?>
             </div>
 
-            <!-- History Table -->
             <?php if (empty($filtered_records)): ?>
                 <div class="empty-state">
                     <i class="fas fa-history"></i>
@@ -998,64 +714,13 @@ if (isset($_GET['export']) && $_GET['export'] === 'excel') {
         </div>
     </div>
 
-    <!-- Logout Modal -->
-    <div class="modal" id="logoutModal">
-        <div class="modal-content" style="max-width: 450px; text-align: center;">
-            <h3 style="color: var(--plp-green); font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem;">
-                Confirm Logout
-            </h3>
-            <div style="color: var(--text-medium); margin-bottom: 2rem; line-height: 1.6;">
-                Are you sure you want to logout? You'll need<br>
-                to log in again to access your account.
-            </div>
-            <div style="display: flex; justify-content: center; gap: 1rem;">
-                <button class="modal-btn modal-btn-cancel" id="cancelLogout" style="min-width: 120px;">
-                    Cancel
-                </button>
-                <button class="modal-btn modal-btn-confirm" id="confirmLogout" style="min-width: 120px;">
-                    Yes, Logout
-                </button>
-            </div>
-        </div>
-    </div>
-
     <script>
-        // Filter by semester
         function filterBySemester() {
             const semester = document.getElementById('semesterFilter').value;
             const url = new URL(window.location.href);
             url.searchParams.set('semester', semester);
             window.location.href = url.toString();
         }
-
-        // Logout modal functionality
-        const logoutBtn = document.querySelector('.logout-btn');
-        const logoutModal = document.getElementById('logoutModal');
-        const cancelLogout = document.getElementById('cancelLogout');
-        const confirmLogout = document.getElementById('confirmLogout');
-
-        // Show modal when clicking logout button
-        logoutBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            logoutModal.classList.add('show');
-        });
-
-        // Hide modal when clicking cancel
-        cancelLogout.addEventListener('click', () => {
-            logoutModal.classList.remove('show');
-        });
-
-        // Handle logout confirmation
-        confirmLogout.addEventListener('click', () => {
-            window.location.href = 'logout.php';
-        });
-
-        // Hide modal when clicking outside
-        logoutModal.addEventListener('click', (e) => {
-            if (e.target === logoutModal) {
-                logoutModal.classList.remove('show');
-            }
-        });
 
         // Auto-hide success/error messages after 5 seconds
         setTimeout(() => {
