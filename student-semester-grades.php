@@ -613,6 +613,126 @@ if (isset($_GET['export']) && $_GET['export'] === 'excel') {
                 padding: 0.6rem 0.4rem;
             }
         }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal.show {
+            display: flex;
+            opacity: 1;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 1.5rem;
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--box-shadow-lg);
+            max-width: 450px;
+            width: 90%;
+            transform: translateY(20px);
+            transition: transform 0.3s ease;
+            position: relative;
+        }
+
+        .modal.show .modal-content {
+            transform: translateY(0);
+        }
+
+        .close {
+            position: absolute;
+            top: 1rem;
+            right: 1.5rem;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-light);
+        }
+
+        .close:hover {
+            color: var(--text-dark);
+        }
+
+        .modal-title {
+            color: var(--plp-green);
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: var(--text-dark);
+            font-size: 0.9rem;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--plp-green-lighter);
+            border-radius: var(--border-radius);
+            font-family: 'Poppins', sans-serif;
+            transition: var(--transition);
+            font-size: 0.9rem;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--plp-green);
+            box-shadow: 0 0 0 3px rgba(0, 99, 65, 0.1);
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .modal-btn {
+            padding: 0.6rem 1.2rem;
+            border: none;
+            border-radius: 50px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            font-family: 'Poppins', sans-serif;
+            font-size: 0.9rem;
+        }
+
+        .modal-btn-cancel {
+            background: #f1f5f9;
+            color: var(--text-medium);
+        }
+
+        .modal-btn-cancel:hover {
+            background: #e2e8f0;
+        }
+
+        .modal-btn-confirm {
+            background: var(--plp-green-gradient);
+            color: white;
+        }
+
+        .modal-btn-confirm:hover {
+            transform: translateY(-2px);
+        }
     </style>
 </head>
 <body>

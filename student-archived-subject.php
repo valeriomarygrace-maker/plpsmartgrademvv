@@ -1099,6 +1099,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['get_subject_details']))
 
         // Open details modal
         function openDetailsModal(subjectId) {
+            console.log('Opening details modal for subject ID:', subjectId); // Debug log
+            
             // Show loading state
             modalContent.innerHTML = `
                 <div style="text-align: center; padding: 2rem;">
@@ -1111,8 +1113,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['get_subject_details']))
             
             // Fetch subject details via AJAX
             fetch(`student-archived-subject.php?get_subject_details=1&subject_record_id=${subjectId}`)
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
                 .then(data => {
+                    console.log('Received data:', data); // Debug log
                     if (data.success) {
                         displaySubjectDetails(data);
                     } else {
@@ -1129,7 +1137,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['get_subject_details']))
                     modalContent.innerHTML = `
                         <div class="alert-error">
                             <i class="fas fa-exclamation-circle"></i>
-                            Error loading subject details
+                            Error loading subject details. Please try again.
                         </div>
                     `;
                 });
@@ -1217,55 +1225,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['get_subject_details']))
             window.location.href = 'logout.php';
         });
 
-        // Hide modal when clicking outside the modal content
-        const modals = [detailsModal, logoutModal];
-        modals.forEach(modal => {
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    modal.classList.remove('show');
-                }
-            });
+        // Hide modals when clicking outside the modal content
+        [detailsModal, logoutModal].forEach(modal => {
+            if (modal) {
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) {
+                        modal.classList.remove('show');
+                    }
+                });
+            }
         });
 
         // Auto-hide success/error messages after 5 seconds
         setTimeout(() => {
             const alerts = document.querySelectorAll('.alert-success, .alert-error');
             alerts.forEach(alert => {
-                alert.style.transition = 'opacity 0.1s ease';
+                alert.style.transition = 'opacity 0.3s ease';
                 alert.style.opacity = '0';
                 setTimeout(() => {
-                    alert.remove();
-                }, 100);
+                    if (alert.parentNode) {
+                        alert.remove();
+                    }
+                }, 300);
             });
         }, 5000);
-        // Logout modal functionality
-    const logoutBtn = document.querySelector('.logout-btn');
-    const logoutModal = document.getElementById('logoutModal');
-    const cancelLogout = document.getElementById('cancelLogout');
-    const confirmLogout = document.getElementById('confirmLogout');
 
-    // Show modal when clicking logout button
-    logoutBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        logoutModal.classList.add('show');
-    });
-
-    // Hide modal when clicking cancel
-    cancelLogout.addEventListener('click', () => {
-        logoutModal.classList.remove('show');
-    });
-
-    // Handle logout confirmation
-    confirmLogout.addEventListener('click', () => {
-        window.location.href = 'logout.php';
-    });
-
-    // Hide modal when clicking outside the modal content
-    logoutModal.addEventListener('click', (e) => {
-        if (e.target === logoutModal) {
-            logoutModal.classList.remove('show');
-        }
-    });
-    </script>
+        // Debug: Check if buttons are working
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Page loaded - checking View Details buttons');
+            
+            const viewDetailsButtons = document.querySelectorAll('.btn-details');
+            console.log('Found', viewDetailsButtons.length, 'View Details buttons');
+            
+            viewDetailsButtons.forEach(button => {
+                button.addEventListener('click', function(e) {
+                    console.log('View Details button clicked');
+                    const subjectId = this.getAttribute('onclick').match(/openDetailsModal\((\d+)\)/)[1];
+                    console.log('Subject ID:', subjectId);
+                    openDetailsModal(subjectId);
+                });
+            });
+        });
+</script>
 </body>
 </html>
