@@ -1055,11 +1055,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['get_subject_details']))
             </h3>
             
             <div id="modalContent">
+                <!-- Content will be loaded via AJAX -->
             </div>
             
             <div class="modal-actions">
                 <button type="button" class="modal-btn modal-btn-close" id="closeDetailsModal">
-                    <i class="fas fa-times"></i> Close
+                     Close
                 </button>
             </div>
         </div>
@@ -1139,6 +1140,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['get_subject_details']))
             const subject = data.subject;
             const grades = data.grades;
             const hasData = data.has_data;
+            
+            let content = `
+                <div class="subject-info">
+                    <div class="info-item">
+                        <i class="fas fa-code"></i>
+                        <span><strong>Subject Code:</strong> ${subject.subject_code}</span>
+                    </div>
+                    <div class="info-item">
+                        <i class="fas fa-book"></i>
+                        <span><strong>Subject Name:</strong> ${subject.subject_name}</span>
+                    </div>
+                    <div class="info-item">
+                        <i class="fas fa-user-tie"></i>
+                        <span><strong>Professor:</strong> ${subject.professor_name}</span>
+                    </div>
+                    <div class="info-item">
+                        <i class="fas fa-calendar"></i>
+                        <span><strong>Semester:</strong> ${subject.semester}</span>
+                    </div>
+                    <div class="info-item">
+                        <i class="fas fa-graduation-cap"></i>
+                        <span><strong>Credits:</strong> ${subject.credits}</span>
+                    </div>
+                </div>
+            `;
             
             if (hasData) {
                 content += `
