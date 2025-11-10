@@ -1427,10 +1427,6 @@ function calculateSubjectGradeFromScores($student_subject_id) {
                             Showing active subjects (no archived subjects yet)
                         </div>
                     <?php else: ?>
-                        <div style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--text-light);">
-                            <i class="fas fa-info-circle"></i>
-                            Showing <?php echo $totalArchived; ?> archived and <?php echo $totalActive; ?> active subjects
-                        </div>
                     <?php endif; ?>
                 </div>
             </div>
