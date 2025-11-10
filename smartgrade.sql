@@ -79,17 +79,19 @@ CREATE TABLE public.student_subject_scores (
   CONSTRAINT student_subject_scores_student_subject_id_fkey FOREIGN KEY (student_subject_id) REFERENCES public.student_subjects(id),
   CONSTRAINT student_subject_scores_category_id_fkey FOREIGN KEY (category_id) REFERENCES public.student_class_standing_categories(id)
 );
-CREATE TABLE IF NOT EXISTS student_subjects (
-  id BIGSERIAL PRIMARY KEY,
-  student_id BIGINT NOT NULL REFERENCES students(id),
-  subject_id BIGINT NOT NULL REFERENCES subjects(id),
-  professor_name VARCHAR NOT NULL,
-  schedule VARCHAR,
-  archived BOOLEAN DEFAULT FALSE,
-  archived_at TIMESTAMP WITH TIME ZONE,
-  deleted_at TIMESTAMP WITH TIME ZONE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  UNIQUE(student_id, subject_id)
+CREATE TABLE public.student_subjects (
+  id bigint NOT NULL DEFAULT nextval('student_subjects_id_seq'::regclass),
+  student_id bigint NOT NULL,
+  subject_id bigint NOT NULL,
+  professor_name character varying NOT NULL,
+  schedule character varying,
+  archived boolean DEFAULT false,
+  archived_at timestamp with time zone,
+  deleted_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT student_subjects_pkey PRIMARY KEY (id),
+  CONSTRAINT student_subjects_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id),
+  CONSTRAINT student_subjects_subject_id_fkey FOREIGN KEY (subject_id) REFERENCES public.subjects(id)
 );
 CREATE TABLE public.students (
   id bigint NOT NULL DEFAULT nextval('students_id_seq'::regclass),

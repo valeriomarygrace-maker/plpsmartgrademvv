@@ -262,7 +262,6 @@ if ($hasScores) {
     $riskLevel = calculateRiskLevel($termGrade);
     $riskDescription = getRiskDescription($riskLevel);
     
-    // GENERATE BEHAVIORAL INSIGHTS, INTERVENTIONS, AND RECOMMENDATIONS
     $behavioralInsights = generateBehavioralInsights($termGrade, $categoryTotals, $term, $student['id'], $subject_id);
     $interventions = generateInterventions($riskLevel, $categoryTotals, $term);
     $recommendations = generateRecommendations($termGrade, $categoryTotals, $riskLevel, $term);
@@ -271,7 +270,6 @@ if ($hasScores) {
     error_log("Term Grade: " . $termGrade);
 
 } else {
-    // NO SCORES - SHOW ENCOURAGING MESSAGES
     $termGrade = 0;
     $subjectGrade = 0;
     $totalClassStanding = 0;
@@ -574,7 +572,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Helper functions
+// Helper functions - ONLY KEEP ESSENTIAL ONES
 function calculateRiskLevel($grade) {
     if ($grade >= 85) return 'low_risk';
     elseif ($grade >= 80) return 'moderate_risk';
@@ -597,145 +595,6 @@ function getGradeDescription($grade) {
     elseif ($grade >= 75) return 'Satisfactory';
     elseif ($grade >= 70) return 'Passing';
     else return 'Needs Improvement';
-}
-
-function generateBehavioralInsights($termGrade, $categoryTotals, $term, $studentId, $subjectId) {
-    $insights = [];
-    
-    if ($termGrade == 0) {
-        $insights[] = [
-            'message' => "Welcome to {$term} term! Start adding your scores to get personalized insights.",
-            'priority' => 'low',
-            'source' => 'system'
-        ];
-        return $insights;
-    }
-    
-    if ($termGrade >= 90) {
-        $insights[] = [
-            'message' => "Excellent {$term} performance! Your consistent effort and time management are paying off.",
-            'priority' => 'low',
-            'source' => 'grade_analysis'
-        ];
-    } elseif ($termGrade >= 85) {
-        $insights[] = [
-            'message' => "Very good {$term} performance. Your study habits and module review are effective.",
-            'priority' => 'low',
-            'source' => 'grade_analysis'
-        ];
-    } elseif ($termGrade >= 80) {
-        $insights[] = [
-            'message' => "Good {$term} performance. Consider improving time management for better results.",
-            'priority' => 'medium',
-            'source' => 'grade_analysis'
-        ];
-    } elseif ($termGrade >= 75) {
-        $insights[] = [
-            'message' => "Satisfactory {$term} performance. Focus on better module reading and time allocation.",
-            'priority' => 'medium',
-            'source' => 'grade_analysis'
-        ];
-    } else {
-        $insights[] = [
-            'message' => "{$term} performance needs improvement. Review time management and study strategies.",
-            'priority' => 'high',
-            'source' => 'grade_analysis'
-        ];
-    }
-    
-    $lowCategories = [];
-    foreach ($categoryTotals as $categoryId => $category) {
-        if ($category['percentage_score'] < 75 && !empty($category['low_scores'])) {
-            $lowCategories[] = $category;
-        }
-    }
-    
-    if (!empty($lowCategories)) {
-        $worstCategory = $lowCategories[0]; 
-        
-        $insights[] = [
-            'message' => "Low performance in {$worstCategory['name']}. Consider spending more time reviewing related modules.",
-            'priority' => 'high',
-            'source' => 'score_analysis'
-        ];
-        
-        // Category-type specific insights
-        if (stripos($worstCategory['name'], 'quiz') !== false) {
-            $insights[] = [
-                'message' => "Low quiz scores suggest need for better module reading before assessments.",
-                'priority' => 'medium',
-                'source' => 'score_analysis'
-            ];
-        } elseif (stripos($worstCategory['name'], 'assignment') !== false) {
-            $insights[] = [
-                'message' => "Assignment scores indicate time management improvements needed for deadlines.",
-                'priority' => 'medium',
-                'source' => 'score_analysis'
-            ];
-        } elseif (stripos($worstCategory['name'], 'project') !== false) {
-            $insights[] = [
-                'message' => "Project performance shows need for better planning and milestone tracking.",
-                'priority' => 'medium',
-                'source' => 'score_analysis'
-            ];
-        } elseif (stripos($worstCategory['name'], 'attendance') !== false) {
-            $insights[] = [
-                'message' => "Low attendance affects learning. Regular class participation improves understanding.",
-                'priority' => 'high',
-                'source' => 'attendance_analysis'
-            ];
-        }
-    }
-    
-    $inconsistentCategories = [];
-    foreach ($categoryTotals as $categoryId => $category) {
-        if (count($category['scores']) > 2) {
-            $scores = array_map(function($score) {
-                return ($score['score_value'] / $score['max_score']) * 100;
-            }, $category['scores']);
-            
-            $stdDev = standard_deviation($scores);
-            if ($stdDev > 20) {
-                $inconsistentCategories[] = $category['name'];
-            }
-        }
-    }
-    
-    if (!empty($inconsistentCategories)) {
-        $insights[] = [
-            'message' => "Inconsistent performance in " . implode(', ', $inconsistentCategories) . ". Improve study consistency.",
-            'priority' => 'medium',
-            'source' => 'consistency_analysis'
-        ];
-    }
-    
-    if ($termGrade < 80) {
-        $insights[] = [
-            'message' => "Consider creating a study schedule to better manage your time for module review.",
-            'priority' => 'medium',
-            'source' => 'time_management'
-        ];
-    }
-    
-    $lowScoreCount = 0;
-    foreach ($categoryTotals as $category) {
-        if ($category['percentage_score'] < 75) $lowScoreCount++;
-    }
-    
-    if ($lowScoreCount >= 2 && $termGrade < 80) {
-        $insights[] = [
-            'message' => "Multiple low scores suggest need for more thorough module reading and comprehension.",
-            'priority' => 'high',
-            'source' => 'module_analysis'
-        ];
-    }
-    
-    usort($insights, function($a, $b) {
-        $priorityOrder = ['high' => 3, 'medium' => 2, 'low' => 1];
-        return $priorityOrder[$b['priority']] - $priorityOrder[$a['priority']];
-    });
-    
-    return array_slice($insights, 0, 2); 
 }
 ?>
 <!DOCTYPE html>
