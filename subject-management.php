@@ -598,32 +598,6 @@ function getGradeDescription($grade) {
     elseif ($grade >= 70) return 'Passing';
     else return 'Needs Improvement';
 }
-// Helper functions
-function calculateRiskLevel($grade) {
-    if ($grade >= 85) return 'low_risk';
-    elseif ($grade >= 80) return 'moderate_risk';
-    else return 'high_risk';
-}
-
-function getRiskDescription($riskLevel) {
-    switch ($riskLevel) {
-        case 'low_risk': return 'Excellent/Good Performance';
-        case 'moderate_risk': return 'Needs Improvement';
-        case 'high_risk': return 'Need to Communicate with Professor';
-        default: return 'No Data Inputted';
-    }
-}
-
-function getGradeDescription($grade) {
-    if ($grade >= 90) return 'Excellent';
-    elseif ($grade >= 85) return 'Very Good';
-    elseif ($grade >= 80) return 'Good';
-    elseif ($grade >= 75) return 'Satisfactory';
-    elseif ($grade >= 70) return 'Passing';
-    else return 'Needs Improvement';
-}
-
-// ========== ADD THE NEW FUNCTIONS RIGHT HERE ==========
 
 // New helper functions for generating insights
 function generateBehavioralInsights($termGrade, $categoryTotals, $term, $studentId, $subjectId) {
