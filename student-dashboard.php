@@ -1350,23 +1350,23 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
                     </div>
                     <div style="display: flex; justify-content: space-around; margin-top: 1rem;">
                         <div style="text-align: center;">
-                            <div style="font-size: 1.5rem; font-weight: 700; color: var(--plp-green);">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: #dc3545;">
                                 <?php echo $semester_risk_data['total_high_risk'] ?? 0; ?>
                             </div>
                             <div style="font-size: 0.8rem; color: var(--text-medium);">High Risk</div>
                         </div>
                         <div style="text-align: center;">
-                            <div style="font-size: 1.5rem; font-weight: 700; color: var(--plp-green);">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: #28a745;">
                                 <?php echo $semester_risk_data['total_low_risk'] ?? 0; ?>
                             </div>
                             <div style="font-size: 0.8rem; color: var(--text-medium);">Low Risk</div>
                         </div>
                         <div style="text-align: center;">
-                            <div style="font-size: 1.5rem; font-weight: 700; color: var(--plp-green);">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: #e2e8f0;">
                                 <?php 
                                 $totalArchived = $semester_risk_data['total_archived_subjects'] ?? 0;
                                 $totalWithRisk = ($semester_risk_data['total_high_risk'] ?? 0) + ($semester_risk_data['total_low_risk'] ?? 0);
-                                echo $totalArchived - $totalWithRisk; 
+                                echo max(0, $totalArchived - $totalWithRisk); 
                                 ?>
                             </div>
                             <div style="font-size: 0.8rem; color: var(--text-medium);">No Data</div>
@@ -1377,70 +1377,92 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
         </div>
     </div>
     
-    <script>
-        // Initialize Charts
-        function initializeCharts() {
-            const semesterRiskData = <?php echo json_encode($semester_risk_data); ?>;
+<script>
+    // Initialize Charts
+    function initializeCharts() {
+        const semesterRiskData = <?php echo json_encode($semester_risk_data); ?>;
+        
+        console.log('Risk Data:', semesterRiskData); // Debug log
+        
+        // Risk Overview Chart (for the 3-column grid)
+        const riskOverviewCtx = document.getElementById('riskOverviewChart')?.getContext('2d');
+        if (riskOverviewCtx) {
+            // Calculate data for the chart
+            const highRiskCount = semesterRiskData.total_high_risk || 0;
+            const lowRiskCount = semesterRiskData.total_low_risk || 0;
+            const totalArchived = semesterRiskData.total_archived_subjects || 0;
+            const noDataCount = Math.max(0, totalArchived - highRiskCount - lowRiskCount);
             
-            console.log('Risk Data:', semesterRiskData); // Debug log
+            console.log('Chart Data:', {
+                highRisk: highRiskCount,
+                lowRisk: lowRiskCount,
+                noData: noDataCount,
+                total: totalArchived
+            });
             
-            // Risk Overview Chart (for the 3-column grid)
-            const riskOverviewCtx = document.getElementById('riskOverviewChart')?.getContext('2d');
-            if (riskOverviewCtx) {
-                // Calculate data for the chart
-                const highRiskCount = semesterRiskData.total_high_risk || 0;
-                const lowRiskCount = semesterRiskData.total_low_risk || 0;
-                const noRiskCount = semesterRiskData.total_archived_subjects - highRiskCount - lowRiskCount;
-                
-                // Only show chart if there's data
-                if (semesterRiskData.total_archived_subjects > 0) {
-                    new Chart(riskOverviewCtx, {
-                        type: 'doughnut',
-                        data: {
-                            labels: ['High Risk', 'Low Risk', 'No Data'],
-                            datasets: [{
-                                data: [highRiskCount, lowRiskCount, noRiskCount],
-                                backgroundColor: ['#dc3545', '#28a745', '#e2e8f0'],
-                                borderWidth: 2,
-                                borderColor: '#fff'
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            cutout: '70%',
-                            plugins: {
-                                legend: {
-                                    position: 'bottom',
-                                    labels: {
-                                        padding: 15,
-                                        usePointStyle: true,
-                                        boxWidth: 12
+            // Only show chart if there's data
+            if (totalArchived > 0) {
+                new Chart(riskOverviewCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['High Risk', 'Low Risk', 'No Data'],
+                        datasets: [{
+                            data: [highRiskCount, lowRiskCount, noDataCount],
+                            backgroundColor: ['#dc3545', '#28a745', '#e2e8f0'],
+                            borderWidth: 2,
+                            borderColor: '#fff'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '70%',
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    padding: 15,
+                                    usePointStyle: true,
+                                    boxWidth: 12,
+                                    font: {
+                                        size: 11
                                     }
-                                },
-                                tooltip: {
-                                    callbacks: {
-                                        label: function(context) {
-                                            const label = context.label || '';
-                                            const value = context.raw || 0;
-                                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                            const percentage = Math.round((value / total) * 100);
-                                            return `${label}: ${value} (${percentage}%)`;
-                                        }
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const label = context.label || '';
+                                        const value = context.raw || 0;
+                                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                        const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
+                                        return `${label}: ${value} (${percentage}%)`;
                                     }
                                 }
                             }
                         }
-                    });
-                } else {
-                    // Hide chart container if no data
-                    riskOverviewCtx.canvas.style.display = 'none';
-                    document.querySelector('.bar-chart-wrapper').innerHTML = '<p style="color: var(--text-light); text-align: center; padding: 2rem;">No risk data available</p>';
-                }
+                    }
+                });
+            } else {
+                // Show message if no data
+                riskOverviewCtx.canvas.style.display = 'none';
+                const wrapper = document.querySelector('.bar-chart-wrapper');
+                wrapper.innerHTML = '<p style="color: var(--text-light); text-align: center; padding: 2rem;">No archived subjects with risk data available</p>';
             }
+        } else {
+            console.error('Risk overview chart canvas not found');
         }
+    }
 
-        document.addEventListener('DOMContentLoaded', initializeCharts);
-    </script>
+    // Initialize charts when DOM is fully loaded
+    document.addEventListener('DOMContentLoaded', function() {
+        initializeCharts();
+    });
+
+    // Also initialize when window loads (as backup)
+    window.addEventListener('load', function() {
+        setTimeout(initializeCharts, 100);
+    });
+</script>
 </body>
 </html>

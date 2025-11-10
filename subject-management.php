@@ -169,7 +169,6 @@ $recommendations = [];
 
 // Calculate grades for CURRENT TERM ONLY
 if ($hasScores) {
-    // CLASS STANDING CALCULATION (60% - includes attendance) FOR CURRENT TERM
     $categoryTotals = [];
     foreach ($categories as $category) {
         $categoryTotals[$category['id']] = [
