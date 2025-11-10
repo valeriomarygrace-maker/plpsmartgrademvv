@@ -67,6 +67,10 @@ try {
                             'term_type' => 'final'
                         ]);
                         
+                        // Initialize exam score variables
+                        $midtermExamScore = 0;
+                        $finalExamScore = 0;
+                        
                         // Simplified grade calculation
                         if ($midtermCategories && count($midtermCategories) > 0) {
                             $midtermClassStanding = 0;
@@ -219,7 +223,6 @@ if (isset($_GET['export']) && $_GET['export'] === 'excel') {
     exit;
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
