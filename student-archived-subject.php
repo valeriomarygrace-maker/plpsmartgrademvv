@@ -1238,6 +1238,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['get_subject_details']))
                 }, 100);
             });
         }, 5000);
+        // Logout modal functionality
+    const logoutBtn = document.querySelector('.logout-btn');
+    const logoutModal = document.getElementById('logoutModal');
+    const cancelLogout = document.getElementById('cancelLogout');
+    const confirmLogout = document.getElementById('confirmLogout');
+
+    // Show modal when clicking logout button
+    logoutBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        logoutModal.classList.add('show');
+    });
+
+    // Hide modal when clicking cancel
+    cancelLogout.addEventListener('click', () => {
+        logoutModal.classList.remove('show');
+    });
+
+    // Handle logout confirmation
+    confirmLogout.addEventListener('click', () => {
+        window.location.href = 'logout.php';
+    });
+
+    // Hide modal when clicking outside the modal content
+    logoutModal.addEventListener('click', (e) => {
+        if (e.target === logoutModal) {
+            logoutModal.classList.remove('show');
+        }
+    });
     </script>
 </body>
 </html>

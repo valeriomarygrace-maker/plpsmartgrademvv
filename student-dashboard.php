@@ -245,7 +245,7 @@ function calculateGWA($grade) {
 }
 
 /**
- * Get semester risk data for bar chart - UPDATED FOR DUAL RISK DISPLAY
+ * Get semester risk data for bar chart - INCLUDES ACTIVE SUBJECTS
  */
 function getSemesterRiskData($student_id) {
     $data = [
@@ -263,12 +263,65 @@ function getSemesterRiskData($student_id) {
         ],
         'total_archived_subjects' => 0,
         'total_high_risk' => 0,
-        'total_low_risk' => 0
+        'total_low_risk' => 0,
+        'total_active_subjects' => 0, // Add active subjects count
+        'active_high_risk' => 0,      // Add active high risk count
+        'active_low_risk' => 0        // Add active low risk count
     ];
     
     try {
-        // Get all archived subjects for this student
-        $archived_subjects = supabaseFetch('archived_subjects', ['student_id' => $student_id]);
+        // Get active subjects first
+        $active_subjects = supabaseFetch('student_subjects', [
+            'student_id' => $student_id, 
+            'deleted_at' => null,
+            'archived' => false
+        ]);
+        
+        if ($active_subjects && is_array($active_subjects)) {
+            $data['total_active_subjects'] = count($active_subjects);
+            
+            foreach ($active_subjects as $subject_record) {
+                // Get subject info to determine semester
+                $subject_data = supabaseFetch('subjects', ['id' => $subject_record['subject_id']]);
+                
+                if ($subject_data && count($subject_data) > 0) {
+                    $subject_info = $subject_data[0];
+                    
+                    // Get performance data for active subject
+                    $performance_data = supabaseFetch('subject_performance', ['student_subject_id' => $subject_record['id']]);
+                    
+                    $is_high_risk = false;
+                    $is_low_risk = false;
+                    $final_grade = 0;
+                    $risk_level = 'no-data';
+                    
+                    if ($performance_data && count($performance_data) > 0) {
+                        $performance = $performance_data[0];
+                        $final_grade = $performance['overall_grade'];
+                        $risk_level = $performance['risk_level'];
+                        
+                        // Use risk level definition
+                        $is_high_risk = ($risk_level === 'high' || $risk_level === 'failed');
+                        $is_low_risk = ($risk_level === 'low' || $risk_level === 'medium');
+                    }
+                    
+                    if ($is_high_risk) {
+                        $data['active_high_risk']++;
+                        $data['total_high_risk']++;
+                    }
+                    if ($is_low_risk) {
+                        $data['active_low_risk']++;
+                        $data['total_low_risk']++;
+                    }
+                }
+            }
+        }
+        
+        // Then get archived subjects (existing code)
+        $archived_subjects = supabaseFetch('student_subjects', [
+            'student_id' => $student_id,
+            'archived' => true
+        ]);
         
         if ($archived_subjects && is_array($archived_subjects)) {
             $data['total_archived_subjects'] = count($archived_subjects);
@@ -282,7 +335,7 @@ function getSemesterRiskData($student_id) {
                     $semester = strtolower($subject_info['semester']);
                     
                     // Get performance data for archived subject
-                    $performance_data = supabaseFetch('archived_subject_performance', ['archived_subject_id' => $archived_subject['id']]);
+                    $performance_data = supabaseFetch('subject_performance', ['student_subject_id' => $archived_subject['id']]);
                     
                     $is_high_risk = false;
                     $is_low_risk = false;
@@ -294,11 +347,9 @@ function getSemesterRiskData($student_id) {
                         $final_grade = $performance['overall_grade'];
                         $risk_level = $performance['risk_level'];
                         
-                        // Use the same risk level definition as archived subjects page
                         $is_high_risk = ($risk_level === 'high' || $risk_level === 'failed');
                         $is_low_risk = ($risk_level === 'low' || $risk_level === 'medium');
                     } else {
-                        // Calculate performance if not stored (same as archived subjects page)
                         $calculated_performance = calculateArchivedSubjectPerformance($archived_subject['id']);
                         if ($calculated_performance) {
                             $final_grade = $calculated_performance['overall_grade'];
@@ -324,14 +375,6 @@ function getSemesterRiskData($student_id) {
                         if ($is_low_risk) {
                             $data['first_semester']['low_risk_count']++;
                         }
-                        $data['first_semester']['subjects'][] = [
-                            'subject_code' => $subject_info['subject_code'],
-                            'subject_name' => $subject_info['subject_name'],
-                            'final_grade' => $final_grade,
-                            'risk_level' => $risk_level,
-                            'is_high_risk' => $is_high_risk,
-                            'is_low_risk' => $is_low_risk
-                        ];
                     } elseif (strpos($semester, 'second') !== false || strpos($semester, '2') !== false) {
                         $data['second_semester']['total_subjects']++;
                         if ($is_high_risk) {
@@ -340,14 +383,6 @@ function getSemesterRiskData($student_id) {
                         if ($is_low_risk) {
                             $data['second_semester']['low_risk_count']++;
                         }
-                        $data['second_semester']['subjects'][] = [
-                            'subject_code' => $subject_info['subject_code'],
-                            'subject_name' => $subject_info['subject_name'],
-                            'final_grade' => $final_grade,
-                            'risk_level' => $risk_level,
-                            'is_high_risk' => $is_high_risk,
-                            'is_low_risk' => $is_low_risk
-                        ];
                     }
                 }
             }
@@ -1351,33 +1386,66 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
                     <div style="display: flex; justify-content: space-around; margin-top: 1rem;">
                         <div style="text-align: center;">
                             <div style="font-size: 1.5rem; font-weight: 700; color: #dc3545;">
-                                <?php echo $semester_risk_data['total_high_risk'] ?? 0; ?>
+                                <?php 
+                                $totalHighRisk = ($semester_risk_data['total_high_risk'] ?? 0) + ($semester_risk_data['active_high_risk'] ?? 0);
+                                echo $totalHighRisk; 
+                                ?>
                             </div>
                             <div style="font-size: 0.8rem; color: var(--text-medium);">High Risk</div>
                         </div>
                         <div style="text-align: center;">
                             <div style="font-size: 1.5rem; font-weight: 700; color: #28a745;">
-                                <?php echo $semester_risk_data['total_low_risk'] ?? 0; ?>
+                                <?php 
+                                $totalLowRisk = ($semester_risk_data['total_low_risk'] ?? 0) + ($semester_risk_data['active_low_risk'] ?? 0);
+                                echo $totalLowRisk; 
+                                ?>
                             </div>
                             <div style="font-size: 0.8rem; color: var(--text-medium);">Low Risk</div>
                         </div>
                         <div style="text-align: center;">
                             <div style="font-size: 1.5rem; font-weight: 700; color: #e2e8f0;">
                                 <?php 
-                                $totalArchived = $semester_risk_data['total_archived_subjects'] ?? 0;
-                                $totalWithRisk = ($semester_risk_data['total_high_risk'] ?? 0) + ($semester_risk_data['total_low_risk'] ?? 0);
-                                echo max(0, $totalArchived - $totalWithRisk); 
+                                $totalSubjects = ($semester_risk_data['total_archived_subjects'] ?? 0) + ($semester_risk_data['total_active_subjects'] ?? 0);
+                                $totalWithRisk = $totalHighRisk + $totalLowRisk;
+                                echo max(0, $totalSubjects - $totalWithRisk); 
                                 ?>
                             </div>
                             <div style="font-size: 0.8rem; color: var(--text-medium);">No Data</div>
                         </div>
                     </div>
+                    <?php if (($semester_risk_data['total_archived_subjects'] ?? 0) === 0): ?>
+                        <div style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--text-light);">
+                            <i class="fas fa-info-circle"></i>
+                            Showing active subjects (no archived subjects yet)
+                        </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
     </div>
-    
-<script>
+
+        <!-- Logout Modal -->
+    <div class="modal" id="logoutModal">
+        <div class="modal-content" style="max-width: 450px; text-align: center;">
+            <h3 style="color: var(--plp-green); font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem;">
+                Confirm Logout
+            </h3>
+            <div style="color: var(--text-medium); margin-bottom: 2rem; line-height: 1.6;">
+                Are you sure you want to logout? You'll need<br>
+                to log in again to access your account.
+            </div>
+            <div style="display: flex; justify-content: center; gap: 1rem;">
+                <button class="modal-btn modal-btn-close" id="cancelLogout" style="min-width: 120px;">
+                    Cancel
+                </button>
+                <button class="modal-btn btn-restore" id="confirmLogout" style="min-width: 120px;">
+                    Yes, Logout
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
     // Initialize Charts
     function initializeCharts() {
         const semesterRiskData = <?php echo json_encode($semester_risk_data); ?>;
@@ -1387,21 +1455,25 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
         // Risk Overview Chart (for the 3-column grid)
         const riskOverviewCtx = document.getElementById('riskOverviewChart')?.getContext('2d');
         if (riskOverviewCtx) {
-            // Calculate data for the chart
-            const highRiskCount = semesterRiskData.total_high_risk || 0;
-            const lowRiskCount = semesterRiskData.total_low_risk || 0;
+            // Calculate data for the chart - include both active and archived
+            const highRiskCount = (semesterRiskData.total_high_risk || 0) + (semesterRiskData.active_high_risk || 0);
+            const lowRiskCount = (semesterRiskData.total_low_risk || 0) + (semesterRiskData.active_low_risk || 0);
             const totalArchived = semesterRiskData.total_archived_subjects || 0;
-            const noDataCount = Math.max(0, totalArchived - highRiskCount - lowRiskCount);
+            const totalActive = semesterRiskData.total_active_subjects || 0;
+            const totalSubjects = totalArchived + totalActive;
+            const noDataCount = Math.max(0, totalSubjects - highRiskCount - lowRiskCount);
             
             console.log('Chart Data:', {
                 highRisk: highRiskCount,
                 lowRisk: lowRiskCount,
                 noData: noDataCount,
-                total: totalArchived
+                total: totalSubjects,
+                archived: totalArchived,
+                active: totalActive
             });
             
             // Only show chart if there's data
-            if (totalArchived > 0) {
+            if (totalSubjects > 0) {
                 new Chart(riskOverviewCtx, {
                     type: 'doughnut',
                     data: {
@@ -1447,7 +1519,7 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
                 // Show message if no data
                 riskOverviewCtx.canvas.style.display = 'none';
                 const wrapper = document.querySelector('.bar-chart-wrapper');
-                wrapper.innerHTML = '<p style="color: var(--text-light); text-align: center; padding: 2rem;">No archived subjects with risk data available</p>';
+                wrapper.innerHTML = '<p style="color: var(--text-light); text-align: center; padding: 2rem;">No subjects with risk data available</p>';
             }
         } else {
             console.error('Risk overview chart canvas not found');
@@ -1462,6 +1534,35 @@ function calculateArchivedSubjectPerformance($archived_subject_id) {
     // Also initialize when window loads (as backup)
     window.addEventListener('load', function() {
         setTimeout(initializeCharts, 100);
+    });
+
+    // Logout modal functionality
+    const logoutBtn = document.querySelector('.logout-btn');
+    const logoutModal = document.getElementById('logoutModal');
+    const cancelLogout = document.getElementById('cancelLogout');
+    const confirmLogout = document.getElementById('confirmLogout');
+
+    // Show modal when clicking logout button
+    logoutBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        logoutModal.classList.add('show');
+    });
+
+    // Hide modal when clicking cancel
+    cancelLogout.addEventListener('click', () => {
+        logoutModal.classList.remove('show');
+    });
+
+    // Handle logout confirmation
+    confirmLogout.addEventListener('click', () => {
+        window.location.href = 'logout.php';
+    });
+
+    // Hide modal when clicking outside the modal content
+    logoutModal.addEventListener('click', (e) => {
+        if (e.target === logoutModal) {
+            logoutModal.classList.remove('show');
+        }
     });
 </script>
 </body>
