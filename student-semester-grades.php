@@ -238,15 +238,22 @@ if (isset($_GET['export']) && $_GET['export'] === 'excel') {
             --plp-green-lighter: #e0f2e9;
             --plp-green-pale: #f5fbf8;
             --plp-green-gradient: linear-gradient(135deg, #006341 0%, #008856 100%);
+            --plp-gold: #FFD700;
+            --plp-dark-green: #004d33;
+            --plp-light-green: #f8fcf9;
+            --plp-pale-green: #e8f5e9;
             --text-dark: #2d3748;
             --text-medium: #4a5568;
             --text-light: #718096;
-            --border-radius: 8px;
-            --box-shadow: 0 2px 8px rgba(0, 99, 65, 0.1);
-            --transition: all 0.3s ease;
+            --border-radius: 12px;
+            --border-radius-lg: 16px;
+            --box-shadow: 0 4px 12px rgba(0, 99, 65, 0.1);
+            --box-shadow-lg: 0 8px 24px rgba(0, 99, 65, 0.15);
+            --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
             --danger: #dc3545;
             --warning: #ffc107;
             --success: #28a745;
+            --info: #17a2b8;
         }
 
         * {
@@ -261,13 +268,14 @@ if (isset($_GET['export']) && $_GET['export'] === 'excel') {
             display: flex;
             min-height: 100vh;
             color: var(--text-dark);
-            line-height: 1.5;
+            line-height: 1.6;
         }
 
         .sidebar {
-            width: 280px;
+            width: 320px;
             background: white;
-            padding: 1rem;
+            box-shadow: var(--box-shadow);
+            padding: 1.5rem;
             display: flex;
             flex-direction: column;
             height: 100vh;
@@ -278,98 +286,129 @@ if (isset($_GET['export']) && $_GET['export'] === 'excel') {
 
         .sidebar-header {
             text-align: center;
-            padding-bottom: 1rem;
             border-bottom: 1px solid rgba(0, 99, 65, 0.1);
         }
 
+        .logo-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
         .logo {
-            width: 100px;
-            height: 100px;
-            margin: 0 auto;
+            width: 130px;
+            height: 130px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            transition: var(--transition);
+        }
+
+        .logo:hover {
+            transform: scale(1.05);
         }
 
         .logo img {
             width: 100%;
             height: 100%;
             object-fit: contain;
+            padding: 5px;
         }
 
         .portal-title {
             color: var(--plp-green);
-            font-size: 1.1rem;
+            font-size: 1.3rem;
             font-weight: 700;
-            margin: 0.5rem 0;
+            letter-spacing: 0.5px;
         }
 
         .student-email {
             color: var(--text-medium);
-            font-size: 0.8rem;
+            font-size: 0.85rem;
+            margin-bottom: 1rem;
+            word-break: break-all;
+            padding: 0.5rem;
+            border-radius: 6px;
+            font-weight: 500;
         }
 
         .nav-menu {
             list-style: none;
-            margin: 1rem 0;
+            flex-grow: 0.30;
+            margin-top: 0.7rem;
         }
 
         .nav-item {
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.7rem;
+            position: relative;
         }
 
         .nav-link {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
-            padding: 0.5rem;
+            gap: 0.75rem;
+            padding: 0.50rem;
             color: var(--text-medium);
             text-decoration: none;
             border-radius: var(--border-radius);
             transition: var(--transition);
             font-weight: 500;
-            font-size: 0.9rem;
         }
 
         .nav-link:hover:not(.active) {
             background: var(--plp-green-lighter);
             color: var(--plp-green);
+            transform: translateY(-3px);
         }
 
         .nav-link.active {
             background: var(--plp-green-gradient);
             color: white;
+            box-shadow: var(--box-shadow);
+        }
+
+        .sidebar-footer {
+            border-top: 3px solid rgba(0, 99, 65, 0.1);
         }
 
         .logout-btn {
+            margin-top:1rem;
             background: transparent;
             color: var(--text-medium);
-            padding: 0.5rem;
+            padding: 0.75rem 1rem;
             border: none;
             border-radius: var(--border-radius);
             cursor: pointer;
             text-decoration: none;
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 0.75rem;
             width: 100%;
             font-weight: 500;
             transition: var(--transition);
-            font-size: 0.9rem;
         }
 
         .logout-btn:hover {
             background: #fee2e2;
             color: #b91c1c;
+            transform: translateX(5px);
         }
 
         .main-content {
             flex: 1;
-            padding: 1rem;
+            padding: 1rem 2.5rem; 
             background: var(--plp-green-pale);
+            max-width: 100%;
+            margin: 0 auto;
+            width: 100%;
         }
 
         .header {
             background: white;
-            padding: 1rem;
+            padding: 1rem 2rem;
             border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
             margin-bottom: 1rem;
             background: var(--plp-green-gradient);
             color: white;
@@ -379,8 +418,9 @@ if (isset($_GET['export']) && $_GET['export'] === 'excel') {
         }
 
         .welcome {
-            font-size: 1.2rem;
+            font-size: 1.5rem;
             font-weight: 700;
+            letter-spacing: 0.5px;
         }
 
         .subject-count {
