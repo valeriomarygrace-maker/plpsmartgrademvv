@@ -1,6 +1,17 @@
 -- WARNING: This schema is for context only and is not meant to be run.
 -- Table order and constraints may not be valid for execution.
 
+CREATE TABLE public.admins (
+  id bigint NOT NULL DEFAULT nextval('admins_id_seq'::regclass),
+  username character varying NOT NULL UNIQUE,
+  email character varying NOT NULL UNIQUE,
+  password character varying NOT NULL,
+  fullname character varying NOT NULL,
+  role character varying DEFAULT 'admin'::character varying,
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT admins_pkey PRIMARY KEY (id)
+);
 CREATE TABLE public.otp_verification (
   id bigint NOT NULL DEFAULT nextval('otp_verification_id_seq'::regclass),
   email character varying NOT NULL,

@@ -39,6 +39,44 @@ try {
             // Get all students with optional semester filter
             $students = getAllStudents($filter_semester);
         }
+        
+        // Handle student update
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_student'])) {
+            $student_id = $_POST['student_id'];
+            $fullname = sanitizeInput($_POST['fullname']);
+            $email = sanitizeInput($_POST['email']);
+            $student_number = sanitizeInput($_POST['student_number']);
+            $course = sanitizeInput($_POST['course']);
+            $year_level = sanitizeInput($_POST['year_level']);
+            $semester = sanitizeInput($_POST['semester']);
+            $section = sanitizeInput($_POST['section']);
+            
+            // Validate required fields
+            if (empty($fullname) || empty($email) || empty($student_number) || empty($course) || empty($year_level) || empty($semester) || empty($section)) {
+                $error_message = 'All fields are required.';
+            } else {
+                // Update student data
+                $update_data = [
+                    'fullname' => $fullname,
+                    'email' => $email,
+                    'student_number' => $student_number,
+                    'course' => $course,
+                    'year_level' => $year_level,
+                    'semester' => $semester,
+                    'section' => $section
+                ];
+                
+                $result = supabaseUpdate('students', $update_data, ['id' => $student_id]);
+                
+                if ($result !== false) {
+                    $success_message = 'Student information updated successfully!';
+                    // Refresh student list
+                    $students = getAllStudents($filter_semester);
+                } else {
+                    $error_message = 'Failed to update student information.';
+                }
+            }
+        }
     }
 } catch (Exception $e) {
     $error_message = 'Database error: ' . $e->getMessage();
@@ -567,6 +605,117 @@ function searchStudents($query) {
             animation: slideIn 0.3s ease;
         }
 
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal.show {
+            display: flex;
+            opacity: 1;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 2.5rem;
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--box-shadow-lg);
+            max-width: 600px;
+            width: 90%;
+            transform: translateY(20px);
+            transition: transform 0.3s ease;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal.show .modal-content {
+            transform: translateY(0);
+        }
+
+        .modal-title {
+            color: var(--plp-green);
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+        }
+
+        .modal-body {
+            margin-bottom: 2rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .form-col {
+            flex: 1;
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .modal-btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 50px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            font-family: 'Poppins', sans-serif;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            min-width: 120px;
+            justify-content: center;
+        }
+
+        .modal-btn-cancel {
+            background: #f1f5f9;
+            color: var(--text-medium);
+        }
+
+        .modal-btn-cancel:hover {
+            background: #e2e8f0;
+            transform: translateY(-2px);
+        }
+
+        .modal-btn-confirm {
+            background: var(--plp-green-gradient);
+            color: white;
+            box-shadow: 0 4px 12px rgba(0, 99, 65, 0.3);
+        }
+
+        .modal-btn-confirm:hover {
+            transform: translateY(-2px);
+        }
+
         @keyframes slideIn {
             from {
                 opacity: 0;
@@ -616,94 +765,19 @@ function searchStudents($query) {
             .action-buttons {
                 flex-direction: column;
             }
-        }
-
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(4px);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
-        .modal.show {
-            display: flex;
-            opacity: 1;
-        }
-
-
-        .modal-content {
-            background: white;
-            padding: 2rem;
-            border-radius: var(--border-radius-lg);
-            box-shadow: var(--box-shadow-lg);
-            text-align: center;
-            max-width: 400px;
-            width: 90%;
-            transform: translateY(20px);
-            transition: transform 0.3s ease;
-        }
-
-        .modal.show .modal-content {
-            transform: translateY(0);
-        }
-
-        .modal-title {
-            color: var(--plp-green);
-            font-size: 1.5rem;
-            font-weight: 700;
-            margin-bottom: 1rem;
-        }
-
-        .modal-body {
-            margin-bottom: 2rem;
-            color: var(--text-medium);
-        }
-
-        .modal-actions {
-            display: flex;
-            justify-content: center;
-            gap: 1rem;
-        }
-
-        .modal-btn {
-            padding: 0.75rem 1.5rem;
-            border: none;
-            border-radius: var(--border-radius);
-            font-weight: 600;
-            cursor: pointer;
-            transition: var(--transition);
-            text-decoration: none;
-            display: inline-block;
-        }
-
-        .modal-btn-cancel {
-            background: var(--plp-green-lighter);
-            color: var(--plp-green);
-        }
-
-        .modal-btn-cancel:hover {
-            background: var(--plp-green-light);
-            color: white;
-            transform: translateY(-2px);
-        }
-
-        .modal-btn-confirm {
-            background: var(--plp-green-gradient);
-            color: white;
-        }
-
-        .modal-btn-confirm:hover {
-            background: linear-gradient(135deg, var(--plp-green-light), var(--plp-green));
-            transform: translateY(-2px);
+            
+            .modal-actions {
+                flex-direction: column;
+            }
+            
+            .modal-btn {
+                min-width: 100%;
+            }
+            
+            .form-row {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
         }
     </style>
 </head>
@@ -864,11 +938,12 @@ function searchStudents($query) {
                                 </td>
                                 <td>
                                     <div class="action-buttons">
-                                        <a href="student-profile.php?student_id=<?php echo $student['id']; ?>" 
-                                           class="action-btn btn-update" 
-                                           title="Update Student">
+                                        <button type="button" 
+                                                class="action-btn btn-update" 
+                                                title="Update Student"
+                                                onclick="openUpdateModal(<?php echo htmlspecialchars(json_encode($student)); ?>)">
                                             <i class="fas fa-edit"></i> Update
-                                        </a>
+                                        </button>
                                     </div>
                                 </td>
                             </tr>
@@ -890,7 +965,76 @@ function searchStudents($query) {
             <?php endif; ?>
         </div>
     </div>
-            <!--  Logout Modal -->
+
+    <!-- Update Student Modal -->
+    <div class="modal" id="updateStudentModal">
+        <div class="modal-content">
+            <h3 class="modal-title">
+                <i class="fas fa-user-edit"></i>
+                Update Student Information
+            </h3>
+            <form method="POST" action="admin-students.php" id="updateStudentForm">
+                <input type="hidden" name="student_id" id="update_student_id">
+                <input type="hidden" name="update_student" value="1">
+                
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label">Full Name</label>
+                        <input type="text" name="fullname" id="update_fullname" class="form-input" required>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-col">
+                            <label class="form-label">Email</label>
+                            <input type="email" name="email" id="update_email" class="form-input" required>
+                        </div>
+                        <div class="form-col">
+                            <label class="form-label">Student Number</label>
+                            <input type="text" name="student_number" id="update_student_number" class="form-input" required>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Course</label>
+                        <input type="text" name="course" id="update_course" class="form-input" required>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-col">
+                            <label class="form-label">Year Level</label>
+                            <select name="year_level" id="update_year_level" class="form-select" required>
+                                <option value="1">1st Year</option>
+                                <option value="2">2nd Year</option>
+                                <option value="3">3rd Year</option>
+                                <option value="4">4th Year</option>
+                            </select>
+                        </div>
+                        <div class="form-col">
+                            <label class="form-label">Semester</label>
+                            <select name="semester" id="update_semester" class="form-select" required>
+                                <option value="1st Semester">1st Semester</option>
+                                <option value="2nd Semester">2nd Semester</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Section</label>
+                        <input type="text" name="section" id="update_section" class="form-input" required>
+                    </div>
+                </div>
+                
+                <div class="modal-actions">
+                    <button type="button" class="modal-btn modal-btn-cancel" onclick="closeUpdateModal()">Cancel</button>
+                    <button type="submit" class="modal-btn modal-btn-confirm">
+                        <i class="fas fa-save"></i> Update Student
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Logout Modal -->
     <div class="modal" id="logoutModal">
         <div class="modal-content" style="max-width: 450px; text-align: center;">
             <h3 style="color: var(--plp-green); font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem;">
@@ -912,6 +1056,24 @@ function searchStudents($query) {
     </div>
 
     <script>
+        // Update Modal Functions
+        function openUpdateModal(student) {
+            document.getElementById('update_student_id').value = student.id;
+            document.getElementById('update_fullname').value = student.fullname;
+            document.getElementById('update_email').value = student.email;
+            document.getElementById('update_student_number').value = student.student_number;
+            document.getElementById('update_course').value = student.course;
+            document.getElementById('update_year_level').value = student.year_level;
+            document.getElementById('update_semester').value = student.semester;
+            document.getElementById('update_section').value = student.section;
+            
+            document.getElementById('updateStudentModal').classList.add('show');
+        }
+
+        function closeUpdateModal() {
+            document.getElementById('updateStudentModal').classList.remove('show');
+        }
+
         // Auto-hide alerts after 5 seconds
         setTimeout(function() {
             const alerts = document.querySelectorAll('.alert-success, .alert-error');
@@ -926,30 +1088,35 @@ function searchStudents($query) {
         const cancelLogout = document.getElementById('cancelLogout');
         const confirmLogout = document.getElementById('confirmLogout');
 
-// Show modal when clicking logout button
         logoutBtn.addEventListener('click', (e) => {
             e.preventDefault();
             logoutModal.classList.add('show');
         });
 
-        // Hide modal when clicking cancel
         cancelLogout.addEventListener('click', () => {
             logoutModal.classList.remove('show');
         });
 
-        // Handle logout confirmation
         confirmLogout.addEventListener('click', () => {
             window.location.href = 'logout.php';
         });
 
-// Hide modal when clicking outside the modal content
-        const modals = [addSubjectModal, editSubjectModal, archiveSubjectModal, logoutModal];
-        modals.forEach(modal => {
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    modal.classList.remove('show');
-                }
-            });
+        // Close modals when clicking outside
+        document.addEventListener('click', function(e) {
+            if (e.target === document.getElementById('updateStudentModal')) {
+                closeUpdateModal();
+            }
+            if (e.target === logoutModal) {
+                logoutModal.classList.remove('show');
+            }
+        });
+
+        // Close modal with Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeUpdateModal();
+                logoutModal.classList.remove('show');
+            }
         });
     </script>
 </body>
