@@ -6,32 +6,19 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Check if user is logged in and either student or admin
-if (!isset($_SESSION['logged_in']) || ($_SESSION['user_type'] !== 'student' && $_SESSION['user_type'] !== 'admin')) {
+if (!isset($_SESSION['logged_in']) || $_SESSION['user_type'] !== 'student') {
     header('Location: login.php');
     exit;
 }
 
 $userEmail = $_SESSION['user_email'] ?? '';
 $userId = $_SESSION['user_id'] ?? null;
-$isAdmin = $_SESSION['user_type'] === 'admin';
 
-// If admin is viewing a student profile, get student ID from URL
-if ($isAdmin && isset($_GET['student_id'])) {
-    $studentId = $_GET['student_id'];
-    $student = getStudentById($studentId);
-} else {
-    // Regular student viewing their own profile
-    $student = getStudentById($userId);
-}
-
+// Get student data from Supabase
+$student = getStudentById($userId);
 if (!$student) {
     $_SESSION['error_message'] = "Student account not found";
-    if ($isAdmin) {
-        header('Location: admin-students.php');
-    } else {
-        header('Location: login.php');
-    }
+    header('Location: login.php');
     exit;
 }
 
@@ -964,58 +951,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['profile_picture'])) 
         </div>
 
         <ul class="nav-menu">
-            <?php if ($isAdmin): ?>
-                <!-- Admin Navigation -->
-                <li class="nav-item">
-                    <a href="admin-dashboard.php" class="nav-link">
-                        <i class="fas fa-chart-line"></i>
-                        Dashboard
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a href="admin-students.php" class="nav-link">
-                        <i class="fas fa-users"></i>
-                        Manage Students
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a href="student-profile.php?student_id=<?php echo $student['id']; ?>" class="nav-link active">
-                        <i class="fas fa-user"></i>
-                        Student Profile
-                    </a>
-                </li>
-            <?php else: ?>
-                <li class="nav-item">
-                    <a href="student-dashboard.php" class="nav-link">
-                        <i class="fas fa-chart-line"></i>
-                        Dashboard
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a href="student-profile.php" class="nav-link active">
-                        <i class="fas fa-user"></i>
-                        Profile
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a href="student-subjects.php" class="nav-link">
-                        <i class="fas fa-book"></i>
-                        Subjects
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a href="student-archived-subject.php" class="nav-link">
-                        <i class="fas fa-archive"></i>
-                        Archived Subjects
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a href="student-semester-grades.php" class="nav-link">
-                        <i class="fas fa-history"></i>
-                        History Records
-                    </a>
-                </li>
-            <?php endif; ?>
+            <li class="nav-item">
+                <a href="student-dashboard.php" class="nav-link">
+                    <i class="fas fa-chart-line"></i>
+                    Dashboard
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="student-profile.php" class="nav-link active">
+                    <i class="fas fa-user"></i>
+                    Profile
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="student-subjects.php" class="nav-link">
+                    <i class="fas fa-book"></i>
+                    Subjects
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="student-archived-subject.php" class="nav-link">
+                    <i class="fas fa-archive"></i>
+                    Archived Subjects
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="student-semester-grades.php" class="nav-link">
+                    <i class="fas fa-history"></i>
+                    History Records
+                </a>
+            </li>
         </ul>
 
         <div class="sidebar-footer">
@@ -1068,15 +1033,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['profile_picture'])) 
             </div>
 
             <div class="header-actions">
-                <?php if ($isAdmin): ?>
-                    <a href="admin-students.php" class="btn btn-secondary">
-                        <i class="fas fa-arrow-left"></i> Back to Students
-                    </a>
-                <?php else: ?>
-                    <button type="button" class="btn btn-secondary" id="editSemesterBtn">
-                        <i class="fas fa-edit"></i> Edit Semester
-                    </button>
-                <?php endif; ?>
+                <button type="button" class="btn btn-secondary" id="editSemesterBtn">
+                    <i class="fas fa-edit"></i> Edit Semester
+                </button>
             </div>
         </div>
 

@@ -635,12 +635,58 @@ try {
         </div>
     </div>
 
+            <!--  Logout Modal -->
+    <div class="modal" id="logoutModal">
+        <div class="modal-content" style="max-width: 450px; text-align: center;">
+            <h3 style="color: var(--plp-green); font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem;">
+                Confirm Logout
+            </h3>
+            <div style="color: var(--text-medium); margin-bottom: 2rem; line-height: 1.6;">
+                Are you sure you want to logout? You'll need<br>
+                to log in again to access your account.
+            </div>
+            <div style="display: flex; justify-content: center; gap: 1rem;">
+                <button class="modal-btn modal-btn-cancel" id="cancelLogout" style="min-width: 120px;">
+                    Cancel
+                </button>
+                <button class="modal-btn modal-btn-confirm" id="confirmLogout" style="min-width: 120px;">
+                    Yes, Logout
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
-        // Simple logout confirmation
-        document.querySelector('.logout-btn').addEventListener('click', (e) => {
-            if (!confirm('Are you sure you want to logout?')) {
-                e.preventDefault();
-            }
+        // Logout modal functionality
+        const logoutBtn = document.querySelector('.logout-btn');
+        const logoutModal = document.getElementById('logoutModal');
+        const cancelLogout = document.getElementById('cancelLogout');
+        const confirmLogout = document.getElementById('confirmLogout');
+
+// Show modal when clicking logout button
+        logoutBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            logoutModal.classList.add('show');
+        });
+
+        // Hide modal when clicking cancel
+        cancelLogout.addEventListener('click', () => {
+            logoutModal.classList.remove('show');
+        });
+
+        // Handle logout confirmation
+        confirmLogout.addEventListener('click', () => {
+            window.location.href = 'logout.php';
+        });
+
+// Hide modal when clicking outside the modal content
+        const modals = [addSubjectModal, editSubjectModal, archiveSubjectModal, logoutModal];
+        modals.forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.remove('show');
+                }
+            });
         });
     </script>
 </body>

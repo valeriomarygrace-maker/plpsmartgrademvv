@@ -39,33 +39,6 @@ try {
             // Get all students with optional semester filter
             $students = getAllStudents($filter_semester);
         }
-        
-        // Handle student actions
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            if (isset($_POST['delete_student'])) {
-                $student_id = $_POST['student_id'];
-                $result = deleteStudent($student_id);
-                
-                if ($result) {
-                    $success_message = 'Student account deleted successfully!';
-                    // Refresh student list
-                    $students = getAllStudents($filter_semester);
-                } else {
-                    $error_message = 'Failed to delete student account.';
-                }
-            }
-            
-            if (isset($_POST['reset_password'])) {
-                $student_id = $_POST['student_id'];
-                $result = resetStudentPassword($student_id);
-                
-                if ($result) {
-                    $success_message = 'Student password reset successfully!';
-                } else {
-                    $error_message = 'Failed to reset student password.';
-                }
-            }
-        }
     }
 } catch (Exception $e) {
     $error_message = 'Database error: ' . $e->getMessage();
@@ -128,63 +101,6 @@ function searchStudents($query) {
     
     return array_values($filtered_students);
 }
-
-/**
- * Delete student account and related data
- */
-function deleteStudent($student_id) {
-    try {
-        // First, get all student subjects
-        $student_subjects = supabaseFetch('student_subjects', ['student_id' => $student_id]);
-        
-        if ($student_subjects && is_array($student_subjects)) {
-            foreach ($student_subjects as $subject) {
-                // Delete subject scores
-                supabaseDelete('student_subject_scores', ['student_subject_id' => $subject['id']]);
-                
-                // Delete class standing categories
-                supabaseDelete('student_class_standing_categories', ['student_subject_id' => $subject['id']]);
-                
-                // Delete subject performance
-                supabaseDelete('subject_performance', ['student_subject_id' => $subject['id']]);
-            }
-            
-            // Delete student subjects
-            supabaseDelete('student_subjects', ['student_id' => $student_id]);
-        }
-        
-        // Delete behavioral data
-        supabaseDelete('student_behavioral_metrics', ['student_id' => $student_id]);
-        supabaseDelete('student_behavior_logs', ['student_id' => $student_id]);
-        supabaseDelete('student_predictions', ['student_id' => $student_id]);
-        supabaseDelete('student_interventions', ['student_id' => $student_id]);
-        
-        // Finally delete the student
-        $result = supabaseDelete('students', ['id' => $student_id]);
-        
-        return $result !== false;
-        
-    } catch (Exception $e) {
-        error_log("Error deleting student: " . $e->getMessage());
-        return false;
-    }
-}
-
-/**
- * Reset student password to default
- */
-function resetStudentPassword($student_id) {
-    try {
-        $default_password = hashPassword('student123'); // Default password
-        $result = supabaseUpdate('students', ['password' => $default_password], ['id' => $student_id]);
-        
-        return $result !== false;
-        
-    } catch (Exception $e) {
-        error_log("Error resetting password: " . $e->getMessage());
-        return false;
-    }
-}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -213,10 +129,6 @@ function resetStudentPassword($student_id) {
             --box-shadow: 0 4px 12px rgba(0, 99, 65, 0.1);
             --box-shadow-lg: 0 8px 24px rgba(0, 99, 65, 0.15);
             --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-            --danger: #dc3545;
-            --warning: #ffc107;
-            --success: #28a745;
-            --info: #17a2b8;
         }
 
         * {
@@ -495,6 +407,7 @@ function resetStudentPassword($student_id) {
             background: var(--plp-green-pale);
             padding: 1.5rem;
             border-bottom: 1px solid var(--plp-green-lighter);
+            text-align: center;
         }
 
         .table-title {
@@ -503,6 +416,7 @@ function resetStudentPassword($student_id) {
             font-weight: 600;
             display: flex;
             align-items: center;
+            justify-content: center;
             gap: 0.75rem;
         }
 
@@ -515,7 +429,7 @@ function resetStudentPassword($student_id) {
             background: var(--plp-green);
             color: white;
             padding: 1rem;
-            text-align: left;
+            text-align: center;
             font-weight: 600;
             font-size: 0.9rem;
         }
@@ -524,6 +438,7 @@ function resetStudentPassword($student_id) {
             padding: 1rem;
             border-bottom: 1px solid var(--plp-green-lighter);
             vertical-align: middle;
+            text-align: center;
         }
 
         .students-table tr:hover {
@@ -534,28 +449,17 @@ function resetStudentPassword($student_id) {
             border-bottom: none;
         }
 
-        .student-avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: var(--plp-green);
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 600;
-            font-size: 0.9rem;
-        }
-
         .student-info {
             display: flex;
             align-items: center;
+            justify-content: center;
             gap: 1rem;
         }
 
         .student-details {
             display: flex;
             flex-direction: column;
+            align-items: center;
         }
 
         .student-name {
@@ -588,19 +492,14 @@ function resetStudentPassword($student_id) {
             color: #2f855a;
         }
 
-        .status-inactive {
-            background: #fed7d7;
-            color: #c53030;
-        }
-
         .action-buttons {
             display: flex;
             gap: 0.5rem;
-            justify-content: flex-end;
+            justify-content: center;
         }
 
         .action-btn {
-            padding: 0.5rem;
+            padding: 0.5rem 1rem;
             border: none;
             border-radius: var(--border-radius);
             cursor: pointer;
@@ -610,36 +509,17 @@ function resetStudentPassword($student_id) {
             align-items: center;
             gap: 0.25rem;
             text-decoration: none;
+            font-weight: 500;
         }
 
-        .btn-view {
-            background: var(--plp-green-lighter);
-            color: var(--plp-green);
-        }
-
-        .btn-view:hover {
+        .btn-update {
             background: var(--plp-green);
             color: white;
         }
 
-        .btn-reset {
-            background: #fff5f5;
-            color: #e53e3e;
-        }
-
-        .btn-reset:hover {
-            background: #e53e3e;
-            color: white;
-        }
-
-        .btn-delete {
-            background: #fed7d7;
-            color: #c53030;
-        }
-
-        .btn-delete:hover {
-            background: #c53030;
-            color: white;
+        .btn-update:hover {
+            background: var(--plp-dark-green);
+            transform: translateY(-2px);
         }
 
         /* Empty State */
@@ -685,109 +565,6 @@ function resetStudentPassword($student_id) {
             align-items: center;
             gap: 0.75rem;
             animation: slideIn 0.3s ease;
-        }
-
-        /* Modal Styles */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(4px);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
-        .modal.show {
-            display: flex;
-            opacity: 1;
-        }
-
-        .modal-content {
-            background: white;
-            padding: 2.5rem;
-            border-radius: var(--border-radius-lg);
-            box-shadow: var(--box-shadow-lg);
-            max-width: 500px;
-            width: 90%;
-            transform: translateY(20px);
-            transition: transform 0.3s ease;
-        }
-
-        .modal.show .modal-content {
-            transform: translateY(0);
-        }
-
-        .modal-title {
-            color: var(--plp-green);
-            font-size: 1.5rem;
-            font-weight: 700;
-            margin-bottom: 1rem;
-            text-align: center;
-        }
-
-        .modal-body {
-            margin-bottom: 2rem;
-            color: var(--text-medium);
-            text-align: center;
-            line-height: 1.6;
-        }
-
-        .modal-actions {
-            display: flex;
-            justify-content: center;
-            gap: 1rem;
-        }
-
-        .modal-btn {
-            padding: 0.75rem 1.5rem;
-            border: none;
-            border-radius: 50px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: var(--transition);
-            font-family: 'Poppins', sans-serif;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            min-width: 120px;
-            justify-content: center;
-        }
-
-        .modal-btn-cancel {
-            background: #f1f5f9;
-            color: var(--text-medium);
-        }
-
-        .modal-btn-cancel:hover {
-            background: #e2e8f0;
-            transform: translateY(-2px);
-        }
-
-        .modal-btn-confirm {
-            background: var(--plp-green-gradient);
-            color: white;
-            box-shadow: 0 4px 12px rgba(0, 99, 65, 0.3);
-        }
-
-        .modal-btn-confirm:hover {
-            transform: translateY(-2px);
-        }
-
-        .modal-btn-danger {
-            background: #dc3545;
-            color: white;
-        }
-
-        .modal-btn-danger:hover {
-            background: #c53030;
-            transform: translateY(-2px);
         }
 
         @keyframes slideIn {
@@ -838,14 +615,6 @@ function resetStudentPassword($student_id) {
             
             .action-buttons {
                 flex-direction: column;
-            }
-            
-            .modal-actions {
-                flex-direction: column;
-            }
-            
-            .modal-btn {
-                min-width: 100%;
             }
         }
     </style>
@@ -955,7 +724,7 @@ function resetStudentPassword($student_id) {
                             <option value="2nd" <?php echo $filter_semester === '2nd' ? 'selected' : ''; ?>>2nd Semester</option>
                         </select>
                         <?php if (!empty($search_query) || !empty($filter_semester)): ?>
-                            <a href="admin-students.php" class="search-btn" style="background: var(--danger);">
+                            <a href="admin-students.php" class="search-btn" style="background: #dc3545;">
                                 <i class="fas fa-times"></i> Clear
                             </a>
                         <?php endif; ?>
@@ -990,9 +759,6 @@ function resetStudentPassword($student_id) {
                             <tr>
                                 <td>
                                     <div class="student-info">
-                                        <div class="student-avatar">
-                                            <?php echo strtoupper(substr($student['fullname'], 0, 1)); ?>
-                                        </div>
                                         <div class="student-details">
                                             <div class="student-name"><?php echo htmlspecialchars($student['fullname']); ?></div>
                                             <div class="student-email"><?php echo htmlspecialchars($student['email']); ?></div>
@@ -1017,22 +783,10 @@ function resetStudentPassword($student_id) {
                                 <td>
                                     <div class="action-buttons">
                                         <a href="student-profile.php?student_id=<?php echo $student['id']; ?>" 
-                                           class="action-btn btn-view" 
-                                           title="View Profile">
-                                            <i class="fas fa-eye"></i> View
+                                           class="action-btn btn-update" 
+                                           title="Update Student">
+                                            <i class="fas fa-edit"></i> Update
                                         </a>
-                                        <form method="POST" style="display: inline;" onsubmit="return confirmReset()">
-                                            <input type="hidden" name="student_id" value="<?php echo $student['id']; ?>">
-                                            <button type="submit" name="reset_password" class="action-btn btn-reset" title="Reset Password">
-                                                <i class="fas fa-key"></i> Reset
-                                            </button>
-                                        </form>
-                                        <form method="POST" style="display: inline;" onsubmit="return confirmDelete()">
-                                            <input type="hidden" name="student_id" value="<?php echo $student['id']; ?>">
-                                            <button type="submit" name="delete_student" class="action-btn btn-delete" title="Delete Student">
-                                                <i class="fas fa-trash"></i> Delete
-                                            </button>
-                                        </form>
                                     </div>
                                 </td>
                             </tr>
@@ -1054,32 +808,28 @@ function resetStudentPassword($student_id) {
             <?php endif; ?>
         </div>
     </div>
-
-    <!-- Logout Modal -->
+            <!--  Logout Modal -->
     <div class="modal" id="logoutModal">
         <div class="modal-content" style="max-width: 450px; text-align: center;">
-            <h3 class="modal-title">Confirm Logout</h3>
-            <div class="modal-body">
+            <h3 style="color: var(--plp-green); font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem;">
+                Confirm Logout
+            </h3>
+            <div style="color: var(--text-medium); margin-bottom: 2rem; line-height: 1.6;">
                 Are you sure you want to logout? You'll need<br>
                 to log in again to access your account.
             </div>
-            <div class="modal-actions">
-                <button class="modal-btn modal-btn-cancel" id="cancelLogout">Cancel</button>
-                <button class="modal-btn modal-btn-confirm" id="confirmLogout">Yes, Logout</button>
+            <div style="display: flex; justify-content: center; gap: 1rem;">
+                <button class="modal-btn modal-btn-cancel" id="cancelLogout" style="min-width: 120px;">
+                    Cancel
+                </button>
+                <button class="modal-btn modal-btn-confirm" id="confirmLogout" style="min-width: 120px;">
+                    Yes, Logout
+                </button>
             </div>
         </div>
     </div>
 
     <script>
-        // Confirmation dialogs
-        function confirmDelete() {
-            return confirm('Are you sure you want to delete this student account? This action cannot be undone.');
-        }
-
-        function confirmReset() {
-            return confirm('Are you sure you want to reset this student\'s password? The new password will be "student123".');
-        }
-
         // Auto-hide alerts after 5 seconds
         setTimeout(function() {
             const alerts = document.querySelectorAll('.alert-success, .alert-error');
@@ -1094,23 +844,30 @@ function resetStudentPassword($student_id) {
         const cancelLogout = document.getElementById('cancelLogout');
         const confirmLogout = document.getElementById('confirmLogout');
 
+// Show modal when clicking logout button
         logoutBtn.addEventListener('click', (e) => {
             e.preventDefault();
             logoutModal.classList.add('show');
         });
 
+        // Hide modal when clicking cancel
         cancelLogout.addEventListener('click', () => {
             logoutModal.classList.remove('show');
         });
 
+        // Handle logout confirmation
         confirmLogout.addEventListener('click', () => {
             window.location.href = 'logout.php';
         });
 
-        logoutModal.addEventListener('click', (e) => {
-            if (e.target === logoutModal) {
-                logoutModal.classList.remove('show');
-            }
+// Hide modal when clicking outside the modal content
+        const modals = [addSubjectModal, editSubjectModal, archiveSubjectModal, logoutModal];
+        modals.forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.remove('show');
+                }
+            });
         });
     </script>
 </body>
