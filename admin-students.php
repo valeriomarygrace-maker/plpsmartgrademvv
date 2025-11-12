@@ -157,7 +157,7 @@ function deleteStudent($student_id) {
         supabaseDelete('student_behavioral_metrics', ['student_id' => $student_id]);
         supabaseDelete('student_behavior_logs', ['student_id' => $student_id]);
         supabaseDelete('student_predictions', ['student_id' => $student_id]);
-        supabaseDelete('student_interventions', ['student_id' => $student_id']);
+        supabaseDelete('student_interventions', ['student_id' => $student_id]);
         
         // Finally delete the student
         $result = supabaseDelete('students', ['id' => $student_id]);

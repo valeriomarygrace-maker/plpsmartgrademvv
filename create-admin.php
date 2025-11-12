@@ -6,7 +6,7 @@ $adminData = [
     'username' => 'admin',
     'email' => 'admin@plpasig.edu.ph',
     'password' => hashPassword('plpadmin123'),
-    'fullname' => 'System Administrator',
+    'fullname' => 'Administrator',
     'role' => 'admin',
     'is_active' => true
 ];
