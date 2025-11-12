@@ -14,7 +14,7 @@ if ($existing_admin) {
 $admin_data = [
     'username' => 'admin',
     'email' => 'admin@plpasig.edu.ph',
-    'password' => hashPassword('admin123'), // Change this password
+    'password' => hashPassword('plpadmin123'), // Change this password
     'fullname' => 'System Administrator',
     'role' => 'admin',
     'is_active' => true
@@ -27,7 +27,7 @@ if ($result !== false) {
     echo "<br><strong>Login Credentials:</strong>";
     echo "<br>Username: admin";
     echo "<br>Email: admin@plpasig.edu.ph"; 
-    echo "<br>Password: admin123";
+    echo "<br>Password: plpadmin123";
     echo "<br><br><strong style='color: red;'>Please change the password immediately and delete this file!</strong>";
 } else {
     echo "Failed to create admin user. Check your Supabase connection and table structure.";
