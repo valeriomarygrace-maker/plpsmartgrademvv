@@ -282,4 +282,34 @@ if (isset($_SESSION['created']) && (time() - $_SESSION['created'] > 28800)) {
         exit;
     }
 }
+/**
+ * Admin Functions
+ */
+function getAdminByEmail($email) {
+    $admins = supabaseFetch('admins', ['email' => $email]);
+    // Check if we got a valid response and it's not empty
+    if ($admins && is_array($admins) && count($admins) > 0) {
+        return $admins[0];
+    }
+    return null;
+}
+
+function getAdminByUsername($username) {
+    $admins = supabaseFetch('admins', ['username' => $username]);
+    if ($admins && is_array($admins) && count($admins) > 0) {
+        return $admins[0];
+    }
+    return null;
+}
+
+function adminExists($email) {
+    return getAdminByEmail($email) !== null;
+}
+
+function requireAdminRole() {
+    if (!isLoggedIn() || $_SESSION['user_type'] !== 'admin') {
+        header('Location: login.php');
+        exit;
+    }
+}
 ?>

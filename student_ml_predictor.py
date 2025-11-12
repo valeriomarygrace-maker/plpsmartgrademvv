@@ -187,7 +187,7 @@ class BehaviorAnalyzer:
         
         # Risk-specific additional recommendations
         if risk_level == 'high_risk':
-            recommendations.append("Communicate with professor about your academic challenges")
+            recommendations.append("Communicate with professor about your scores")
             recommendations.append("Utilize all available academic support resources")
         
         # Term-specific recommendations

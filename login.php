@@ -7,43 +7,68 @@ $success = '';
 $showSignupModal = false;
 $email = '';
 
+
 // Handle login form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && isset($_POST['password']) && !isset($_POST['signup'])) {
     $email = sanitizeInput($_POST['email']);
     $password = $_POST['password'];
     
-    // Validate PLP email
-    if (!isValidPLPEmail($email)) {
-        $error = 'Your email address is not valid.';
-    } else {
-        // Check if email exists in students table
-        $student = getStudentByEmail($email);
-        
-        if ($student) {
-            // Check if student has a password set
-            if (empty($student['password'])) {
-                $error = 'No password set for this account.';
-                $showSignupModal = true;
-            } elseif (verifyPassword($password, $student['password'])) {
-                // Regenerate session for security
-                regenerateSession();
-                
-                $_SESSION['logged_in'] = true;
-                $_SESSION['user_email'] = $email;
-                $_SESSION['user_type'] = 'student';
-                $_SESSION['user_id'] = $student['id'];
-                $_SESSION['user_name'] = $student['fullname'];
-                $_SESSION['login_time'] = time();
-                
-                // Redirect to student dashboard
-                header('Location: student-dashboard.php');
-                exit;
-            } else {
-                $error = 'Invalid password. Please try again.';
-            }
+    // First, check if it's an admin
+    $admin = getAdminByEmail($email);
+    
+    if ($admin) {
+        // Admin login
+        if (verifyPassword($password, $admin['password'])) {
+            // Regenerate session for security
+            regenerateSession();
+            
+            $_SESSION['logged_in'] = true;
+            $_SESSION['user_email'] = $email;
+            $_SESSION['user_type'] = 'admin';
+            $_SESSION['user_id'] = $admin['id'];
+            $_SESSION['user_name'] = $admin['fullname'];
+            $_SESSION['login_time'] = time();
+            
+            // Redirect to admin dashboard
+            header('Location: admin-dashboard.php');
+            exit;
         } else {
-            $error = 'Email not found in our system. Please sign up first.';
-            $showSignupModal = true;
+            $error = 'Invalid password. Please try again.';
+        }
+    } else {
+        // Check if it's a student (your existing student login logic)
+        if (!isValidPLPEmail($email)) {
+            $error = 'Your email address is not valid.';
+        } else {
+            // Check if email exists in students table
+            $student = getStudentByEmail($email);
+            
+            if ($student) {
+                // Check if student has a password set
+                if (empty($student['password'])) {
+                    $error = 'No password set for this account.';
+                    $showSignupModal = true;
+                } elseif (verifyPassword($password, $student['password'])) {
+                    // Regenerate session for security
+                    regenerateSession();
+                    
+                    $_SESSION['logged_in'] = true;
+                    $_SESSION['user_email'] = $email;
+                    $_SESSION['user_type'] = 'student';
+                    $_SESSION['user_id'] = $student['id'];
+                    $_SESSION['user_name'] = $student['fullname'];
+                    $_SESSION['login_time'] = time();
+                    
+                    // Redirect to student dashboard
+                    header('Location: student-dashboard.php');
+                    exit;
+                } else {
+                    $error = 'Invalid password. Please try again.';
+                }
+            } else {
+                $error = 'Email not found in our system. Please sign up first.';
+                $showSignupModal = true;
+            }
         }
     }
 }
