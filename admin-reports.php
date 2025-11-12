@@ -888,6 +888,117 @@ function calculateRiskSummary($risk_assessments) {
                 overflow-x: auto;
             }
         }
+        
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal.show {
+            display: flex;
+            opacity: 1;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 2.5rem;
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--box-shadow-lg);
+            max-width: 600px;
+            width: 90%;
+            transform: translateY(20px);
+            transition: transform 0.3s ease;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal.show .modal-content {
+            transform: translateY(0);
+        }
+
+        .modal-title {
+            color: var(--plp-green);
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+        }
+
+        .modal-body {
+            margin-bottom: 2rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .form-col {
+            flex: 1;
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .modal-btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 50px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            font-family: 'Poppins', sans-serif;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            min-width: 120px;
+            justify-content: center;
+        }
+
+        .modal-btn-cancel {
+            background: #f1f5f9;
+            color: var(--text-medium);
+        }
+
+        .modal-btn-cancel:hover {
+            background: #e2e8f0;
+            transform: translateY(-2px);
+        }
+
+        .modal-btn-confirm {
+            background: var(--plp-green-gradient);
+            color: white;
+            box-shadow: 0 4px 12px rgba(0, 99, 65, 0.3);
+        }
+
+        .modal-btn-confirm:hover {
+            transform: translateY(-2px);
+        }
     </style>
 </head>
 <body>
@@ -960,272 +1071,55 @@ function calculateRiskSummary($risk_assessments) {
             </div>
         </div>
 
-        <!-- Report Controls -->
-        <div class="report-controls">
-            <div class="control-group">
-                <label class="form-label">Report Type</label>
-                <select name="report_type" class="form-select" onchange="updateReport()">
-                    <option value="overview" <?php echo $report_type === 'overview' ? 'selected' : ''; ?>>Overview Dashboard</option>
-                    <option value="student_performance" <?php echo $report_type === 'student_performance' ? 'selected' : ''; ?>>Student Performance</option>
-                    <option value="subject_analysis" <?php echo $report_type === 'subject_analysis' ? 'selected' : ''; ?>>Subject Analysis</option>
-                    <option value="risk_assessment" <?php echo $report_type === 'risk_assessment' ? 'selected' : ''; ?>>Risk Assessment</option>
-                </select>
+        
+    <!-- Logout Modal -->
+    <div class="modal" id="logoutModal">
+        <div class="modal-content" style="max-width: 450px; text-align: center;">
+            <h3 style="color: var(--plp-green); font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem;">
+                Confirm Logout
+            </h3>
+            <div style="color: var(--text-medium); margin-bottom: 2rem; line-height: 1.6;">
+                Are you sure you want to logout? You'll need<br>
+                to log in again to access your account.
             </div>
-            
-            <div class="control-group">
-                <label class="form-label">Time Period</label>
-                <select name="time_period" class="form-select" onchange="updateReport()">
-                    <option value="current_semester" <?php echo $time_period === 'current_semester' ? 'selected' : ''; ?>>Current Semester</option>
-                    <option value="last_30_days" <?php echo $time_period === 'last_30_days' ? 'selected' : ''; ?>>Last 30 Days</option>
-                    <option value="last_6_months" <?php echo $time_period === 'last_6_months' ? 'selected' : ''; ?>>Last 6 Months</option>
-                    <option value="all_time" <?php echo $time_period === 'all_time' ? 'selected' : ''; ?>>All Time</option>
-                </select>
-            </div>
-            
-            <div class="control-group">
-                <button type="button" class="generate-btn" onclick="generateReport()">
-                    <i class="fas fa-sync-alt"></i> Generate Report
+            <div style="display: flex; justify-content: center; gap: 1rem;">
+                <button class="modal-btn modal-btn-cancel" id="cancelLogout" style="min-width: 120px;">
+                    Cancel
                 </button>
-            </div>
-        </div>
-
-        <!-- Report Content -->
-        <div class="report-content">
-            <div class="report-header">
-                <div class="report-title">
-                    <i class="fas fa-chart-pie"></i>
-                    <?php 
-                    $report_titles = [
-                        'overview' => 'System Overview Dashboard',
-                        'student_performance' => 'Student Performance Report',
-                        'subject_analysis' => 'Subject Analysis Report',
-                        'risk_assessment' => 'Risk Assessment Report'
-                    ];
-                    echo $report_titles[$report_type] ?? 'Reports Dashboard';
-                    ?>
-                </div>
-            </div>
-            
-            <div class="report-body">
-                <?php if ($report_type === 'overview'): ?>
-                    <!-- Overview Report -->
-                    <div class="stats-grid">
-                        <div class="stat-card">
-                            <div class="stat-value"><?php echo $report_data['total_students'] ?? 0; ?></div>
-                            <div class="stat-label">Total Students</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value"><?php echo $report_data['active_students'] ?? 0; ?></div>
-                            <div class="stat-label">Active Students</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value"><?php echo $report_data['total_subjects'] ?? 0; ?></div>
-                            <div class="stat-label">Total Subjects</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value"><?php echo $report_data['recent_activity']['new_registrations'] ?? 0; ?></div>
-                            <div class="stat-label">New Registrations (7 days)</div>
-                        </div>
-                    </div>
-
-                    <div class="charts-grid">
-                        <div class="chart-container">
-                            <div class="chart-title">Risk Level Distribution</div>
-                            <div class="chart-wrapper">
-                                <canvas id="riskDistributionChart"></canvas>
-                            </div>
-                        </div>
-                        <div class="chart-container">
-                            <div class="chart-title">Student Activity Overview</div>
-                            <div class="chart-wrapper">
-                                <canvas id="activityChart"></canvas>
-                            </div>
-                        </div>
-                    </div>
-
-                <?php elseif ($report_type === 'student_performance'): ?>
-                    <!-- Student Performance Report -->
-                    <div class="stats-grid">
-                        <div class="stat-card">
-                            <div class="stat-value"><?php echo $report_data['summary']['total_students'] ?? 0; ?></div>
-                            <div class="stat-label">Students Assessed</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value"><?php echo $report_data['summary']['excellent'] ?? 0; ?></div>
-                            <div class="stat-label">Excellent Performance</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value"><?php echo $report_data['summary']['good'] ?? 0; ?></div>
-                            <div class="stat-label">Good Performance</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value"><?php echo $report_data['summary']['needs_improvement'] ?? 0; ?></div>
-                            <div class="stat-label">Needs Improvement</div>
-                        </div>
-                    </div>
-
-                    <div class="chart-container">
-                        <div class="chart-title">Performance Distribution</div>
-                        <div class="chart-wrapper">
-                            <canvas id="performanceChart"></canvas>
-                        </div>
-                    </div>
-
-                <?php elseif ($report_type === 'risk_assessment'): ?>
-                    <!-- Risk Assessment Report -->
-                    <div class="stats-grid">
-                        <div class="stat-card">
-                            <div class="stat-value"><?php echo $report_data['risk_summary']['total_assessed'] ?? 0; ?></div>
-                            <div class="stat-label">Students Assessed</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value"><?php echo $report_data['risk_summary']['high_risk'] ?? 0; ?></div>
-                            <div class="stat-label">High Risk Students</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value"><?php echo $report_data['risk_summary']['medium_risk'] ?? 0; ?></div>
-                            <div class="stat-label">Medium Risk Students</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value"><?php echo $report_data['risk_summary']['low_risk'] ?? 0; ?></div>
-                            <div class="stat-label">Low Risk Students</div>
-                        </div>
-                    </div>
-
-                    <div class="chart-container">
-                        <div class="chart-title">Risk Assessment Overview</div>
-                        <div class="chart-wrapper">
-                            <canvas id="riskAssessmentChart"></canvas>
-                        </div>
-                    </div>
-
-                <?php else: ?>
-                    <div class="empty-state">
-                        <i class="fas fa-chart-bar"></i>
-                        <p>Select a report type to view analytics</p>
-                        <small>Choose from the options above to generate different reports</small>
-                    </div>
-                <?php endif; ?>
+                <button class="modal-btn modal-btn-confirm" id="confirmLogout" style="min-width: 120px;">
+                    Yes, Logout
+                </button>
             </div>
         </div>
     </div>
 
     <script>
-        function updateReport() {
-            const reportType = document.querySelector('select[name="report_type"]').value;
-            const timePeriod = document.querySelector('select[name="time_period"]').value;
-            
-            const url = new URL(window.location.href);
-            url.searchParams.set('report_type', reportType);
-            url.searchParams.set('time_period', timePeriod);
-            
-            window.location.href = url.toString();
-        }
+    // Logout modal functionality
+        const logoutBtn = document.querySelector('.logout-btn');
+        const logoutModal = document.getElementById('logoutModal');
+        const cancelLogout = document.getElementById('cancelLogout');
+        const confirmLogout = document.getElementById('confirmLogout');
 
-        function generateReport() {
-            updateReport();
-        }
-
-        // Initialize charts when the page loads
-        document.addEventListener('DOMContentLoaded', function() {
-            <?php if ($report_type === 'overview' && isset($report_data['risk_distribution'])): ?>
-            // Risk Distribution Chart
-            const riskCtx = document.getElementById('riskDistributionChart')?.getContext('2d');
-            if (riskCtx) {
-                new Chart(riskCtx, {
-                    type: 'doughnut',
-                    data: {
-                        labels: ['High Risk', 'Medium Risk', 'Low Risk', 'No Data'],
-                        datasets: [{
-                            data: [
-                                <?php echo $report_data['risk_distribution']['high_risk'] ?? 0; ?>,
-                                <?php echo $report_data['risk_distribution']['medium_risk'] ?? 0; ?>,
-                                <?php echo $report_data['risk_distribution']['low_risk'] ?? 0; ?>,
-                                <?php echo $report_data['risk_distribution']['no_data'] ?? 0; ?>
-                            ],
-                            backgroundColor: ['#dc3545', '#ffc107', '#28a745', '#6c757d']
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                position: 'bottom'
-                            }
-                        }
-                    }
-                });
-            }
-            <?php endif; ?>
-
-            <?php if ($report_type === 'student_performance' && isset($report_data['summary'])): ?>
-            // Performance Chart
-            const performanceCtx = document.getElementById('performanceChart')?.getContext('2d');
-            if (performanceCtx) {
-                new Chart(performanceCtx, {
-                    type: 'bar',
-                    data: {
-                        labels: ['Excellent', 'Good', 'Average', 'Needs Improvement'],
-                        datasets: [{
-                            label: 'Number of Students',
-                            data: [
-                                <?php echo $report_data['summary']['excellent'] ?? 0; ?>,
-                                <?php echo $report_data['summary']['good'] ?? 0; ?>,
-                                <?php echo $report_data['summary']['average'] ?? 0; ?>,
-                                <?php echo $report_data['summary']['needs_improvement'] ?? 0; ?>
-                            ],
-                            backgroundColor: '#006341'
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {
-                            y: {
-                                beginAtZero: true
-                            }
-                        }
-                    }
-                });
-            }
-            <?php endif; ?>
-
-            <?php if ($report_type === 'risk_assessment' && isset($report_data['risk_summary'])): ?>
-            // Risk Assessment Chart
-            const riskAssessmentCtx = document.getElementById('riskAssessmentChart')?.getContext('2d');
-            if (riskAssessmentCtx) {
-                new Chart(riskAssessmentCtx, {
-                    type: 'pie',
-                    data: {
-                        labels: ['High Risk', 'Medium Risk', 'Low Risk'],
-                        datasets: [{
-                            data: [
-                                <?php echo $report_data['risk_summary']['high_risk'] ?? 0; ?>,
-                                <?php echo $report_data['risk_summary']['medium_risk'] ?? 0; ?>,
-                                <?php echo $report_data['risk_summary']['low_risk'] ?? 0; ?>
-                            ],
-                            backgroundColor: ['#dc3545', '#ffc107', '#28a745']
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                position: 'bottom'
-                            }
-                        }
-                    }
-                });
-            }
-            <?php endif; ?>
+        logoutBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            logoutModal.classList.add('show');
         });
 
-        // Logout functionality
-        document.querySelector('.logout-btn').addEventListener('click', (e) => {
-            if (!confirm('Are you sure you want to logout?')) {
-                e.preventDefault();
+        cancelLogout.addEventListener('click', () => {
+            logoutModal.classList.remove('show');
+        });
+
+        confirmLogout.addEventListener('click', () => {
+            window.location.href = 'logout.php';
+        });
+
+        // Close modals when clicking outside
+        document.addEventListener('click', function(e) {
+            if (e.target === document.getElementById('updateStudentModal')) {
+                closeUpdateModal();
+            }
+            if (e.target === logoutModal) {
+                logoutModal.classList.remove('show');
             }
         });
     </script>

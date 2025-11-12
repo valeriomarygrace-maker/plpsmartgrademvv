@@ -544,12 +544,6 @@ try {
                 </a>
             </li>
             <li class="nav-item">
-                <a href="admin-subjects.php" class="nav-link">
-                    <i class="fas fa-book"></i>
-                    Manage Subjects
-                </a>
-            </li>
-            <li class="nav-item">
                 <a href="admin-reports.php" class="nav-link">
                     <i class="fas fa-chart-bar"></i>
                     Reports
