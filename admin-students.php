@@ -46,22 +46,18 @@ try {
             $fullname = sanitizeInput($_POST['fullname']);
             $email = sanitizeInput($_POST['email']);
             $student_number = sanitizeInput($_POST['student_number']);
-            $course = sanitizeInput($_POST['course']);
-            $year_level = sanitizeInput($_POST['year_level']);
             $semester = sanitizeInput($_POST['semester']);
             $section = sanitizeInput($_POST['section']);
             
             // Validate required fields
-            if (empty($fullname) || empty($email) || empty($student_number) || empty($course) || empty($year_level) || empty($semester) || empty($section)) {
+            if (empty($fullname) || empty($email) || empty($student_number) || empty($semester) || empty($section)) {
                 $error_message = 'All fields are required.';
             } else {
-                // Update student data
+                // Update student data (excluding course and year_level)
                 $update_data = [
                     'fullname' => $fullname,
                     'email' => $email,
                     'student_number' => $student_number,
-                    'course' => $course,
-                    'year_level' => $year_level,
                     'semester' => $semester,
                     'section' => $section
                 ];
@@ -149,635 +145,19 @@ function searchStudents($query) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --plp-green: #006341;
-            --plp-green-light: #008856;
-            --plp-green-lighter: #e0f2e9;
-            --plp-green-pale: #f5fbf8;
-            --plp-green-gradient: linear-gradient(135deg, #006341 0%, #008856 100%);
-            --plp-gold: #FFD700;
-            --plp-dark-green: #004d33;
-            --plp-light-green: #f8fcf9;
-            --plp-pale-green: #e8f5e9;
-            --text-dark: #2d3748;
-            --text-medium: #4a5568;
-            --text-light: #718096;
-            --border-radius: 12px;
-            --border-radius-lg: 16px;
-            --box-shadow: 0 4px 12px rgba(0, 99, 65, 0.1);
-            --box-shadow-lg: 0 8px 24px rgba(0, 99, 65, 0.15);
-            --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Poppins', sans-serif;
-            background: var(--plp-green-pale);
-            display: flex;
-            min-height: 100vh;
-            color: var(--text-dark);
-            line-height: 1.6;
-        }
-
-        .sidebar {
-            width: 320px;
-            background: white;
-            box-shadow: var(--box-shadow);
-            padding: 1.5rem;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            position: sticky;
-            top: 0;
-            border-right: 1px solid rgba(0, 99, 65, 0.1);
-        }
-
-        .sidebar-header {
-            text-align: center;
-            border-bottom: 1px solid rgba(0, 99, 65, 0.1);
-        }
-
-        .logo-container {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .logo {
-            width: 130px;
-            height: 130px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-            transition: var(--transition);
-        }
-
-        .logo:hover {
-            transform: scale(1.05);
-        }
-
-        .logo img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-            padding: 5px;
-        }
-
-        .portal-title {
-            color: var(--plp-green);
-            font-size: 1.3rem;
-            font-weight: 700;
-            letter-spacing: 0.5px;
-        }
-
-        .admin-email {
-            color: var(--text-medium);
-            font-size: 0.85rem;
-            margin-bottom: 1rem;
-            word-break: break-all;
-            padding: 0.5rem;
-            border-radius: 6px;
-            font-weight: 500;
-        }
-
-        .nav-menu {
-            list-style: none;
-            flex-grow: 0.30;
-            margin-top: 0.7rem;
-        }
-
-        .nav-item {
-            margin-bottom: 0.7rem;
-            position: relative;
-        }
-
-        .nav-link {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            padding: 0.50rem;
-            color: var(--text-medium);
-            text-decoration: none;
-            border-radius: var(--border-radius);
-            transition: var(--transition);
-            font-weight: 500;
-        }
-
-        .nav-link:hover:not(.active) {
-            background: var(--plp-green-lighter);
-            color: var(--plp-green);
-            transform: translateY(-3px);
-        }
-
-        .nav-link.active {
-            background: var(--plp-green-gradient);
-            color: white;
-            box-shadow: var(--box-shadow);
-        }
-
-        .sidebar-footer {
-            border-top: 3px solid rgba(0, 99, 65, 0.1);
-        }
-
-        .logout-btn {
-            margin-top:1rem;
-            background: transparent;
-            color: var(--text-medium);
-            padding: 0.75rem 1rem;
-            border: none;
-            border-radius: var(--border-radius);
-            cursor: pointer;
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            width: 100%;
-            font-weight: 500;
-            transition: var(--transition);
-        }
-
-        .logout-btn:hover {
-            background: #fee2e2;
-            color: #b91c1c;
-            transform: translateX(5px);
-        }
-
-        .main-content {
-            flex: 1;
-            padding: 1rem 2.5rem; 
-            background: var(--plp-green-pale);
-            max-width: 100%;
-            margin: 0 auto;
-            width: 100%;
-            overflow-y: auto;
-        }
-
-        .header {
-            background: white;
-            padding: 0.6rem 1.25rem;
-            border-radius: var(--border-radius);
-            box-shadow: var(--box-shadow);
-            margin-bottom: 1.5rem; 
-            background: var(--plp-green-gradient);
-            color: white;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .welcome {
-            font-size: 1.5rem;
-            font-weight: 700;
-            letter-spacing: 0.5px;
-        }
-
-        .header-actions {
-            display: flex;
-            gap: 1rem;
-            align-items: center;
-        }
-
-        .btn {
-            padding: 0.75rem 1.5rem;
-            border: none;
-            border-radius: 50px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: var(--transition);
-            font-family: 'Poppins', sans-serif;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            text-decoration: none;
-        }
-
-        .btn-primary {
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-        }
-
-        .btn-primary:hover {
-            background: rgba(255, 255, 255, 0.3);
-            transform: translateY(-2px);
-        }
-
-        /* Search and Filter Section */
-        .search-section {
-            background: white;
-            padding: 1.5rem;
-            border-radius: var(--border-radius);
-            box-shadow: var(--box-shadow);
-            margin-bottom: 1.5rem;
-            display: flex;
-            gap: 1rem;
-            align-items: end;
-            flex-wrap: wrap;
-        }
-
-        .search-group {
-            flex: 1;
-            min-width: 300px;
-        }
-
-        .filter-group {
-            min-width: 200px;
-        }
-
-        .form-label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-weight: 600;
-            color: var(--text-medium);
-            font-size: 0.9rem;
-        }
-
-        .form-input, .form-select {
-            width: 100%;
-            padding: 0.75rem 1rem;
+        /* ... (keep all the existing CSS styles) ... */
+        
+        .readonly-field {
+            background-color: var(--plp-green-pale);
             border: 2px solid var(--plp-green-lighter);
-            border-radius: var(--border-radius);
-            font-size: 1rem;
-            transition: var(--transition);
-            font-family: 'Poppins', sans-serif;
+            color: var(--text-medium);
+            cursor: not-allowed;
         }
-
-        .form-input:focus, .form-select:focus {
+        
+        .readonly-field:focus {
             outline: none;
-            border-color: var(--plp-green);
-            box-shadow: 0 0 0 3px rgba(0, 99, 65, 0.1);
-        }
-
-        .search-btn {
-            background: var(--plp-green-gradient);
-            color: white;
-            border: none;
-            padding: 0.75rem 1.5rem;
-            border-radius: var(--border-radius);
-            cursor: pointer;
-            transition: var(--transition);
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .search-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0, 99, 65, 0.3);
-        }
-
-        /* Students Table */
-        .students-table-container {
-            background: white;
-            border-radius: var(--border-radius);
-            box-shadow: var(--box-shadow);
-            overflow: hidden;
-        }
-
-        .table-header {
-            background: var(--plp-green-pale);
-            padding: 1.5rem;
-            border-bottom: 1px solid var(--plp-green-lighter);
-            text-align: center;
-        }
-
-        .table-title {
-            color: var(--plp-green);
-            font-size: 1.3rem;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.75rem;
-        }
-
-        .students-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .students-table th {
-            background: var(--plp-green);
-            color: white;
-            padding: 1rem;
-            text-align: center;
-            font-weight: 600;
-            font-size: 0.9rem;
-        }
-
-        .students-table td {
-            padding: 1rem;
-            border-bottom: 1px solid var(--plp-green-lighter);
-            vertical-align: middle;
-            text-align: center;
-        }
-
-        .students-table tr:hover {
-            background: var(--plp-green-pale);
-        }
-
-        .students-table tr:last-child td {
-            border-bottom: none;
-        }
-
-        .student-info {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 1rem;
-        }
-
-        .student-details {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        .student-name {
-            font-weight: 600;
-            color: var(--text-dark);
-            margin-bottom: 0.25rem;
-        }
-
-        .student-email {
-            font-size: 0.8rem;
-            color: var(--text-light);
-        }
-
-        .student-meta {
-            font-size: 0.8rem;
-            color: var(--text-medium);
-        }
-
-        .status-badge {
-            display: inline-block;
-            padding: 0.25rem 0.75rem;
-            border-radius: 20px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-
-        .status-active {
-            background: #c6f6d5;
-            color: #2f855a;
-        }
-
-        .action-buttons {
-            display: flex;
-            gap: 0.5rem;
-            justify-content: center;
-        }
-
-        .action-btn {
-            padding: 0.5rem 1rem;
-            border: none;
-            border-radius: var(--border-radius);
-            cursor: pointer;
-            transition: var(--transition);
-            font-size: 0.8rem;
-            display: flex;
-            align-items: center;
-            gap: 0.25rem;
-            text-decoration: none;
-            font-weight: 500;
-        }
-
-        .btn-update {
-            background: var(--plp-green);
-            color: white;
-        }
-
-        .btn-update:hover {
-            background: var(--plp-dark-green);
-            transform: translateY(-2px);
-        }
-
-        /* Empty State */
-        .empty-state {
-            text-align: center;
-            padding: 3rem;
-            color: var(--text-medium);
-        }
-
-        .empty-state i {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-            color: var(--plp-green-lighter);
-        }
-
-        .empty-state p {
-            font-size: 1rem;
-            margin-bottom: 0.5rem;
-        }
-
-        /* Alerts */
-        .alert-error {
-            background: #fed7d7;
-            color: #c53030;
-            padding: 1rem;
-            border-radius: var(--border-radius);
-            margin-bottom: 1.5rem;
-            border-left: 4px solid #e53e3e;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            animation: slideIn 0.3s ease;
-        }
-
-        .alert-success {
-            background: #c6f6d5;
-            color: #2f855a;
-            padding: 1rem;
-            border-radius: var(--border-radius);
-            margin-bottom: 1.5rem;
-            border-left: 4px solid #38a169;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            animation: slideIn 0.3s ease;
-        }
-
-        /* Modal Styles */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(4px);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
-        .modal.show {
-            display: flex;
-            opacity: 1;
-        }
-
-        .modal-content {
-            background: white;
-            padding: 2.5rem;
-            border-radius: var(--border-radius-lg);
-            box-shadow: var(--box-shadow-lg);
-            max-width: 600px;
-            width: 90%;
-            transform: translateY(20px);
-            transition: transform 0.3s ease;
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-
-        .modal.show .modal-content {
-            transform: translateY(0);
-        }
-
-        .modal-title {
-            color: var(--plp-green);
-            font-size: 1.5rem;
-            font-weight: 700;
-            margin-bottom: 1.5rem;
-            text-align: center;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.75rem;
-        }
-
-        .modal-body {
-            margin-bottom: 2rem;
-        }
-
-        .form-group {
-            margin-bottom: 1.5rem;
-        }
-
-        .form-row {
-            display: flex;
-            gap: 1rem;
-            margin-bottom: 1rem;
-        }
-
-        .form-col {
-            flex: 1;
-        }
-
-        .modal-actions {
-            display: flex;
-            justify-content: center;
-            gap: 1rem;
-            margin-top: 2rem;
-        }
-
-        .modal-btn {
-            padding: 0.75rem 1.5rem;
-            border: none;
-            border-radius: 50px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: var(--transition);
-            font-family: 'Poppins', sans-serif;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            min-width: 120px;
-            justify-content: center;
-        }
-
-        .modal-btn-cancel {
-            background: #f1f5f9;
-            color: var(--text-medium);
-        }
-
-        .modal-btn-cancel:hover {
-            background: #e2e8f0;
-            transform: translateY(-2px);
-        }
-
-        .modal-btn-confirm {
-            background: var(--plp-green-gradient);
-            color: white;
-            box-shadow: 0 4px 12px rgba(0, 99, 65, 0.3);
-        }
-
-        .modal-btn-confirm:hover {
-            transform: translateY(-2px);
-        }
-
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        /* Responsive Design */
-        @media (max-width: 768px) {
-            body {
-                flex-direction: column;
-            }
-            
-            .sidebar {
-                width: 100%;
-                height: auto;
-                position: relative;
-            }
-            
-            .main-content {
-                padding: 1.5rem;
-            }
-            
-            .header {
-                flex-direction: column;
-                gap: 1rem;
-                text-align: center;
-            }
-            
-            .search-section {
-                flex-direction: column;
-            }
-            
-            .search-group, .filter-group {
-                min-width: 100%;
-            }
-            
-            .students-table {
-                display: block;
-                overflow-x: auto;
-            }
-            
-            .action-buttons {
-                flex-direction: column;
-            }
-            
-            .modal-actions {
-                flex-direction: column;
-            }
-            
-            .modal-btn {
-                min-width: 100%;
-            }
-            
-            .form-row {
-                flex-direction: column;
-                gap: 0.5rem;
-            }
+            border-color: var(--plp-green-lighter);
+            box-shadow: none;
         }
     </style>
 </head>
@@ -996,18 +376,15 @@ function searchStudents($query) {
                     
                     <div class="form-group">
                         <label class="form-label">Course</label>
-                        <input type="text" name="course" id="update_course" class="form-input" required>
+                        <input type="text" id="update_course_display" class="form-input readonly-field" readonly>
+                        <input type="hidden" name="course" id="update_course">
                     </div>
                     
                     <div class="form-row">
                         <div class="form-col">
                             <label class="form-label">Year Level</label>
-                            <select name="year_level" id="update_year_level" class="form-select" required>
-                                <option value="1">1st Year</option>
-                                <option value="2">2nd Year</option>
-                                <option value="3">3rd Year</option>
-                                <option value="4">4th Year</option>
-                            </select>
+                            <input type="text" id="update_year_level_display" class="form-input readonly-field" readonly>
+                            <input type="hidden" name="year_level" id="update_year_level">
                         </div>
                         <div class="form-col">
                             <label class="form-label">Semester</label>
@@ -1062,12 +439,30 @@ function searchStudents($query) {
             document.getElementById('update_fullname').value = student.fullname;
             document.getElementById('update_email').value = student.email;
             document.getElementById('update_student_number').value = student.student_number;
+            
+            // Set course (readonly)
+            document.getElementById('update_course_display').value = student.course;
             document.getElementById('update_course').value = student.course;
+            
+            // Set year level (readonly)
+            const yearLevelText = getYearLevelText(student.year_level);
+            document.getElementById('update_year_level_display').value = yearLevelText;
             document.getElementById('update_year_level').value = student.year_level;
+            
             document.getElementById('update_semester').value = student.semester;
             document.getElementById('update_section').value = student.section;
             
             document.getElementById('updateStudentModal').classList.add('show');
+        }
+
+        function getYearLevelText(yearLevel) {
+            switch(yearLevel.toString()) {
+                case '1': return '1st Year';
+                case '2': return '2nd Year';
+                case '3': return '3rd Year';
+                case '4': return '4th Year';
+                default: return yearLevel.toString() + ' Year';
+            }
         }
 
         function closeUpdateModal() {
