@@ -1,35 +1,24 @@
 <?php
 require_once 'config.php';
 
-// This script should be run once to create the first admin user
-// Delete this file after use for security
-
-// Check if admin already exists
-$existing_admin = getAdminByEmail('admin@plpasig.edu.ph');
-if ($existing_admin) {
-    echo "Admin user already exists!";
-    exit;
-}
-
-$admin_data = [
+// Create admin account
+$adminData = [
     'username' => 'admin',
     'email' => 'admin@plpasig.edu.ph',
-    'password' => hashPassword('plpadmin123'), // Change this password
+    'password' => hashPassword('plpadmin123'),
     'fullname' => 'System Administrator',
     'role' => 'admin',
     'is_active' => true
 ];
 
-$result = supabaseInsert('admins', $admin_data);
+$result = supabaseInsert('admins', $adminData);
 
 if ($result !== false) {
-    echo "Admin user created successfully!";
-    echo "<br><strong>Login Credentials:</strong>";
-    echo "<br>Username: admin";
-    echo "<br>Email: admin@plpasig.edu.ph"; 
-    echo "<br>Password: plpadmin123";
-    echo "<br><br><strong style='color: red;'>Please change the password immediately and delete this file!</strong>";
+    echo "Admin account created successfully!<br>";
+    echo "Email: admin@plpasig.edu.ph<br>";
+    echo "Password: plpadmin123<br>";
+    echo "<a href='login.php'>Go to Login</a>";
 } else {
-    echo "Failed to create admin user. Check your Supabase connection and table structure.";
+    echo "Error creating admin account. It might already exist.";
 }
 ?>

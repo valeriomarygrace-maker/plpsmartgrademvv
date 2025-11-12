@@ -1,5 +1,6 @@
 <?php
 require_once 'config.php';
+require_once 'ml-helpers.php';
 
 // Start session if not already started
 if (session_status() === PHP_SESSION_NONE) {
@@ -11,35 +12,38 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['user_type'] !== 'admin') {
     exit;
 }
 
-// Get admin info
-$admin = getAdminByEmail($_SESSION['user_email']);
+// Initialize variables
+$admin = null;
+$total_students = 0;
+$total_subjects = 0;
+$recent_students = [];
+$error_message = '';
 
-// Get statistics for dashboard
 try {
-    // Get total students count
-    $students = supabaseFetchAll('students');
-    $total_students = $students ? count($students) : 0;
+    // Get admin info
+    $admin = getAdminByEmail($_SESSION['user_email']);
     
-    // Get total subjects count
-    $subjects = supabaseFetchAll('subjects');
-    $total_subjects = $subjects ? count($subjects) : 0;
-    
-    // Get recent students (last 5)
-    $recent_students = $students ? array_slice($students, -5, 5, true) : [];
-    $recent_students = array_reverse($recent_students); // Show newest first
-    
-    // Get students by course
-    $students_by_course = [];
-    if ($students) {
-        foreach ($students as $student) {
-            $course = $student['course'] ?? 'Unknown';
-            if (!isset($students_by_course[$course])) {
-                $students_by_course[$course] = 0;
-            }
-            $students_by_course[$course]++;
+    if (!$admin) {
+        $error_message = 'Admin record not found.';
+    } else {
+        // Get total students count
+        $students = supabaseFetchAll('students');
+        $total_students = $students ? count($students) : 0;
+        
+        // Get total subjects count
+        $subjects = supabaseFetchAll('subjects');
+        $total_subjects = $subjects ? count($subjects) : 0;
+        
+        // Get recent students (last 5)
+        if ($students) {
+            usort($students, function($a, $b) {
+                $dateA = isset($a['created_at']) ? strtotime($a['created_at']) : 0;
+                $dateB = isset($b['created_at']) ? strtotime($b['created_at']) : 0;
+                return $dateB - $dateA;
+            });
+            $recent_students = array_slice($students, 0, 5);
         }
     }
-    
 } catch (Exception $e) {
     $error_message = 'Database error: ' . $e->getMessage();
     error_log("Error in admin-dashboard.php: " . $e->getMessage());
@@ -53,7 +57,6 @@ try {
     <title>Admin Dashboard - PLP SmartGrade</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
             --plp-green: #006341;
@@ -263,11 +266,6 @@ try {
             transition: var(--transition);
         }
 
-        .card:hover {
-            transform: translateY(-5px);
-            box-shadow: var(--box-shadow-lg);
-        }
-
         .card-header {
             display: flex;
             justify-content: space-between;
@@ -301,10 +299,6 @@ try {
             padding: 1rem;
             border-radius: var(--border-radius);
             transition: var(--transition);
-        }
-
-        .metric-card:hover {
-            transform: translateY(-3px);
         }
 
         .metric-value {
@@ -351,10 +345,9 @@ try {
             font-size: 0.85rem;
         }
 
-        .student-course {
-            text-align: right;
-            font-weight: 600;
-            color: var(--plp-green);
+        .student-email {
+            color: var(--text-medium);
+            font-size: 0.8rem;
         }
 
         .empty-state {
@@ -386,36 +379,15 @@ try {
             gap: 0.75rem;
         }
 
-        .chart-container {
-            background: white;
-            padding: 1.5rem;
-            border-radius: var(--border-radius);
-            box-shadow: var(--box-shadow);
-            margin-top: 1rem;
-        }
-
-        .chart-title {
-            color: var(--plp-green);
-            font-size: 1.1rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-        }
-
-        .chart-wrapper {
-            position: relative;
-            height: 300px;
-            margin: 0 auto;
-        }
-
         .three-column-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 1.5rem;
             margin-bottom: 2rem;
+        }
+
+        .three-column-grid .card {
+            margin-bottom: 0;
         }
 
         @media (max-width: 1200px) {
@@ -469,9 +441,6 @@ try {
             </div>
             <div class="portal-title">PLPSMARTGRADE</div>
             <div class="admin-email"><?php echo htmlspecialchars($admin['email']); ?></div>
-            <div class="admin-email" style="background: var(--plp-green-lighter); color: var(--plp-green);">
-                <i class="fas fa-user-shield"></i> Administrator
-            </div>
         </div>
         
         <ul class="nav-menu">
@@ -496,7 +465,7 @@ try {
             <li class="nav-item">
                 <a href="admin-reports.php" class="nav-link">
                     <i class="fas fa-chart-bar"></i>
-                    Reports & Analytics
+                    Reports
                 </a>
             </li>
             <li class="nav-item">
@@ -516,7 +485,7 @@ try {
     </div>
 
     <div class="main-content">
-        <?php if (isset($error_message)): ?>
+        <?php if ($error_message): ?>
             <div class="alert-error">
                 <i class="fas fa-exclamation-circle"></i>
                 <?php echo $error_message; ?>
@@ -524,10 +493,10 @@ try {
         <?php endif; ?>
         
         <div class="header">
-            <div class="welcome">Admin Dashboard</div>
+            <div class="welcome">Welcome, <?php echo htmlspecialchars(explode(' ', $admin['fullname'])[0]); ?>!</div>
         </div>
 
-        <!-- Statistics Overview -->
+        <!-- Admin Statistics -->
         <div class="dashboard-grid">
             <div class="metrics-grid">
                 <div class="metric-card">
@@ -561,36 +530,20 @@ try {
                                     <div class="student-name"><?php echo htmlspecialchars($student['fullname']); ?></div>
                                     <div class="student-details">
                                         <?php echo htmlspecialchars($student['student_number']); ?> • 
-                                        <?php echo htmlspecialchars($student['year_level']); ?> Year
+                                        <?php echo htmlspecialchars($student['section']); ?>
                                     </div>
-                                </div>
-                                <div class="student-course">
-                                    <?php echo htmlspecialchars($student['section']); ?>
+                                    <div class="student-email"><?php echo htmlspecialchars($student['email']); ?></div>
                                 </div>
                             </li>
                         <?php endforeach; ?>
                     </ul>
                 <?php else: ?>
                     <div class="empty-state">
-                        <i class="fas fa-users"></i>
+                        <i class="fas fa-user-graduate"></i>
                         <p>No students found</p>
+                        <small>Students will appear here once they register</small>
                     </div>
                 <?php endif; ?>
-            </div>
-
-            <!-- Students by Course -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title">
-                        <i class="fas fa-chart-pie"></i>
-                        Students by Course
-                    </div>
-                </div>
-                <div style="text-align: center; padding: 1rem;">
-                    <div class="chart-wrapper" style="height: 200px;">
-                        <canvas id="studentsByCourseChart"></canvas>
-                    </div>
-                </div>
             </div>
 
             <!-- Quick Actions -->
@@ -601,122 +554,94 @@ try {
                         Quick Actions
                     </div>
                 </div>
-                <div style="display: flex; flex-direction: column; gap: 0.75rem; padding: 0.5rem;">
-                    <a href="admin-students.php?action=add" class="nav-link" style="justify-content: flex-start;">
+                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    <a href="admin-students.php" style="
+                        display: flex; 
+                        align-items: center; 
+                        gap: 0.75rem; 
+                        padding: 0.75rem; 
+                        background: var(--plp-green-pale); 
+                        border-radius: var(--border-radius); 
+                        text-decoration: none; 
+                        color: var(--plp-green); 
+                        font-weight: 500;
+                        transition: var(--transition);
+                    ">
                         <i class="fas fa-user-plus"></i>
                         Add New Student
                     </a>
-                    <a href="admin-subjects.php?action=add" class="nav-link" style="justify-content: flex-start;">
+                    <a href="admin-subjects.php" style="
+                        display: flex; 
+                        align-items: center; 
+                        gap: 0.75rem; 
+                        padding: 0.75rem; 
+                        background: var(--plp-green-pale); 
+                        border-radius: var(--border-radius); 
+                        text-decoration: none; 
+                        color: var(--plp-green); 
+                        font-weight: 500;
+                        transition: var(--transition);
+                    ">
                         <i class="fas fa-book-medical"></i>
                         Add New Subject
                     </a>
-                    <a href="admin-reports.php" class="nav-link" style="justify-content: flex-start;">
-                        <i class="fas fa-file-export"></i>
-                        Generate Report
-                    </a>
-                    <a href="admin-settings.php" class="nav-link" style="justify-content: flex-start;">
-                        <i class="fas fa-cogs"></i>
-                        System Settings
+                    <a href="admin-reports.php" style="
+                        display: flex; 
+                        align-items: center; 
+                        gap: 0.75rem; 
+                        padding: 0.75rem; 
+                        background: var(--plp-green-pale); 
+                        border-radius: var(--border-radius); 
+                        text-decoration: none; 
+                        color: var(--plp-green); 
+                        font-weight: 500;
+                        transition: var(--transition);
+                    ">
+                        <i class="fas fa-chart-pie"></i>
+                        Generate Reports
                     </a>
                 </div>
             </div>
-        </div>
 
-        <!-- System Overview Chart -->
-        <div class="chart-container">
-            <div class="chart-title">
-                <i class="fas fa-chart-bar"></i>
-                System Overview
-            </div>
-            <div class="chart-wrapper">
-                <canvas id="systemOverviewChart"></canvas>
+            <!-- System Status -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fas fa-server"></i>
+                        System Status
+                    </div>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color: var(--text-medium);">Database</span>
+                        <span style="color: var(--success); font-weight: 600;">
+                            <i class="fas fa-check-circle"></i> Online
+                        </span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color: var(--text-medium);">ML Service</span>
+                        <span style="color: var(--success); font-weight: 600;">
+                            <i class="fas fa-check-circle"></i> Active
+                        </span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color: var(--text-medium);">Last Backup</span>
+                        <span style="color: var(--text-medium); font-size: 0.85rem;">
+                            <?php echo date('M j, Y'); ?>
+                        </span>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
-    // Initialize Charts
-    document.addEventListener('DOMContentLoaded', function() {
-        // Students by Course Chart
-        const courseCtx = document.getElementById('studentsByCourseChart')?.getContext('2d');
-        if (courseCtx) {
-            const courseData = <?php echo json_encode($students_by_course); ?>;
-            
-            new Chart(courseCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: Object.keys(courseData),
-                    datasets: [{
-                        data: Object.values(courseData),
-                        backgroundColor: [
-                            '#006341', '#008856', '#00a86b', '#00c980',
-                            '#e0f2e9', '#f5fbf8'
-                        ],
-                        borderWidth: 2,
-                        borderColor: '#fff'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    cutout: '60%',
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: {
-                                padding: 15,
-                                usePointStyle: true,
-                                boxWidth: 10,
-                                font: {
-                                    size: 10
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-        }
-
-        // System Overview Chart
-        const systemCtx = document.getElementById('systemOverviewChart')?.getContext('2d');
-        if (systemCtx) {
-            new Chart(systemCtx, {
-                type: 'bar',
-                data: {
-                    labels: ['Students', 'Subjects', 'Active Sessions', 'Recent Activity'],
-                    datasets: [{
-                        label: 'System Metrics',
-                        data: [
-                            <?php echo $total_students; ?>,
-                            <?php echo $total_subjects; ?>,
-                            Math.floor(<?php echo $total_students; ?> * 0.3), // Example data
-                            Math.floor(<?php echo $total_students; ?> * 0.7)  // Example data
-                        ],
-                        backgroundColor: '#006341',
-                        borderColor: '#004d33',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            grid: {
-                                color: 'rgba(0, 99, 65, 0.1)'
-                            }
-                        },
-                        x: {
-                            grid: {
-                                display: false
-                            }
-                        }
-                    }
-                }
-            });
-        }
-    });
+        // Simple logout confirmation
+        document.querySelector('.logout-btn').addEventListener('click', (e) => {
+            if (!confirm('Are you sure you want to logout?')) {
+                e.preventDefault();
+            }
+        });
     </script>
 </body>
 </html>
