@@ -429,6 +429,93 @@ try {
                 grid-template-columns: 1fr;
             }
         }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal.show {
+            display: flex;
+            opacity: 1;
+        }
+
+
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--box-shadow-lg);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+            transform: translateY(20px);
+            transition: transform 0.3s ease;
+        }
+
+        .modal.show .modal-content {
+            transform: translateY(0);
+        }
+
+        .modal-title {
+            color: var(--plp-green);
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+
+        .modal-body {
+            margin-bottom: 2rem;
+            color: var(--text-medium);
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+        }
+
+        .modal-btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: var(--border-radius);
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .modal-btn-cancel {
+            background: var(--plp-green-lighter);
+            color: var(--plp-green);
+        }
+
+        .modal-btn-cancel:hover {
+            background: var(--plp-green-light);
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .modal-btn-confirm {
+            background: var(--plp-green-gradient);
+            color: white;
+        }
+
+        .modal-btn-confirm:hover {
+            background: linear-gradient(135deg, var(--plp-green-light), var(--plp-green));
+            transform: translateY(-2px);
+        }
     </style>
 </head>
 <body>
