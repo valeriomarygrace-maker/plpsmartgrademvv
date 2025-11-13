@@ -3,19 +3,22 @@
 $supabase_url = getenv('SUPABASE_URL') ?: 'https://xwvrgpxcceivakzrwwji.supabase.co';
 $supabase_key = getenv('SUPABASE_KEY') ?: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh3dnJncHhjY2VpdmFrenJ3d2ppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE3MjQ0NzQsImV4cCI6MjA3NzMwMDQ3NH0.ovd8v3lqsYtJU78D4iM6CyAyvi6jK4FUbYUjydFi4FM';
 
+// Start session only if not already started
 if (session_status() === PHP_SESSION_NONE) {
     session_set_cookie_params([
-        'lifetime' => 86400, // 24 hours
+        'lifetime' => 0,
         'path' => '/',
         'domain' => '',
-        'secure' => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on',
+        'secure' => isset($_SERVER['HTTPS']),
         'httponly' => true,
-        'samesite' => 'Lax' 
+        'samesite' => 'Strict'
     ]);
     session_start();
 }
 
-// In config.php, update the supabaseFetch function:
+/**
+ * Simple Supabase API Helper Function
+ */
 function supabaseFetch($table, $filters = [], $method = 'GET', $data = null) {
     global $supabase_url, $supabase_key;
     
@@ -47,7 +50,6 @@ function supabaseFetch($table, $filters = [], $method = 'GET', $data = null) {
         CURLOPT_HTTPHEADER => $headers,
         CURLOPT_SSL_VERIFYPEER => false,
         CURLOPT_TIMEOUT => 30,
-        CURLOPT_FAILONERROR => true // Add this
     ]);
     
     if ($method === 'POST') {
@@ -65,14 +67,13 @@ function supabaseFetch($table, $filters = [], $method = 'GET', $data = null) {
     $error = curl_error($ch);
     curl_close($ch);
     
-    // Enhanced error logging
     if ($error) {
-        error_log("cURL Error for table $table: $error - URL: $url");
+        error_log("cURL Error: $error");
         return false;
     }
     
     if ($httpCode >= 400) {
-        error_log("HTTP Error $httpCode for table: $table - Response: $response");
+        error_log("HTTP Error $httpCode for table: $table");
         return false;
     }
     
@@ -281,30 +282,4 @@ if (isset($_SESSION['created']) && (time() - $_SESSION['created'] > 28800)) {
         exit;
     }
 }
-/**
- * Admin Functions
- */
-function getAdminByEmail($email) {
-    $admins = supabaseFetch('admins', ['email' => $email]);
-    return $admins && count($admins) > 0 ? $admins[0] : null;
-}
-
-function getAdminById($id) {
-    $admins = supabaseFetch('admins', ['id' => $id]);
-    return $admins && count($admins) > 0 ? $admins[0] : null;
-}
-
-function adminExists($email) {
-    $admins = supabaseFetch('admins', ['email' => $email]);
-    return $admins && count($admins) > 0;
-}
-
-function requireAdminRole() {
-    if (!isLoggedIn() || $_SESSION['user_type'] !== 'admin') {
-        header('Location: login.php');
-        exit;
-    }
-}
-
-
 ?>
