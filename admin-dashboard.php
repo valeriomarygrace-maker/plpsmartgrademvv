@@ -532,27 +532,21 @@ try {
         
         <ul class="nav-menu">
             <li class="nav-item">
-                <a href="admin-dashboard.php" class="nav-link active">
+                <a href="admin-dashboard.php" class="nav-link">
                     <i class="fas fa-chart-line"></i>
                     Dashboard
                 </a>
             </li>
             <li class="nav-item">
-                <a href="admin-students.php" class="nav-link">
+                <a href="admin-students.php" class="nav-link active">
                     <i class="fas fa-users"></i>
                     Manage Students
                 </a>
             </li>
             <li class="nav-item">
-                <a href="admin-reports.php" class="nav-link">
-                    <i class="fas fa-chart-bar"></i>
-                    Reports
-                </a>
-            </li>
-            <li class="nav-item">
                 <a href="admin-settings.php" class="nav-link">
                     <i class="fas fa-cog"></i>
-                    System Settings
+                    System Logs
                 </a>
             </li>
         </ul>

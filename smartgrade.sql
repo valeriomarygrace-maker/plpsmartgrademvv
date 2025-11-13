@@ -141,3 +141,14 @@ CREATE TABLE public.subjects (
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT subjects_pkey PRIMARY KEY (id)
 );
+CREATE TABLE public.system_logs (
+  id bigint NOT NULL DEFAULT nextval('system_logs_id_seq'::regclass),
+  user_email character varying NOT NULL,
+  user_type character varying NOT NULL,
+  action character varying NOT NULL,
+  description text,
+  ip_address character varying,
+  user_agent text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT system_logs_pkey PRIMARY KEY (id)
+);

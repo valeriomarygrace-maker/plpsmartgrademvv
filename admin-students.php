@@ -815,15 +815,9 @@ function searchStudents($query) {
                 </a>
             </li>
             <li class="nav-item">
-                <a href="admin-reports.php" class="nav-link">
-                    <i class="fas fa-chart-bar"></i>
-                    Reports
-                </a>
-            </li>
-            <li class="nav-item">
                 <a href="admin-settings.php" class="nav-link">
                     <i class="fas fa-cog"></i>
-                    System Settings
+                    System Logs
                 </a>
             </li>
         </ul>

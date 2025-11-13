@@ -32,6 +32,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && isset($_P
                 $_SESSION['user_name'] = $admin['fullname'];
                 $_SESSION['login_time'] = time();
                 
+                // Log the login activity
+                logUserLogin($email, 'admin', $admin['id']);
+                
                 // Redirect to admin dashboard
                 header('Location: admin-dashboard.php');
                 exit;
@@ -57,6 +60,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && isset($_P
                     $_SESSION['user_id'] = $student['id'];
                     $_SESSION['user_name'] = $student['fullname'];
                     $_SESSION['login_time'] = time();
+                    
+                    // Log the login activity
+                    logUserLogin($email, 'student', $student['id']);
                     
                     // Redirect to student dashboard
                     header('Location: student-dashboard.php');
