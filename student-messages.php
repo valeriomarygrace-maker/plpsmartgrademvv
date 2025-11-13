@@ -1,7 +1,15 @@
 <?php
 require_once 'config.php';
-require_once 'student-header.php';
-requireStudentRole();
+
+// Start session if not already started
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+if (!isset($_SESSION['logged_in']) || $_SESSION['user_type'] !== 'student') {
+    header('Location: login.php');
+    exit;
+}
 
 // Initialize variables
 $messages = [];
@@ -36,8 +44,15 @@ if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
     header('Location: student-messages.php');
     exit;
 }
-?>
 
+// Get student info
+$student = null;
+try {
+    $student = getStudentByEmail($_SESSION['user_email']);
+} catch (Exception $e) {
+    $error = 'Error loading student info: ' . $e->getMessage();
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -47,6 +62,7 @@ if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        /* COPY ALL THE CSS FROM YOUR student-dashboard.php FILE */
         :root {
             --plp-green: #006341;
             --plp-green-light: #008856;
@@ -407,8 +423,13 @@ if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
         }
 
         .badge-unread {
-            background: var(--plp-green);
+            background: var(--danger);
             color: white;
+            padding: 0.2rem 0.5rem;
+            border-radius: 50%;
+            font-size: 0.7rem;
+            font-weight: 600;
+            margin-left: 0.5rem;
         }
 
         .empty-state {
