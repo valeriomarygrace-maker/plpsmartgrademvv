@@ -247,30 +247,33 @@ $admin = getAdminByEmail($_SESSION['user_email']);
             margin-bottom: 2rem;
         }
 
-        .filters-form {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        /* Simplified Filters */
+        .filters-container {
+            display: flex;
             gap: 1rem;
             margin-bottom: 2rem;
             padding: 1.5rem;
             background: var(--plp-green-pale);
             border-radius: var(--border-radius);
+            align-items: end;
+            flex-wrap: wrap;
         }
 
-        .form-group {
+        .filter-group {
             display: flex;
             flex-direction: column;
+            min-width: 150px;
         }
 
-        .form-group label {
+        .filter-group label {
             font-weight: 600;
             color: var(--plp-green);
             margin-bottom: 0.5rem;
             font-size: 0.9rem;
         }
 
-        .form-group select,
-        .form-group input {
+        .filter-group select,
+        .filter-group input {
             padding: 0.75rem;
             border: 1px solid rgba(0, 99, 65, 0.2);
             border-radius: var(--border-radius);
@@ -278,8 +281,8 @@ $admin = getAdminByEmail($_SESSION['user_email']);
             transition: var(--transition);
         }
 
-        .form-group select:focus,
-        .form-group input:focus {
+        .filter-group select:focus,
+        .filter-group input:focus {
             outline: none;
             border-color: var(--plp-green);
             box-shadow: 0 0 0 3px rgba(0, 99, 65, 0.1);
@@ -405,32 +408,7 @@ $admin = getAdminByEmail($_SESSION['user_email']);
             color: var(--plp-green-lighter);
         }
 
-        /* Responsive Design */
-        @media (max-width: 768px) {
-            body {
-                flex-direction: column;
-            }
-            
-            .sidebar {
-                width: 100%;
-                height: auto;
-                position: relative;
-            }
-            
-            .main-content {
-                padding: 1.5rem;
-            }
-            
-            .header {
-                flex-direction: column;
-                gap: 1rem;
-                text-align: center;
-            }
-            
-            .filters-form {
-                grid-template-columns: 1fr;
-            }
-        }
+        /* Modal Styles */
         .modal {
             display: none;
             position: fixed;
@@ -452,7 +430,6 @@ $admin = getAdminByEmail($_SESSION['user_email']);
             opacity: 1;
         }
 
-
         .modal-content {
             background: white;
             padding: 2rem;
@@ -467,24 +444,6 @@ $admin = getAdminByEmail($_SESSION['user_email']);
 
         .modal.show .modal-content {
             transform: translateY(0);
-        }
-
-        .modal-title {
-            color: var(--plp-green);
-            font-size: 1.5rem;
-            font-weight: 700;
-            margin-bottom: 1rem;
-        }
-
-        .modal-body {
-            margin-bottom: 2rem;
-            color: var(--text-medium);
-        }
-
-        .modal-actions {
-            display: flex;
-            justify-content: center;
-            gap: 1rem;
         }
 
         .modal-btn {
@@ -518,32 +477,37 @@ $admin = getAdminByEmail($_SESSION['user_email']);
             background: linear-gradient(135deg, var(--plp-green-light), var(--plp-green));
             transform: translateY(-2px);
         }
-        .unread-badge {
-            background: #ff4444;
-            color: white;
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            font-size: 0.75rem;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            margin-left: auto;
-        }
 
-        .sidebar-badge {
-            background: #ff4444;
-            color: white;
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            font-size: 0.75rem;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            margin-left: auto;
-            font-weight: 600;
-            animation: pulse 2s infinite;
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+            }
+            
+            .main-content {
+                padding: 1.5rem;
+            }
+            
+            .header {
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }
+            
+            .filters-container {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .filter-group {
+                min-width: auto;
+            }
         }
     </style>
 </head>
@@ -606,9 +570,9 @@ $admin = getAdminByEmail($_SESSION['user_email']);
         </div>
 
         <div class="container">
-            <!-- Filters -->
-            <form method="POST" class="filters-form">
-                <div class="form-group">
+            <!-- Simplified Filters -->
+            <form method="POST" class="filters-container">
+                <div class="filter-group">
                     <label for="user_type">User Type</label>
                     <select id="user_type" name="user_type">
                         <option value="">All Types</option>
@@ -617,7 +581,7 @@ $admin = getAdminByEmail($_SESSION['user_email']);
                     </select>
                 </div>
 
-                <div class="form-group">
+                <div class="filter-group">
                     <label for="action">Action</label>
                     <select id="action" name="action">
                         <option value="">All Actions</option>
@@ -627,22 +591,25 @@ $admin = getAdminByEmail($_SESSION['user_email']);
                     </select>
                 </div>
 
-                <div class="form-group">
+                <div class="filter-group">
                     <label for="date_from">Date From</label>
                     <input type="date" id="date_from" name="date_from" value="<?php echo isset($_POST['date_from']) ? htmlspecialchars($_POST['date_from']) : ''; ?>">
                 </div>
 
-                <div class="form-group">
+                <div class="filter-group">
                     <label for="date_to">Date To</label>
                     <input type="date" id="date_to" name="date_to" value="<?php echo isset($_POST['date_to']) ? htmlspecialchars($_POST['date_to']) : ''; ?>">
                 </div>
 
-                <div class="form-group" style="grid-column: 1 / -1; display: flex; gap: 1rem; align-items: end;">
+                <div class="filter-group">
                     <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-filter"></i> Apply Filters
+                        <i class="fas fa-filter"></i> Apply
                     </button>
+                </div>
+
+                <div class="filter-group">
                     <a href="?clear_filters=1" class="btn btn-secondary">
-                        <i class="fas fa-times"></i> Clear Filters
+                        <i class="fas fa-times"></i> Clear
                     </a>
                 </div>
             </form>
@@ -711,7 +678,8 @@ $admin = getAdminByEmail($_SESSION['user_email']);
             <?php endif; ?>
         </div>
     </div>
-        <!-- Logout Modal -->
+
+    <!-- Logout Modal -->
     <div class="modal" id="logoutModal">
         <div class="modal-content" style="max-width: 450px; text-align: center;">
             <h3 style="color: var(--plp-green); font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem;">
@@ -756,13 +724,10 @@ $admin = getAdminByEmail($_SESSION['user_email']);
         });
 
         // Hide modal when clicking outside the modal content
-        const modals = [addSubjectModal, editSubjectModal, archiveSubjectModal, logoutModal];
-        modals.forEach(modal => {
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    modal.classList.remove('show');
-                }
-            });
+        logoutModal.addEventListener('click', (e) => {
+            if (e.target === logoutModal) {
+                logoutModal.classList.remove('show');
+            }
         });
     </script>
 </body>
