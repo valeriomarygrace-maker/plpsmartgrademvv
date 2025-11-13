@@ -16,34 +16,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && isset($_P
     if (!isValidPLPEmail($email)) {
         $error = 'Your email address is not valid.';
     } else {
-        // Check if email exists in students table
-        $student = getStudentByEmail($email);
+        // First, check if it's an admin
+        $admin = getAdminByEmail($email);
         
-        if ($student) {
-            // Check if student has a password set
-            if (empty($student['password'])) {
-                $error = 'No password set for this account.';
-                $showSignupModal = true;
-            } elseif (verifyPassword($password, $student['password'])) {
+        if ($admin) {
+            // Admin login
+            if (verifyPassword($password, $admin['password'])) {
                 // Regenerate session for security
                 regenerateSession();
                 
                 $_SESSION['logged_in'] = true;
                 $_SESSION['user_email'] = $email;
-                $_SESSION['user_type'] = 'student';
-                $_SESSION['user_id'] = $student['id'];
-                $_SESSION['user_name'] = $student['fullname'];
+                $_SESSION['user_type'] = 'admin';
+                $_SESSION['user_id'] = $admin['id'];
+                $_SESSION['user_name'] = $admin['fullname'];
                 $_SESSION['login_time'] = time();
                 
-                // Redirect to student dashboard
-                header('Location: student-dashboard.php');
+                // Redirect to admin dashboard
+                header('Location: admin-dashboard.php');
                 exit;
             } else {
                 $error = 'Invalid password. Please try again.';
             }
         } else {
-            $error = 'Email not found in our system. Please sign up first.';
-            $showSignupModal = true;
+            // Check if email exists in students table
+            $student = getStudentByEmail($email);
+            
+            if ($student) {
+                // Check if student has a password set
+                if (empty($student['password'])) {
+                    $error = 'No password set for this account.';
+                    $showSignupModal = true;
+                } elseif (verifyPassword($password, $student['password'])) {
+                    // Regenerate session for security
+                    regenerateSession();
+                    
+                    $_SESSION['logged_in'] = true;
+                    $_SESSION['user_email'] = $email;
+                    $_SESSION['user_type'] = 'student';
+                    $_SESSION['user_id'] = $student['id'];
+                    $_SESSION['user_name'] = $student['fullname'];
+                    $_SESSION['login_time'] = time();
+                    
+                    // Redirect to student dashboard
+                    header('Location: student-dashboard.php');
+                    exit;
+                } else {
+                    $error = 'Invalid password. Please try again.';
+                }
+            } else {
+                $error = 'Email not found in our system. Please sign up first.';
+                $showSignupModal = true;
+            }
         }
     }
 }
@@ -806,7 +830,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
                 
                 <div class="login-container">
                     <form class="login-form" method="POST" id="loginForm">
-                        <h3>Student Log In</h3>
+                    <h3><?php echo isset($_SESSION['user_type']) && $_SESSION['user_type'] === 'admin' ? 'Admin' : 'Student'; ?> Log In</h3>
                         
                         <?php if ($error && !isset($_POST['signup'])): ?>
                             <div class="alert alert-error">
