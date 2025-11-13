@@ -171,6 +171,7 @@ $termGrade = 0;
 $subjectGrade = 0;
 $riskLevel = 'no-data';
 $riskDescription = 'No Data Inputted';
+$ml_confidence = 0;
 $behavioralInsights = [];
 $interventions = [];
 $recommendations = [];
@@ -265,14 +266,35 @@ if ($hasScores) {
         $termGrade = 100;
     }
 
-    // Calculate risk level and generate insights
-    $riskLevel = calculateRiskLevel($termGrade);
-    $riskDescription = getRiskDescription($riskLevel);
-    
-    $behavioralInsights = generateBehavioralInsights($termGrade, $categoryTotals, $term, $student['id'], $subject_id);
-    $interventions = generateInterventions($riskLevel, $categoryTotals, $term);
-    $recommendations = generateRecommendations($termGrade, $categoryTotals, $riskLevel, $term);
+    // 🚀 NEW: CALL PYTHON ML FOR RISK PREDICTION
+    $ml_prediction = callPythonMLAPI([
+        'subject_grade' => $termGrade,
+        'class_standings' => array_column($categoryTotals, 'percentage_score'),
+        'exam_scores' => $term === 'midterm' ? [$midtermScore] : [$finalScore],
+        'attendance' => getAttendanceData($categoryTotals),
+        'subject' => $subject['subject_name'],
+        'term' => $term
+    ]);
 
+    if ($ml_prediction && $ml_prediction['success']) {
+        // Use ML prediction
+        $riskLevel = $ml_prediction['risk_level'];
+        $riskDescription = $ml_prediction['risk_description'];
+        $ml_confidence = $ml_prediction['confidence'] * 100; // Convert to percentage
+        $behavioralInsights = $ml_prediction['behavioral_insights'];
+        $recommendations = $ml_prediction['recommendations'];
+    } else {
+        // Fallback to simple rules if ML fails
+        $riskLevel = calculateRiskLevelSimple($termGrade);
+        $riskDescription = getRiskDescription($riskLevel);
+        $ml_confidence = 0;
+        $behavioralInsights = generateBehavioralInsights($termGrade, $categoryTotals, $term, $student['id'], $subject_id);
+        $recommendations = generateRecommendations($termGrade, $categoryTotals, $riskLevel, $term);
+    }
+
+    $interventions = generateInterventions($riskLevel, $categoryTotals, $term);
+
+    error_log("ML Prediction: " . json_encode($ml_prediction));
     error_log("Total Class Standing: " . $totalClassStanding);
     error_log("Term Grade: " . $termGrade);
 
@@ -282,6 +304,7 @@ if ($hasScores) {
     $totalClassStanding = 0;
     $midtermScore = 0;
     $finalScore = 0;
+    $ml_confidence = 0;
     
     // Provide basic insights even without scores
     $behavioralInsights = [[
@@ -300,6 +323,79 @@ if ($hasScores) {
         'priority' => 'low',
         'source' => 'system'
     ]];
+}
+
+/**
+ * NEW: Get attendance data for ML analysis
+ */
+function getAttendanceData($categoryTotals) {
+    $attendance = [];
+    foreach ($categoryTotals as $category) {
+        if (strtolower($category['name']) === 'attendance' && !empty($category['scores'])) {
+            foreach ($category['scores'] as $score) {
+                $attendance[] = $score['score_name'] === 'Present' ? 1 : 0;
+            }
+        }
+    }
+    return $attendance;
+}
+
+/**
+ * NEW: Call Python ML API
+ */
+function callPythonMLAPI($student_data) {
+    $url = 'http://localhost:5000/predict';
+    
+    $payload = json_encode([
+        'class_standings' => $student_data['class_standings'] ?? [],
+        'exam_scores' => $student_data['exam_scores'] ?? [],
+        'attendance' => $student_data['attendance'] ?? [],
+        'subject' => $student_data['subject'] ?? 'General',
+        'term' => $student_data['term'] ?? 'midterm',
+        'subject_grade' => $student_data['subject_grade'] ?? 0
+    ]);
+    
+    $options = [
+        'http' => [
+            'header'  => "Content-type: application/json\r\n",
+            'method'  => 'POST',
+            'content' => $payload,
+            'timeout' => 5 // 5 second timeout
+        ]
+    ];
+    
+    $context = stream_context_create($options);
+    
+    try {
+        $result = @file_get_contents($url, false, $context);
+        
+        if ($result === FALSE) {
+            error_log("Python ML API call failed - service might be down");
+            return null;
+        }
+        
+        $decoded_result = json_decode($result, true);
+        
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            error_log("Python ML API returned invalid JSON");
+            return null;
+        }
+        
+        return $decoded_result;
+        
+    } catch (Exception $e) {
+        error_log("Python ML API exception: " . $e->getMessage());
+        return null;
+    }
+}
+
+/**
+ * Fallback function if ML service is down
+ */
+function calculateRiskLevelSimple($grade) {
+    if ($grade >= 85) return 'low_risk';
+    elseif ($grade >= 80) return 'moderate_risk';
+    else return 'high_risk';
 }
 
 // FORM HANDLING - Only allow actions for current term
@@ -580,12 +676,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Helper functions - ONLY KEEP ESSENTIAL ONES
-function calculateRiskLevel($grade) {
-    if ($grade >= 85) return 'low_risk';
-    elseif ($grade >= 80) return 'moderate_risk';
-    else return 'high_risk';
-}
-
 function getRiskDescription($riskLevel) {
     switch ($riskLevel) {
         case 'low_risk': return 'Excellent/Good Performance';
@@ -1534,6 +1624,29 @@ function getGradeDescription($grade) {
             font-weight: 600;
             animation: pulse 2s infinite;
         }
+        .ml-confidence {
+            display: inline-block;
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 0.3rem 0.8rem;
+            border-radius: 15px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-left: 0.5rem;
+        }
+        
+        .ml-badge {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 0.3rem 0.8rem;
+            border-radius: 15px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            margin-left: 0.5rem;
+        }
     </style>
 </head>
 <body>
@@ -1618,6 +1731,12 @@ function getGradeDescription($grade) {
         <div class="header">
             <div class="class-title">
                 <?php echo htmlspecialchars($subject['subject_code'] . ' - ' . $subject['subject_name']); ?>
+                <?php if ($hasScores && $ml_confidence > 0): ?>
+                    <span class="ml-badge">
+                        <i class="fas fa-robot"></i>
+                        ML Powered
+                    </span>
+                <?php endif; ?>
             </div>
             <div class="header-actions">
                 <a href="termevaluations.php?subject_id=<?php echo $subject_id; ?>" class="btn btn-secondary">
@@ -1637,14 +1756,13 @@ function getGradeDescription($grade) {
                     <?php if ($hasScores): ?>
                         <div class="performance-value"><?php echo number_format($termGrade, 1); ?>%</div>
                         <div class="performance-label" style="margin-top: 0.5rem; font-size: 0.9rem; color: var(--text-medium);">
-                            <?php
-                            if ($termGrade >= 90) echo 'Excellent';
-                            elseif ($termGrade >= 85) echo 'Very Good';
-                            elseif ($termGrade >= 80) echo 'Good';
-                            elseif ($termGrade >= 75) echo 'Satisfactory';
-                            elseif ($termGrade >= 70) echo 'Passing';
-                            else echo 'Needs Improvement';
-                            ?>
+                            <?php echo getGradeDescription($termGrade); ?>
+                            <?php if ($ml_confidence > 0): ?>
+                                <div class="ml-confidence">
+                                    <i class="fas fa-brain"></i>
+                                    <?php echo number_format($ml_confidence, 1); ?>% confident
+                                </div>
+                            <?php endif; ?>
                         </div>
                     <?php else: ?>
                         <div class="performance-value" style="color: var(--text-light);">--</div>
@@ -1653,10 +1771,16 @@ function getGradeDescription($grade) {
                 </div>
                 
                 <div class="performance-card">
-                    <div class="performance-label">Class Standing</div>
+                    <div class="performance-label">Risk Level</div>
                     <?php if ($hasScores): ?>
-                        <div class="performance-value"><?php echo number_format($totalClassStanding, 1); ?>%</div>
-                        <div class="performance-label">of <?php echo $totalClassStandingPercentage; ?>%</div>
+                        <div class="performance-value" style="font-size: 1.5rem;">
+                            <span class="risk-badge <?php echo $riskLevel; ?>">
+                                <?php echo ucfirst(str_replace('_', ' ', $riskLevel)); ?>
+                            </span>
+                        </div>
+                        <div class="performance-label" style="margin-top: 0.5rem; font-size: 0.9rem; color: var(--text-medium);">
+                            <?php echo $riskDescription; ?>
+                        </div>
                     <?php else: ?>
                         <div class="performance-value" style="color: var(--text-light);">--</div>
                         <div class="performance-label">No scores added</div>
@@ -2433,6 +2557,14 @@ function getGradeDescription($grade) {
             this.style.boxShadow = '';
         }
     });
+
+    document.addEventListener('DOMContentLoaded', function() {
+            <?php if ($hasScores && $ml_confidence > 0): ?>
+                console.log("ML Prediction Active - Confidence: <?php echo $ml_confidence; ?>%");
+            <?php elseif ($hasScores): ?>
+                console.log("Using fallback risk calculation - ML service unavailable");
+            <?php endif; ?>
+        });
 
     // Logout modal functionality
     const logoutBtn = document.querySelector('.logout-btn');
