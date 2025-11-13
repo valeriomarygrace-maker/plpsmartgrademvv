@@ -276,5 +276,132 @@ function getConversationPartners($userId, $userType) {
         return $partners;
     }
 }
+/**
+ * Log system activities
+ */
+function logSystemActivity($user_email, $user_type, $action, $description = '') {
+    $log_data = [
+        'user_email' => $user_email,
+        'user_type' => $user_type,
+        'action' => $action,
+        'description' => $description,
+        'ip_address' => $_SERVER['REMOTE_ADDR'] ?? 'Unknown',
+        'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown'
+    ];
+    
+    return supabaseInsert('system_logs', $log_data);
+}
 
+/**
+ * Get system logs with filters
+ */
+function getSystemLogs($filters = [], $limit = 50, $offset = 0) {
+    global $supabase_url, $supabase_key;
+    
+    $query_params = [
+        'order' => 'created_at.desc',
+        'limit' => $limit,
+        'offset' => $offset
+    ];
+    
+    // Add filters if provided
+    if (!empty($filters['user_type'])) {
+        $query_params['user_type'] = 'eq.' . $filters['user_type'];
+    }
+    
+    if (!empty($filters['action'])) {
+        $query_params['action'] = 'eq.' . $filters['action'];
+    }
+    
+    if (!empty($filters['date_from'])) {
+        $query_params['created_at'] = 'gte.' . $filters['date_from'];
+    }
+    
+    if (!empty($filters['date_to'])) {
+        $query_params['created_at'] = 'lte.' . $filters['date_to'];
+    }
+    
+    $url = $supabase_url . "/rest/v1/system_logs?" . http_build_query($query_params);
+    
+    $ch = curl_init();
+    $headers = [
+        'apikey: ' . $supabase_key,
+        'Authorization: Bearer ' . $supabase_key,
+        'Content-Type: application/json'
+    ];
+    
+    curl_setopt_array($ch, [
+        CURLOPT_URL => $url,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => $headers,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_TIMEOUT => 30,
+    ]);
+    
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    if ($httpCode === 200) {
+        return json_decode($response, true) ?: [];
+    }
+    
+    return [];
+}
+
+/**
+ * Count system logs for pagination
+ */
+function countSystemLogs($filters = []) {
+    global $supabase_url, $supabase_key;
+    
+    $query_params = [
+        'select' => 'count'
+    ];
+    
+    // Add filters if provided
+    if (!empty($filters['user_type'])) {
+        $query_params['user_type'] = 'eq.' . $filters['user_type'];
+    }
+    
+    if (!empty($filters['action'])) {
+        $query_params['action'] = 'eq.' . $filters['action'];
+    }
+    
+    if (!empty($filters['date_from'])) {
+        $query_params['created_at'] = 'gte.' . $filters['date_from'];
+    }
+    
+    if (!empty($filters['date_to'])) {
+        $query_params['created_at'] = 'lte.' . $filters['date_to'];
+    }
+    
+    $url = $supabase_url . "/rest/v1/system_logs?" . http_build_query($query_params);
+    
+    $ch = curl_init();
+    $headers = [
+        'apikey: ' . $supabase_key,
+        'Authorization: Bearer ' . $supabase_key,
+        'Content-Type: application/json'
+    ];
+    
+    curl_setopt_array($ch, [
+        CURLOPT_URL => $url,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => $headers,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_TIMEOUT => 30,
+    ]);
+    
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    if ($httpCode === 200) {
+        $result = json_decode($response, true);
+        return $result[0]['count'] ?? 0;
+    }
+    
+    return 0;
+}
 ?>

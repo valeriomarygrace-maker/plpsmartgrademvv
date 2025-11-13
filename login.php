@@ -37,6 +37,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && isset($_P
                 $_SESSION['user_id'] = $admin['id'];
                 $_SESSION['user_name'] = $admin['fullname'];
                 
+                // Log the login activity
+                logSystemActivity($email, 'admin', 'login', 'Admin logged in successfully');
+                
                 header('Location: admin-dashboard.php');
                 exit;
             } else {
@@ -56,6 +59,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && isset($_P
                     $_SESSION['user_type'] = 'student';
                     $_SESSION['user_id'] = $student['id'];
                     $_SESSION['user_name'] = $student['fullname'];
+                    
+                    // Log the login activity
+                    logSystemActivity($email, 'student', 'login', 'Student logged in successfully');
                     
                     header('Location: student-dashboard.php');
                     exit;
@@ -114,6 +120,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             if ($result !== false) {
                 $success = 'Registration successful! ';
                 $showSignupModal = false;
+                
+                // Log the signup activity
+                logSystemActivity($email, 'student', 'signup', 'Student registered successfully');
             } else {
                 $error = 'Registration failed. Please try again.';
                 $showSignupModal = true;
