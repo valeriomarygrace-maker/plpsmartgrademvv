@@ -276,6 +276,7 @@ function getConversationPartners($userId, $userType) {
         return $partners;
     }
 }
+
 /**
  * Log system activities
  */

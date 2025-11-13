@@ -33,60 +33,6 @@ $system_logs = getSystemLogs($filters, $limit, $offset);
 $total_logs = countSystemLogs($filters);
 $total_pages = ceil($total_logs / $limit);
 $current_page = floor($offset / $limit) + 1;
-
-// Add this function to config.php if not exists
-function countSystemLogs($filters = []) {
-    global $supabase_url, $supabase_key;
-    
-    $query_params = [
-        'select' => 'count'
-    ];
-    
-    // Add filters if provided
-    if (!empty($filters['user_type'])) {
-        $query_params['user_type'] = 'eq.' . $filters['user_type'];
-    }
-    
-    if (!empty($filters['action'])) {
-        $query_params['action'] = 'eq.' . $filters['action'];
-    }
-    
-    if (!empty($filters['date_from'])) {
-        $query_params['created_at'] = 'gte.' . $filters['date_from'];
-    }
-    
-    if (!empty($filters['date_to'])) {
-        $query_params['created_at'] = 'lte.' . $filters['date_to'];
-    }
-    
-    $url = $supabase_url . "/rest/v1/system_logs?" . http_build_query($query_params);
-    
-    $ch = curl_init();
-    $headers = [
-        'apikey: ' . $supabase_key,
-        'Authorization: Bearer ' . $supabase_key,
-        'Content-Type: application/json'
-    ];
-    
-    curl_setopt_array($ch, [
-        CURLOPT_URL => $url,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER => $headers,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_TIMEOUT => 30,
-    ]);
-    
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    
-    if ($httpCode === 200) {
-        $result = json_decode($response, true);
-        return $result[0]['count'] ?? 0;
-    }
-    
-    return 0;
-}
 ?>
 
 <!DOCTYPE html>

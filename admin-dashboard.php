@@ -34,7 +34,7 @@ try {
                 $dateB = isset($b['created_at']) ? strtotime($b['created_at']) : 0;
                 return $dateB - $dateA;
             });
-            $recent_students = array_slice($students, 0, 5);
+            $recent_students = array_slice($students, 0, 3);
         }
     }
 } catch (Exception $e) {
