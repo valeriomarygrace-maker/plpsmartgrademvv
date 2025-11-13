@@ -488,9 +488,4 @@ function getUnreadMessageCount($user_id, $user_type) {
     $messages = supabaseFetch('messages', $filters);
     return $messages ? count($messages) : 0;
 }
-
-/**
-
-
-
 ?>
