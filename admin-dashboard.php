@@ -13,6 +13,12 @@ if (!$admin) {
     exit;
 }
 
+// Initialize variables
+$error_message = '';
+$total_students = 0;
+$total_subjects = 0;
+$recent_students = [];
+
 // Get dashboard data
 $students = supabaseFetch('students', []);
 $total_students = $students ? count($students) : 0;
@@ -21,7 +27,6 @@ $subjects = supabaseFetch('subjects', []);
 $total_subjects = $subjects ? count($subjects) : 0;
 
 // Get recent students
-$recent_students = [];
 if ($students) {
     usort($students, function($a, $b) {
         $dateA = isset($a['created_at']) ? strtotime($a['created_at']) : 0;
@@ -31,7 +36,6 @@ if ($students) {
     $recent_students = array_slice($students, 0, 5);
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>

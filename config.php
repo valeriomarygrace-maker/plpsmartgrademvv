@@ -89,6 +89,11 @@ function getStudentByEmail($email) {
     return $students && count($students) > 0 ? $students[0] : null;
 }
 
+function getStudentById($id) {
+    $students = supabaseFetch('students', ['id' => $id]);
+    return $students && count($students) > 0 ? $students[0] : null;
+}
+
 function isValidPLPEmail($email) {
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         return false;
@@ -121,5 +126,30 @@ function requireStudentRole() {
 
 function sanitizeInput($data) {
     return htmlspecialchars(trim($data), ENT_QUOTES, 'UTF-8');
+}
+
+/**
+ * Message Functions
+ */
+function getUnreadMessageCount($userId, $userType) {
+    // Since we don't have a messages table defined in your schema,
+    // this function returns 0 for now
+    // You can implement this later when you have a messages table
+    return 0;
+}
+
+/**
+ * Additional Supabase Helper Functions
+ */
+function supabaseUpdate($table, $data, $filters = []) {
+    return supabaseFetch($table, $filters, 'PATCH', $data);
+}
+
+function supabaseInsert($table, $data) {
+    return supabaseFetch($table, [], 'POST', $data);
+}
+
+function supabaseFetchAll($table, $filters = []) {
+    return supabaseFetch($table, $filters);
 }
 ?>

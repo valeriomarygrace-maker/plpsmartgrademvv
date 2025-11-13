@@ -14,8 +14,8 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['user_type'] !== 'student') {
 $userEmail = $_SESSION['user_email'] ?? '';
 $userId = $_SESSION['user_id'] ?? null;
 
-// Get student data from Supabase
-$student = getStudentById($userId);
+// Get student data from Supabase - FIXED: Use getStudentByEmail instead of getStudentById
+$student = getStudentByEmail($userEmail);
 if (!$student) {
     $_SESSION['error_message'] = "Student account not found";
     header('Location: login.php');
@@ -121,7 +121,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['profile_picture'])) 
     }
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
