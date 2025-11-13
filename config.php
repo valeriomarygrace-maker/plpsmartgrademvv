@@ -471,14 +471,10 @@ function logUserAction($user_email, $user_type, $action, $description = '') {
     return supabaseInsert('system_logs', $log_data);
 }
 
-// Session timeout check
-if (isset($_SESSION['created']) && (time() - $_SESSION['created'] > 28800)) {
-    session_destroy();
-    if (basename($_SERVER['PHP_SELF']) !== 'login.php') {
-        header('Location: login.php');
-        exit;
-    }
-}
+/**
+ * Messaging Functions
+ */
+
 /**
  * Get unread message count for user
  */
@@ -551,4 +547,63 @@ function getRecentConversations($user_id, $user_type) {
     
     return [];
 }
+
+/**
+ * Get messages between two users
+ */
+function getMessagesBetweenUsers($user1_id, $user1_type, $user2_id, $user2_type) {
+    global $supabase_url, $supabase_key;
+    
+    $url = $supabase_url . "/rest/v1/messages?select=*&or=(and(sender_id.eq.{$user1_id},sender_type.eq.{$user1_type},receiver_id.eq.{$user2_id},receiver_type.eq.{$user2_type}),and(sender_id.eq.{$user2_id},sender_type.eq.{$user2_type},receiver_id.eq.{$user1_id},receiver_type.eq.{$user1_type}))&order=created_at.asc";
+    
+    $ch = curl_init();
+    $headers = [
+        'apikey: ' . $supabase_key,
+        'Authorization: Bearer ' . $supabase_key,
+        'Content-Type: application/json'
+    ];
+    
+    curl_setopt_array($ch, [
+        CURLOPT_URL => $url,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => $headers,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_TIMEOUT => 30,
+    ]);
+    
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    if ($httpCode === 200) {
+        return json_decode($response, true) ?: [];
+    }
+    
+    return [];
+}
+
+/**
+ * Mark messages as read
+ */
+function markMessagesAsRead($sender_id, $sender_type, $receiver_id, $receiver_type) {
+    $filters = [
+        'sender_id' => $sender_id,
+        'sender_type' => $sender_type,
+        'receiver_id' => $receiver_id,
+        'receiver_type' => $receiver_type,
+        'is_read' => false
+    ];
+    
+    return supabaseUpdate('messages', ['is_read' => true], $filters);
+}
+
+// Session timeout check
+if (isset($_SESSION['created']) && (time() - $_SESSION['created'] > 28800)) {
+    session_destroy();
+    if (basename($_SERVER['PHP_SELF']) !== 'login.php') {
+        header('Location: login.php');
+        exit;
+    }
+}
+
 ?>
