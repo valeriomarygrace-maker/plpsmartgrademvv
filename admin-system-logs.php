@@ -277,41 +277,6 @@ if (!empty($filter_date) && is_array($logs)) {
             gap: 0.5rem;
         }
 
-        .metrics-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 1rem;
-        }
-
-        .metric-card {
-            border-radius: var(--border-radius);
-            box-shadow: var(--box-shadow);
-            border-left: 4px solid var(--plp-green);
-            background: white;
-            text-align: center;
-            padding: 1rem;
-            border-radius: var(--border-radius);
-            transition: var(--transition);
-        }
-
-        .metric-card:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--box-shadow-lg);
-        }
-
-        .metric-value {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: var(--plp-green);
-            margin-bottom: 0.25rem;
-        }
-
-        .metric-label {
-            font-size: 0.85rem;
-            color: var(--text-medium);
-            font-weight: 500;
-        }
-
         /* Filter Styles */
         .filters-container {
             background: white;
@@ -547,28 +512,6 @@ if (!empty($filter_date) && is_array($logs)) {
             }
         }
 
-        .three-column-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 1.5rem;
-            margin-bottom: 2rem;
-        }
-
-        .three-column-grid .card {
-            margin-bottom: 0;
-        }
-
-        @media (max-width: 1200px) {
-            .three-column-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-
-        @media (max-width: 768px) {
-            .three-column-grid {
-                grid-template-columns: 1fr;
-            }
-        }
     </style>
 </head>
 <body>
@@ -585,7 +528,7 @@ if (!empty($filter_date) && is_array($logs)) {
         
         <ul class="nav-menu">
             <li class="nav-item">
-                <a href="admin-dashboard.php" class="nav-link active">
+                <a href="admin-dashboard.php" class="nav-link ">
                     <i class="fas fa-chart-line"></i>
                     Dashboard
                 </a>
@@ -597,7 +540,7 @@ if (!empty($filter_date) && is_array($logs)) {
                 </a>
             </li>
             <li class="nav-item">
-                <a href="admin-system-logs.php" class="nav-link">
+                <a href="admin-system-logs.php" class="nav-link active">
                     <i class="fas fa-cog"></i>
                     System Logs
                 </a>
@@ -629,22 +572,6 @@ if (!empty($filter_date) && is_array($logs)) {
         
         <div class="header">
             <div class="welcome">System Activity Logs</div>
-        </div>
-
-        <!-- Statistics Cards -->
-        <div class="three-column-grid">
-            <div class="metric-card">
-                <div class="metric-value"><?php echo $stats['total_logins'] ?? 0; ?></div>
-                <div class="metric-label">Total Logins</div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-value"><?php echo $stats['total_logouts'] ?? 0; ?></div>
-                <div class="metric-label">Total Logouts</div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-value"><?php echo $stats['unique_students'] ?? 0; ?></div>
-                <div class="metric-label">Unique Students</div>
-            </div>
         </div>
 
         <!-- Filters -->
