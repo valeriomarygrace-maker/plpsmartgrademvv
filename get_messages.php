@@ -26,6 +26,8 @@ foreach ($messages as $msg) {
 
 if (!empty($unread_ids)) {
     markMessagesAsRead($unread_ids);
+    // Refresh unread count after marking messages as read
+    refreshUnreadMessageCount($user_id, $user_type);
 }
 
 echo json_encode($messages);

@@ -144,6 +144,11 @@ function supabaseFetchAll($table, $filters = []) {
 }
 
 function getUnreadMessageCount($userId, $userType) {
+    // Check if we already have the count in session
+    if (isset($_SESSION['unread_message_count']) && $_SESSION['unread_message_count_time'] > time() - 30) {
+        return $_SESSION['unread_message_count'];
+    }
+    
     if ($userType === 'student') {
         $filters = [
             'receiver_id' => $userId,
@@ -159,8 +164,24 @@ function getUnreadMessageCount($userId, $userType) {
     }
     
     $messages = supabaseFetch('messages', $filters);
-    return $messages ? count($messages) : 0;
+    $count = $messages ? count($messages) : 0;
+    
+    // Store in session for 30 seconds
+    $_SESSION['unread_message_count'] = $count;
+    $_SESSION['unread_message_count_time'] = time();
+    
+    return $count;
 }
+
+/**
+ * Force refresh unread count (call this after sending/reading messages)
+ */
+function refreshUnreadMessageCount($userId, $userType) {
+    unset($_SESSION['unread_message_count']);
+    unset($_SESSION['unread_message_count_time']);
+    return getUnreadMessageCount($userId, $userType);
+}
+
 
 function getMessagesBetweenUsers($user1_id, $user1_type, $user2_id, $user2_type) {
     global $supabase_url, $supabase_key;

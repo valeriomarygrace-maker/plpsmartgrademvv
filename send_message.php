@@ -29,6 +29,8 @@ $message_data = [
 ];
 
 if (supabaseInsert('messages', $message_data)) {
+    // Refresh unread count for the receiver
+    refreshUnreadMessageCount($receiver_id, $receiver_type);
     echo json_encode(['success' => true]);
 } else {
     echo json_encode(['success' => false]);

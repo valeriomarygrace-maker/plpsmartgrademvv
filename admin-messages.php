@@ -3,7 +3,7 @@ require_once 'config.php';
 requireAdminRole();
 
 $admin_id = $_SESSION['user_id'];
-$students = supabaseFetchAll('students');
+$admin = getAdminByEmail($_SESSION['user_email']);
 
 // Get conversation partners (students who have messaged with this admin)
 $partners = getConversationPartners($admin_id, 'admin');
@@ -46,50 +46,171 @@ $partners = getConversationPartners($admin_id, 'admin');
         body {
             font-family: 'Poppins', sans-serif;
             background: var(--plp-green-pale);
+            display: flex;
+            min-height: 100vh;
             color: var(--text-dark);
             line-height: 1.6;
         }
 
-        .messages-container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 2rem;
-        }
-
-        .messages-header {
+        .sidebar {
+            width: 320px;
             background: white;
-            padding: 2rem;
-            border-radius: var(--border-radius-lg);
             box-shadow: var(--box-shadow);
-            margin-bottom: 2rem;
-            border-left: 4px solid var(--plp-green);
-        }
-
-        .messages-header h1 {
-            color: var(--plp-green);
-            font-size: 2rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
+            padding: 1.5rem;
             display: flex;
-            align-items: center;
-            gap: 1rem;
+            flex-direction: column;
+            height: 100vh;
+            position: sticky;
+            top: 0;
+            border-right: 1px solid rgba(0, 99, 65, 0.1);
         }
 
-        .messages-header h1 i {
-            background: var(--plp-green-pale);
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
+        .sidebar-header {
+            text-align: center;
+            border-bottom: 1px solid rgba(0, 99, 65, 0.1);
+        }
+
+        .logo-container {
             display: flex;
             align-items: center;
             justify-content: center;
         }
 
-        .messages-content {
+        .logo {
+            width: 130px;
+            height: 130px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            transition: var(--transition);
+        }
+
+        .logo:hover {
+            transform: scale(1.05);
+        }
+
+        .logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            padding: 5px;
+        }
+
+        .portal-title {
+            color: var(--plp-green);
+            font-size: 1.3rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .admin-email {
+            color: var(--text-medium);
+            font-size: 0.85rem;
+            margin-bottom: 1rem;
+            word-break: break-all;
+            padding: 0.5rem;
+            border-radius: 6px;
+            font-weight: 500;
+        }
+
+        .nav-menu {
+            list-style: none;
+            flex-grow: 0.30;
+            margin-top: 0.7rem;
+        }
+
+        .nav-item {
+            margin-bottom: 0.7rem;
+            position: relative;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.50rem;
+            color: var(--text-medium);
+            text-decoration: none;
+            border-radius: var(--border-radius);
+            transition: var(--transition);
+            font-weight: 500;
+            position: relative;
+        }
+
+        .nav-link:hover:not(.active) {
+            background: var(--plp-green-lighter);
+            color: var(--plp-green);
+            transform: translateY(-3px);
+        }
+
+        .nav-link.active {
+            background: var(--plp-green-gradient);
+            color: white;
+            box-shadow: var(--box-shadow);
+        }
+
+        .sidebar-footer {
+            border-top: 3px solid rgba(0, 99, 65, 0.1);
+        }
+
+        .logout-btn {
+            margin-top:1rem;
+            background: transparent;
+            color: var(--text-medium);
+            padding: 0.75rem 1rem;
+            border: none;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            width: 100%;
+            font-weight: 500;
+            transition: var(--transition);
+        }
+
+        .logout-btn:hover {
+            background: #fee2e2;
+            color: #b91c1c;
+            transform: translateX(5px);
+        }
+
+        .main-content {
+            flex: 1;
+            padding: 1rem 2.5rem; 
+            background: var(--plp-green-pale);
+            max-width: 100%;
+            margin: 0 auto;
+            width: 100%;
+            overflow-y: auto;
+        }
+
+        .header {
+            background: white;
+            padding: 0.6rem 1.25rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            margin-bottom: 1.5rem; 
+            background: var(--plp-green-gradient);
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .welcome {
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .messages-container {
             display: grid;
             grid-template-columns: 350px 1fr;
             gap: 2rem;
-            height: 70vh;
+            height: calc(100vh - 120px);
         }
 
         .students-list {
@@ -107,6 +228,9 @@ $partners = getConversationPartners($admin_id, 'admin');
             padding: 1.5rem;
             font-weight: 600;
             font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
         }
 
         .students-container {
@@ -348,6 +472,33 @@ $partners = getConversationPartners($admin_id, 'admin');
             margin-left: auto;
         }
 
+        .sidebar-badge {
+            background: #ff4444;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 0.75rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: auto;
+            font-weight: 600;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.1);
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
+
         .empty-state {
             padding: 2rem;
             text-align: center;
@@ -359,22 +510,94 @@ $partners = getConversationPartners($admin_id, 'admin');
             color: var(--plp-green-lighter);
             margin-bottom: 1rem;
         }
+
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+            }
+            
+            .main-content {
+                padding: 1rem;
+            }
+            
+            .messages-container {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+            
+            .students-list {
+                height: 300px;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="messages-container">
-        <div class="messages-header">
-            <h1>
-                <i class="fas fa-comments"></i>
-                Messages
-            </h1>
-            <p style="color: var(--text-medium);">Communicate with students</p>
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <div class="logo-container">
+                <div class="logo">
+                    <img src="plplogo.png" alt="PLP Logo">
+                </div>
+            </div>
+            <div class="portal-title">PLPSMARTGRADE</div>
+            <div class="admin-email"><?php echo htmlspecialchars($admin['email']); ?></div>
         </div>
         
-        <div class="messages-content">
+        <ul class="nav-menu">
+            <li class="nav-item">
+                <a href="admin-dashboard.php" class="nav-link">
+                    <i class="fas fa-chart-line"></i>
+                    Dashboard
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="admin-students.php" class="nav-link">
+                    <i class="fas fa-users"></i>
+                    Manage Students
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="admin-messages.php" class="nav-link active">
+                    <i class="fas fa-comments"></i>
+                    Messages
+                    <?php 
+                    $unread_count = getUnreadMessageCount($_SESSION['user_id'], 'admin');
+                    if ($unread_count > 0): ?>
+                        <span class="sidebar-badge"><?php echo $unread_count; ?></span>
+                    <?php endif; ?>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="admin-settings.php" class="nav-link">
+                    <i class="fas fa-cog"></i>
+                    System Settings
+                </a>
+            </li>
+        </ul>
+
+        <div class="sidebar-footer">
+            <a href="logout.php" class="logout-btn">
+                <i class="fas fa-sign-out-alt"></i>
+                Logout
+            </a>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="header">
+            <div class="welcome">Messages</div>
+        </div>
+
+        <div class="messages-container">
             <div class="students-list">
                 <div class="list-header">
-                    <i class="fas fa-users"></i>
+                    <i class="fas fa-user-graduate"></i>
                     Students
                 </div>
                 <div class="students-container">
@@ -566,6 +789,11 @@ $partners = getConversationPartners($admin_id, 'admin');
                 clearInterval(refreshInterval);
             }
         });
+
+        // Auto-refresh page every 60 seconds to update message count
+        setTimeout(() => {
+            location.reload();
+        }, 60000);
     </script>
 </body>
 </html>

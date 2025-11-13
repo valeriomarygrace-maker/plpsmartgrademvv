@@ -135,6 +135,7 @@ $partners = getConversationPartners($student_id, 'student');
             border-radius: var(--border-radius);
             transition: var(--transition);
             font-weight: 500;
+            position: relative;
         }
 
         .nav-link:hover:not(.active) {
@@ -471,6 +472,33 @@ $partners = getConversationPartners($student_id, 'student');
             margin-left: auto;
         }
 
+        .sidebar-badge {
+            background: #ff4444;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 0.75rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: auto;
+            font-weight: 600;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.1);
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
+
         .empty-state {
             padding: 2rem;
             text-align: center;
@@ -544,6 +572,11 @@ $partners = getConversationPartners($student_id, 'student');
                 <a href="student-messages.php" class="nav-link active">
                     <i class="fas fa-comments"></i>
                     Messages
+                    <?php 
+                    $unread_count = getUnreadMessageCount($_SESSION['user_id'], 'student');
+                    if ($unread_count > 0): ?>
+                        <span class="sidebar-badge"><?php echo $unread_count; ?></span>
+                    <?php endif; ?>
                 </a>
             </li>
             <li class="nav-item">
@@ -768,6 +801,11 @@ $partners = getConversationPartners($student_id, 'student');
                 clearInterval(refreshInterval);
             }
         });
+
+        // Auto-refresh page every 60 seconds to update message count
+        setTimeout(() => {
+            location.reload();
+        }, 60000);
     </script>
 </body>
 </html>
