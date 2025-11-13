@@ -1,13 +1,19 @@
 <?php
 require_once 'config.php';
-require_once 'ml-helpers.php';
 
 // Start session if not already started
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-if (!isset($_SESSION['logged_in']) || $_SESSION['user_type'] !== 'student') {
+// Check if user is logged in and has correct role
+if (!isset($_SESSION['logged_in']) || !$_SESSION['logged_in']) {
+    header('Location: login.php');
+    exit;
+}
+
+// For student dashboard  
+if ($_SESSION['user_type'] !== 'student') {
     header('Location: login.php');
     exit;
 }
@@ -67,6 +73,7 @@ try {
         $semester_risk_data = getSemesterRiskData($student['id']);
         
     }
+    
 } catch (Exception $e) {
     $error_message = 'Database error: ' . $e->getMessage();
     error_log("Error in student-dashboard.php: " . $e->getMessage());

@@ -1,13 +1,19 @@
 <?php
 require_once 'config.php';
-require_once 'ml-helpers.php';
 
 // Start session if not already started
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-if (!isset($_SESSION['logged_in']) || $_SESSION['user_type'] !== 'admin') {
+// Check if user is logged in and has correct role
+if (!isset($_SESSION['logged_in']) || !$_SESSION['logged_in']) {
+    header('Location: login.php');
+    exit;
+}
+
+// For admin dashboard
+if ($_SESSION['user_type'] !== 'admin') {
     header('Location: login.php');
     exit;
 }
@@ -49,6 +55,7 @@ try {
     error_log("Error in admin-dashboard.php: " . $e->getMessage());
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -544,18 +551,15 @@ try {
                 </a>
             </li>
             <li class="nav-item">
-                <a href="student-messages.php" class="nav-link">
-                    <i class="fas fa-envelope"></i>
-                    Messages
-                    <?php if (getUnreadMessageCount($_SESSION['user_id'], 'student') > 0): ?>
-                        <span class="badge badge-unread"><?php echo getUnreadMessageCount($_SESSION['user_id'], 'student'); ?></span>
-                    <?php endif; ?>
+                <a href="admin-reports.php" class="nav-link">
+                    <i class="fas fa-chart-bar"></i>
+                    Reports
                 </a>
             </li>
             <li class="nav-item">
-                <a href="admin-system-logs.php" class="nav-link">
+                <a href="admin-settings.php" class="nav-link">
                     <i class="fas fa-cog"></i>
-                    System Logs
+                    System Settings
                 </a>
             </li>
         </ul>

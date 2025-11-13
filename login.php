@@ -12,16 +12,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && isset($_P
     $email = sanitizeInput($_POST['email']);
     $password = $_POST['password'];
     
+    // Debug logging
+    error_log("=== LOGIN ATTEMPT ===");
+    error_log("Email: $email");
+    
     // Validate PLP email
     if (!isValidPLPEmail($email)) {
         $error = 'Your email address is not valid.';
+        error_log("Invalid email format: $email");
     } else {
         // First, check if it's an admin
         $admin = getAdminByEmail($email);
+        error_log("Admin search result: " . ($admin ? 'Found' : 'Not found'));
         
         if ($admin) {
+            error_log("Admin found - ID: " . $admin['id'] . ", Email: " . $admin['email']);
             // Admin login
             if (verifyPassword($password, $admin['password'])) {
+                error_log("Admin password verified successfully");
+                
                 // Regenerate session for security
                 regenerateSession();
                 
@@ -32,22 +41,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && isset($_P
                 $_SESSION['user_name'] = $admin['fullname'];
                 $_SESSION['login_time'] = time();
                 
+                error_log("Session set successfully - Redirecting to admin dashboard");
+                error_log("Session data: " . print_r($_SESSION, true));
+                
                 // Redirect to admin dashboard
                 header('Location: admin-dashboard.php');
                 exit;
             } else {
                 $error = 'Invalid password. Please try again.';
+                error_log("Admin password verification failed");
+                error_log("Input password: $password");
+                error_log("Stored hash: " . $admin['password']);
             }
         } else {
             // Check if email exists in students table
             $student = getStudentByEmail($email);
+            error_log("Student search result: " . ($student ? 'Found' : 'Not found'));
             
             if ($student) {
+                error_log("Student found - ID: " . $student['id'] . ", Email: " . $student['email']);
                 // Check if student has a password set
                 if (empty($student['password'])) {
                     $error = 'No password set for this account.';
                     $showSignupModal = true;
+                    error_log("Student has no password set");
                 } elseif (verifyPassword($password, $student['password'])) {
+                    error_log("Student password verified successfully");
+                    
                     // Regenerate session for security
                     regenerateSession();
                     
@@ -58,21 +78,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && isset($_P
                     $_SESSION['user_name'] = $student['fullname'];
                     $_SESSION['login_time'] = time();
                     
+                    error_log("Session set successfully - Redirecting to student dashboard");
+                    error_log("Session data: " . print_r($_SESSION, true));
+                    
                     // Redirect to student dashboard
                     header('Location: student-dashboard.php');
                     exit;
                 } else {
                     $error = 'Invalid password. Please try again.';
+                    error_log("Student password verification failed");
+                    error_log("Input password: $password");
+                    error_log("Stored hash: " . $student['password']);
                 }
             } else {
                 $error = 'Email not found in our system. Please sign up first.';
                 $showSignupModal = true;
+                error_log("Email not found in system: $email");
             }
         }
     }
+    error_log("=== LOGIN ATTEMPT ENDED ===");
 }
     
-// Handle signup
+// Handle signup (your existing signup code remains the same)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
     $student_number = sanitizeInput($_POST['student_number']);
     $fullname = sanitizeInput($_POST['fullname']);

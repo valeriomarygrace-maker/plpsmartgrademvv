@@ -6,12 +6,12 @@ $supabase_key = getenv('SUPABASE_KEY') ?: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.
 // Start session only if not already started
 if (session_status() === PHP_SESSION_NONE) {
     session_set_cookie_params([
-        'lifetime' => 0,
+        'lifetime' => 86400, // 24 hours
         'path' => '/',
         'domain' => '',
-        'secure' => isset($_SERVER['HTTPS']),
+        'secure' => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on',
         'httponly' => true,
-        'samesite' => 'Strict'
+        'samesite' => 'Lax'
     ]);
     session_start();
 }
@@ -50,6 +50,7 @@ function supabaseFetch($table, $filters = [], $method = 'GET', $data = null) {
         CURLOPT_HTTPHEADER => $headers,
         CURLOPT_SSL_VERIFYPEER => false,
         CURLOPT_TIMEOUT => 30,
+        CURLOPT_FAILONERROR => true
     ]);
     
     if ($method === 'POST') {
@@ -68,12 +69,12 @@ function supabaseFetch($table, $filters = [], $method = 'GET', $data = null) {
     curl_close($ch);
     
     if ($error) {
-        error_log("cURL Error: $error");
+        error_log("cURL Error for table $table: $error - URL: $url");
         return false;
     }
     
     if ($httpCode >= 400) {
-        error_log("HTTP Error $httpCode for table: $table");
+        error_log("HTTP Error $httpCode for table: $table - Response: $response");
         return false;
     }
     
