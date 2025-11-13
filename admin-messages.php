@@ -3,83 +3,17 @@ require_once 'config.php';
 requireAdminRole();
 
 $admin_id = $_SESSION['user_id'];
-$students = supabaseFetchAll('students', 'fullname.asc');
+$students = supabaseFetchAll('students');
 
-// Handle sending message
-if ($_POST['action'] === 'send_message') {
-    $receiver_id = sanitizeInput($_POST['receiver_id']);
-    $message = sanitizeInput($_POST['message']);
-    
-    if (!empty($message) && !empty($receiver_id)) {
-        $message_data = [
-            'sender_id' => $admin_id,
-            'sender_type' => 'admin',
-            'receiver_id' => $receiver_id,
-            'receiver_type' => 'student',
-            'message' => $message,
-            'is_read' => false
-        ];
-        
-        if (supabaseInsert('messages', $message_data)) {
-            echo json_encode(['success' => true]);
-            exit;
-        }
-    }
-    echo json_encode(['success' => false]);
-    exit;
-}
-
-// Get messages for admin
-function getAdminMessages($admin_id) {
-    // Get messages where admin is sender or receiver
-    global $supabase_url, $supabase_key;
-    
-    $url = $supabase_url . "/rest/v1/messages?or=(sender_id.eq.{$admin_id},receiver_id.eq.{$admin_id})&sender_type=eq.admin&receiver_type=eq.student&order=created_at.asc";
-    
-    $ch = curl_init();
-    $headers = [
-        'apikey: ' . $supabase_key,
-        'Authorization: Bearer ' . $supabase_key,
-        'Content-Type: application/json'
-    ];
-    
-    curl_setopt_array($ch, [
-        CURLOPT_URL => $url,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER => $headers,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_TIMEOUT => 30,
-    ]);
-    
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    
-    if ($httpCode === 200) {
-        return json_decode($response, true) ?: [];
-    }
-    
-    return [];
-}
-
-// Mark messages as read
-function markMessagesAsRead($message_ids) {
-    if (empty($message_ids)) return false;
-    
-    $data = ['is_read' => true];
-    $filters = ['id' => 'in.(' . implode(',', $message_ids) . ')'];
-    
-    return supabaseUpdate('messages', $data, $filters);
-}
-
-$messages = getAdminMessages($admin_id);
+// Get conversation partners (students who have messaged with this admin)
+$partners = getConversationPartners($admin_id, 'admin');
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Messages - Student Performance Tracking System</title>
+    <title>Admin Messages - PLP SmartGrade</title>
     <style>
         .messages-container {
             max-width: 1200px;
@@ -134,7 +68,7 @@ $messages = getAdminMessages($admin_id);
         .chat-header {
             padding: 15px 20px;
             border-bottom: 1px solid #eee;
-            background: #2196f3;
+            background: var(--plp-green);
             color: white;
             border-radius: 10px 10px 0 0;
         }
@@ -152,7 +86,7 @@ $messages = getAdminMessages($admin_id);
             word-wrap: break-word;
         }
         .message.sent {
-            background: #2196f3;
+            background: var(--plp-green);
             color: white;
             margin-left: auto;
             border-bottom-right-radius: 5px;
@@ -182,7 +116,7 @@ $messages = getAdminMessages($admin_id);
             height: 40px;
         }
         .send-btn {
-            background: #2196f3;
+            background: var(--plp-green);
             color: white;
             border: none;
             padding: 10px 20px;
@@ -190,7 +124,7 @@ $messages = getAdminMessages($admin_id);
             cursor: pointer;
         }
         .send-btn:hover {
-            background: #1976d2;
+            background: var(--plp-dark-green);
         }
         .no-chat-selected {
             display: flex;
@@ -222,27 +156,26 @@ $messages = getAdminMessages($admin_id);
         
         <div class="messages-content">
             <div class="students-list">
-                <?php foreach ($students as $student): ?>
-                    <?php 
-                    $unread_count = 0;
-                    foreach ($messages as $msg) {
-                        if ($msg['sender_id'] == $student['id'] && $msg['sender_type'] == 'student' && !$msg['is_read']) {
-                            $unread_count++;
-                        }
-                    }
-                    ?>
-                    <div class="student-item" data-student-id="<?= $student['id'] ?>">
-                        <div class="student-name">
-                            <?= htmlspecialchars($student['fullname']) ?>
-                            <?php if ($unread_count > 0): ?>
-                                <span class="unread-badge"><?= $unread_count ?></span>
-                            <?php endif; ?>
+                <?php if (!empty($partners)): ?>
+                    <?php foreach ($partners as $partner): ?>
+                        <div class="student-item" data-student-id="<?= $partner['id'] ?>">
+                            <div class="student-name">
+                                <?= htmlspecialchars($partner['name']) ?>
+                                <?php if ($partner['unread_count'] > 0): ?>
+                                    <span class="unread-badge"><?= $partner['unread_count'] ?></span>
+                                <?php endif; ?>
+                            </div>
+                            <div class="student-info">
+                                Student
+                            </div>
                         </div>
-                        <div class="student-info">
-                            <?= htmlspecialchars($student['course']) ?> - <?= htmlspecialchars($student['section']) ?>
-                        </div>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <div class="student-item">
+                        <div class="student-name">No conversations yet</div>
+                        <div class="student-info">Start a conversation with a student</div>
                     </div>
-                <?php endforeach; ?>
+                <?php endif; ?>
             </div>
             
             <div class="chat-container">
@@ -288,7 +221,7 @@ $messages = getAdminMessages($admin_id);
         function loadMessages() {
             if (!currentStudentId) return;
             
-            fetch('get-messages.php?student_id=' + currentStudentId + '&user_type=admin')
+            fetch('get_messages.php?partner_id=' + currentStudentId + '&user_type=admin')
                 .then(response => response.json())
                 .then(messages => {
                     const messagesArea = document.getElementById('messages-area');
@@ -316,9 +249,6 @@ $messages = getAdminMessages($admin_id);
                     });
                     
                     messagesArea.scrollTop = messagesArea.scrollHeight;
-                    
-                    // Mark messages as read
-                    markMessagesAsRead();
                 });
         }
 
@@ -328,11 +258,10 @@ $messages = getAdminMessages($admin_id);
             if (!messageText || !currentStudentId) return;
             
             const formData = new FormData();
-            formData.append('action', 'send_message');
             formData.append('receiver_id', currentStudentId);
             formData.append('message', messageText);
             
-            fetch('admin_messages.php', {
+            fetch('send_message.php', {
                 method: 'POST',
                 body: formData
             })
@@ -342,22 +271,6 @@ $messages = getAdminMessages($admin_id);
                     document.getElementById('message-text').value = '';
                     loadMessages();
                 }
-            });
-        }
-
-        // Mark messages as read
-        function markMessagesAsRead() {
-            if (!currentStudentId) return;
-            
-            fetch('mark-read.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    student_id: currentStudentId,
-                    user_type: 'admin'
-                })
             });
         }
 

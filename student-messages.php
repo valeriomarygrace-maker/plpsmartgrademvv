@@ -1,83 +1,19 @@
 <?php
 require_once 'config.php';
-
-// Debug session
-error_log("Session status: " . session_status());
-error_log("Logged in: " . (isLoggedIn() ? 'Yes' : 'No'));
-error_log("User type: " . ($_SESSION['user_type'] ?? 'Not set'));
-
 requireStudentRole();
 
 $student_id = $_SESSION['user_id'];
 $student = getStudentById($student_id);
-$admins = supabaseFetchAll('admins', 'fullname.asc');
 
-// Handle sending message
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'send_message') {
-    $receiver_id = sanitizeInput($_POST['receiver_id']);
-    $message = sanitizeInput($_POST['message']);
-    
-    if (!empty($message) && !empty($receiver_id)) {
-        $message_data = [
-            'sender_id' => $student_id,
-            'sender_type' => 'student',
-            'receiver_id' => $receiver_id,
-            'receiver_type' => 'admin',
-            'message' => $message,
-            'is_read' => false
-        ];
-        
-        if (supabaseInsert('messages', $message_data)) {
-            echo json_encode(['success' => true]);
-            exit;
-        }
-    }
-    echo json_encode(['success' => false]);
-    exit;
-}
-
-// Get messages for student
-function getStudentMessages($student_id) {
-    global $supabase_url, $supabase_key;
-    
-    // Get all messages where student is involved with any admin
-    $url = $supabase_url . "/rest/v1/messages?select=*&or=(and(sender_id.eq.{$student_id},sender_type.eq.student),and(receiver_id.eq.{$student_id},receiver_type.eq.student))&order=created_at.asc";
-    
-    $ch = curl_init();
-    $headers = [
-        'apikey: ' . $supabase_key,
-        'Authorization: Bearer ' . $supabase_key,
-        'Content-Type: application/json'
-    ];
-    
-    curl_setopt_array($ch, [
-        CURLOPT_URL => $url,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER => $headers,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_TIMEOUT => 30,
-    ]);
-    
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    
-    if ($httpCode === 200) {
-        return json_decode($response, true) ?: [];
-    }
-    
-    error_log("Failed to fetch messages. HTTP Code: $httpCode");
-    return [];
-}
-
-$messages = getStudentMessages($student_id);
+// Get conversation partners (admins who have messaged with this student)
+$partners = getConversationPartners($student_id, 'student');
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Messages - Student Performance Tracking System</title>
+    <title>Messages - PLP SmartGrade</title>
     <style>
         .messages-container {
             max-width: 1200px;
@@ -132,7 +68,7 @@ $messages = getStudentMessages($student_id);
         .chat-header {
             padding: 15px 20px;
             border-bottom: 1px solid #eee;
-            background: #4caf50;
+            background: var(--plp-green);
             color: white;
             border-radius: 10px 10px 0 0;
         }
@@ -150,7 +86,7 @@ $messages = getStudentMessages($student_id);
             word-wrap: break-word;
         }
         .message.sent {
-            background: #4caf50;
+            background: var(--plp-green);
             color: white;
             margin-left: auto;
             border-bottom-right-radius: 5px;
@@ -180,7 +116,7 @@ $messages = getStudentMessages($student_id);
             height: 40px;
         }
         .send-btn {
-            background: #4caf50;
+            background: var(--plp-green);
             color: white;
             border: none;
             padding: 10px 20px;
@@ -188,7 +124,7 @@ $messages = getStudentMessages($student_id);
             cursor: pointer;
         }
         .send-btn:hover {
-            background: #45a049;
+            background: var(--plp-dark-green);
         }
         .no-chat-selected {
             display: flex;
@@ -220,21 +156,13 @@ $messages = getStudentMessages($student_id);
         
         <div class="messages-content">
             <div class="admins-list">
-                <?php if (!empty($admins)): ?>
-                    <?php foreach ($admins as $admin): ?>
-                        <?php 
-                        $unread_count = 0;
-                        foreach ($messages as $msg) {
-                            if ($msg['sender_id'] == $admin['id'] && $msg['sender_type'] == 'admin' && !$msg['is_read']) {
-                                $unread_count++;
-                            }
-                        }
-                        ?>
-                        <div class="admin-item" data-admin-id="<?= $admin['id'] ?>" data-admin-name="<?= htmlspecialchars($admin['fullname']) ?>">
+                <?php if (!empty($partners)): ?>
+                    <?php foreach ($partners as $partner): ?>
+                        <div class="admin-item" data-admin-id="<?= $partner['id'] ?>">
                             <div class="admin-name">
-                                <?= htmlspecialchars($admin['fullname']) ?>
-                                <?php if ($unread_count > 0): ?>
-                                    <span class="unread-badge"><?= $unread_count ?></span>
+                                <?= htmlspecialchars($partner['name']) ?>
+                                <?php if ($partner['unread_count'] > 0): ?>
+                                    <span class="unread-badge"><?= $partner['unread_count'] ?></span>
                                 <?php endif; ?>
                             </div>
                             <div class="admin-role">
@@ -244,7 +172,8 @@ $messages = getStudentMessages($student_id);
                     <?php endforeach; ?>
                 <?php else: ?>
                     <div class="admin-item">
-                        <div class="admin-name">No administrators found</div>
+                        <div class="admin-name">No conversations yet</div>
+                        <div class="admin-role">Start a conversation with an administrator</div>
                     </div>
                 <?php endif; ?>
             </div>
@@ -278,7 +207,7 @@ $messages = getStudentMessages($student_id);
                 this.classList.add('active');
                 
                 currentAdminId = this.dataset.adminId;
-                currentAdminName = this.dataset.adminName;
+                currentAdminName = this.querySelector('.admin-name').textContent.split(' ')[0];
                 
                 document.getElementById('current-admin-name').textContent = `Chat with ${currentAdminName}`;
                 document.getElementById('message-input').style.display = 'flex';
@@ -292,13 +221,8 @@ $messages = getStudentMessages($student_id);
         function loadMessages() {
             if (!currentAdminId) return;
             
-            fetch('get_messages.php?admin_id=' + currentAdminId + '&user_type=student')
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Network response was not ok');
-                    }
-                    return response.json();
-                })
+            fetch('get_messages.php?partner_id=' + currentAdminId + '&user_type=student')
+                .then(response => response.json())
                 .then(messages => {
                     const messagesArea = document.getElementById('messages-area');
                     messagesArea.innerHTML = '';
@@ -325,12 +249,6 @@ $messages = getStudentMessages($student_id);
                     });
                     
                     messagesArea.scrollTop = messagesArea.scrollHeight;
-                    
-                    // Mark messages as read
-                    markMessagesAsRead();
-                })
-                .catch(error => {
-                    console.error('Error loading messages:', error);
                 });
         }
 
@@ -340,11 +258,10 @@ $messages = getStudentMessages($student_id);
             if (!messageText || !currentAdminId) return;
             
             const formData = new FormData();
-            formData.append('action', 'send_message');
             formData.append('receiver_id', currentAdminId);
             formData.append('message', messageText);
             
-            fetch('student_messages.php', {
+            fetch('send_message.php', {
                 method: 'POST',
                 body: formData
             })
@@ -353,30 +270,8 @@ $messages = getStudentMessages($student_id);
                 if (result.success) {
                     document.getElementById('message-text').value = '';
                     loadMessages();
-                } else {
-                    alert('Failed to send message');
                 }
-            })
-            .catch(error => {
-                console.error('Error sending message:', error);
-                alert('Error sending message');
             });
-        }
-
-        // Mark messages as read
-        function markMessagesAsRead() {
-            if (!currentAdminId) return;
-            
-            fetch('mark_read.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    admin_id: currentAdminId,
-                    user_type: 'student'
-                })
-            }).catch(error => console.error('Error marking as read:', error));
         }
 
         // Auto-refresh messages
