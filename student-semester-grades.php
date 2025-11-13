@@ -1,5 +1,6 @@
 <?php
 require_once 'config.php';
+require_once 'student-header.php';
 
 if (!isset($_SESSION['logged_in']) || $_SESSION['user_type'] !== 'student') {
     header('Location: login.php');
@@ -21,6 +22,14 @@ try {
     }
 } catch (Exception $e) {
     $error_message = 'Database error: ' . $e->getMessage();
+}
+
+// After line 4 (after session_start())
+$unread_count = 0;
+try {
+    $unread_count = getUnreadMessageCount($_SESSION['user_id'], 'student');
+} catch (Exception $e) {
+    $unread_count = 0;
 }
 
 // Get all archived subjects for the student
@@ -732,6 +741,15 @@ if (isset($_GET['export']) && $_GET['export'] === 'excel') {
 
         .modal-btn-confirm:hover {
             transform: translateY(-2px);
+        }
+        .badge-unread {
+            background: var(--danger);
+            color: white;
+            padding: 0.2rem 0.5rem;
+            border-radius: 50%;
+            font-size: 0.7rem;
+            font-weight: 600;
+            margin-left: 0.5rem;
         }
     </style>
 </head>

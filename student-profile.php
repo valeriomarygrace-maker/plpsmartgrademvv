@@ -1,5 +1,6 @@
 <?php
 require_once 'config.php';
+require_once 'student-header.php';
 
 // Start session if not already started
 if (session_status() === PHP_SESSION_NONE) {
@@ -35,6 +36,14 @@ try {
     }
 } catch (Exception $e) {
     $error_message = 'Database error: ' . $e->getMessage();
+}
+
+// After line 10 (after session_start())
+$unread_count = 0;
+try {
+    $unread_count = getUnreadMessageCount($_SESSION['user_id'], 'student');
+} catch (Exception $e) {
+    $unread_count = 0;
 }
 
 // Handle semester update

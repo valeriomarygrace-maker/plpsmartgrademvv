@@ -1,6 +1,7 @@
 <?php
 require_once 'config.php';
 require_once 'ml-helpers.php';
+require_once 'student-header.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -9,6 +10,14 @@ if (session_status() === PHP_SESSION_NONE) {
 if (!isset($_SESSION['logged_in']) || $_SESSION['user_type'] !== 'student') {
     header('Location: login.php');
     exit;
+}
+
+// After line 4 (after session_start())
+$unread_count = 0;
+try {
+    $unread_count = getUnreadMessageCount($_SESSION['user_id'], 'student');
+} catch (Exception $e) {
+    $unread_count = 0;
 }
 
 $success_message = '';

@@ -1,5 +1,6 @@
 <?php
 require_once 'config.php';
+require_once 'student-header.php';
 requireStudentRole();
 
 // Initialize variables

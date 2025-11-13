@@ -1,15 +1,24 @@
 <?php
 require_once 'config.php';
 require_once 'ml-helpers.php';
+require_once 'student-header.php';
 
 // Start session if not already started
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+
 if (!isset($_SESSION['logged_in']) || $_SESSION['user_type'] !== 'student') {
     header('Location: login.php');
     exit;
+}
+
+$unread_count = 0;
+try {
+    $unread_count = getUnreadMessageCount($_SESSION['user_id'], 'student');
+} catch (Exception $e) {
+    $unread_count = 0;
 }
 
 // Initialize variables
@@ -19,6 +28,7 @@ $recent_scores = [];
 $performance_metrics = [];
 $semester_risk_data = [];
 $error_message = '';
+
 
 try {
     // Get student info using Supabase
@@ -1193,6 +1203,15 @@ function calculateSubjectGradeFromScores($student_subject_id) {
             .three-column-grid {
                 grid-template-columns: 1fr;
             }
+        }
+        .badge-unread {
+            background: var(--danger);
+            color: white;
+            padding: 0.2rem 0.5rem;
+            border-radius: 50%;
+            font-size: 0.7rem;
+            font-weight: 600;
+            margin-left: 0.5rem;
         }
     </style>
 </head>
