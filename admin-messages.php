@@ -749,11 +749,11 @@ $messages = getAdminMessages($admin_id);
                     }
                     return response.json();
                 })
-                .then(messages => {
+                .then(result => {
                     const messagesArea = document.getElementById('messages-area');
                     messagesArea.innerHTML = '';
                     
-                    if (messages.length === 0) {
+                    if (!result.success || !result.messages || result.messages.length === 0) {
                         const noMessages = document.createElement('div');
                         noMessages.className = 'no-chat-selected';
                         noMessages.innerHTML = `
@@ -767,7 +767,7 @@ $messages = getAdminMessages($admin_id);
                         return;
                     }
                     
-                    messages.forEach(msg => {
+                    result.messages.forEach(msg => {
                         const messageDiv = document.createElement('div');
                         messageDiv.className = `message ${msg.sender_type === 'admin' ? 'sent' : 'received'}`;
                         
@@ -776,7 +776,7 @@ $messages = getAdminMessages($admin_id);
                         });
                         
                         messageDiv.innerHTML = `
-                            <div class="message-content">${msg.message}</div>
+                            <div class="message-content">${escapeHtml(msg.message)}</div>
                             <div class="message-time">${time}</div>
                         `;
                         
@@ -862,7 +862,7 @@ $messages = getAdminMessages($admin_id);
             if (refreshInterval) {
                 clearInterval(refreshInterval);
             }
-            refreshInterval = setInterval(loadMessages, 3000);
+            refreshInterval = setInterval(loadMessages, 2000); // Refresh every 2 seconds
         }
 
         // Enter key to send message
@@ -885,6 +885,16 @@ $messages = getAdminMessages($admin_id);
                 clearInterval(refreshInterval);
             }
         });
+
+        // Utility function to escape HTML
+        function escapeHtml(unsafe) {
+            return unsafe
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
     </script>
 </body>
 </html>
