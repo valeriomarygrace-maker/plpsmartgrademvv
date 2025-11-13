@@ -744,7 +744,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'excel') {
                 </div>
             </div>
             <div class="portal-title">PLPSMARTGRADE</div>
-            <div class="student-email"><?php echo htmlspecialchars($student['email']); ?></div>
+            <div class="student-email"><?php echo htmlspecialchars($_SESSION['user_email']); ?></div>
         </div>
         
         <ul class="nav-menu">
@@ -767,6 +767,15 @@ if (isset($_GET['export']) && $_GET['export'] === 'excel') {
                 </a>
             </li>
             <li class="nav-item">
+                <a href="student-messages.php" class="nav-link">
+                    <i class="fas fa-envelope"></i>
+                    Messages
+                    <?php if ($unread_count > 0): ?>
+                        <span class="badge badge-unread"><?php echo $unread_count; ?></span>
+                    <?php endif; ?>
+                </a>
+            </li>
+            <li class="nav-item">
                 <a href="student-archived-subject.php" class="nav-link">
                     <i class="fas fa-archive"></i>
                     Archived Subjects
@@ -780,10 +789,12 @@ if (isset($_GET['export']) && $_GET['export'] === 'excel') {
             </li>
         </ul>
 
-        <a href="logout.php" class="logout-btn">
-            <i class="fas fa-sign-out-alt"></i>
-            Logout
-        </a>
+        <div class="sidebar-footer">
+            <a href="logout.php" class="logout-btn">
+                <i class="fas fa-sign-out-alt"></i>
+                Logout
+            </a>
+        </div>
     </div>
 
     <div class="main-content">

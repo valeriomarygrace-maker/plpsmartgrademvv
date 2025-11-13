@@ -1205,7 +1205,7 @@ function calculateSubjectGradeFromScores($student_subject_id) {
                 </div>
             </div>
             <div class="portal-title">PLPSMARTGRADE</div>
-            <div class="student-email"><?php echo htmlspecialchars($student['email']); ?></div>
+            <div class="student-email"><?php echo htmlspecialchars($_SESSION['user_email']); ?></div>
         </div>
         
         <ul class="nav-menu">
@@ -1225,6 +1225,15 @@ function calculateSubjectGradeFromScores($student_subject_id) {
                 <a href="student-subjects.php" class="nav-link">
                     <i class="fas fa-book"></i>
                     Subjects
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="student-messages.php" class="nav-link">
+                    <i class="fas fa-envelope"></i>
+                    Messages
+                    <?php if ($unread_count > 0): ?>
+                        <span class="badge badge-unread"><?php echo $unread_count; ?></span>
+                    <?php endif; ?>
                 </a>
             </li>
             <li class="nav-item">
