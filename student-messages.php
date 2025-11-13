@@ -1,9 +1,6 @@
 <?php
 require_once 'config.php';
 
-// Debug session
-debugSession("Accessing student-messages.php");
-
 requireStudentRole();
 
 $student_id = $_SESSION['user_id'];

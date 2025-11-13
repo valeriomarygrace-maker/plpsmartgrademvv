@@ -1,6 +1,5 @@
 <?php
 require_once 'config.php';
-debugSession("Accessing admin-messages.php");
 requireAdminRole();
 
 $admin_id = $_SESSION['user_id'];
