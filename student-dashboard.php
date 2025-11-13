@@ -1192,6 +1192,33 @@ function calculateSubjectGradeFromScores($student_subject_id) {
                 grid-template-columns: 1fr;
             }
         }
+        .unread-badge {
+            background: #ff4444;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 0.75rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: auto;
+        }
+
+        .sidebar-badge {
+            background: #ff4444;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 0.75rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: auto;
+            font-weight: 600;
+            animation: pulse 2s infinite;
+        }
     </style>
 </head>
 <body>
@@ -1227,8 +1254,13 @@ function calculateSubjectGradeFromScores($student_subject_id) {
             </li>
             <li class="nav-item">
                 <a href="student-messages.php" class="nav-link">
-                    <i class="fas fa-book"></i>
-                    Message
+                    <i class="fas fa-comments"></i>
+                    Messages
+                    <?php 
+                    $unread_count = getUnreadMessageCount($_SESSION['user_id'], 'student');
+                    if ($unread_count > 0): ?>
+                        <span class="sidebar-badge"><?php echo $unread_count; ?></span>
+                    <?php endif; ?>
                 </a>
             </li>
             <li class="nav-item">

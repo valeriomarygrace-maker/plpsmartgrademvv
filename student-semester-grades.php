@@ -741,14 +741,32 @@ if (isset($_GET['export']) && $_GET['export'] === 'excel') {
         .modal-btn-confirm:hover {
             transform: translateY(-2px);
         }
-        .badge-unread {
-            background: var(--danger);
+        .unread-badge {
+            background: #ff4444;
             color: white;
-            padding: 0.2rem 0.5rem;
             border-radius: 50%;
-            font-size: 0.7rem;
+            width: 20px;
+            height: 20px;
+            font-size: 0.75rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: auto;
+        }
+
+        .sidebar-badge {
+            background: #ff4444;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 0.75rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: auto;
             font-weight: 600;
-            margin-left: 0.5rem;
+            animation: pulse 2s infinite;
         }
     </style>
 </head>
@@ -761,7 +779,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'excel') {
                 </div>
             </div>
             <div class="portal-title">PLPSMARTGRADE</div>
-            <div class="student-email"><?php echo htmlspecialchars($_SESSION['user_email']); ?></div>
+            <div class="student-email"><?php echo htmlspecialchars($student['email']); ?></div>
         </div>
         
         <ul class="nav-menu">
@@ -785,10 +803,12 @@ if (isset($_GET['export']) && $_GET['export'] === 'excel') {
             </li>
             <li class="nav-item">
                 <a href="student-messages.php" class="nav-link">
-                    <i class="fas fa-envelope"></i>
+                    <i class="fas fa-comments"></i>
                     Messages
-                    <?php if ($unread_count > 0): ?>
-                        <span class="badge badge-unread"><?php echo $unread_count; ?></span>
+                    <?php 
+                    $unread_count = getUnreadMessageCount($_SESSION['user_id'], 'student');
+                    if ($unread_count > 0): ?>
+                        <span class="sidebar-badge"><?php echo $unread_count; ?></span>
                     <?php endif; ?>
                 </a>
             </li>
