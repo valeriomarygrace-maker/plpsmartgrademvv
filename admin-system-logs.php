@@ -511,7 +511,33 @@ if (!empty($filter_date) && is_array($logs)) {
                 grid-template-columns: 1fr;
             }
         }
+        .unread-badge {
+            background: #ff4444;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 0.75rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: auto;
+        }
 
+        .sidebar-badge {
+            background: #ff4444;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 0.75rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: auto;
+            font-weight: 600;
+            animation: pulse 2s infinite;
+        }
     </style>
 </head>
 <body>
@@ -540,16 +566,18 @@ if (!empty($filter_date) && is_array($logs)) {
                 </a>
             </li>
             <li class="nav-item">
-                <a href="student-messages.php" class="nav-link">
-                    <i class="fas fa-envelope"></i>
+                <a href="admin-messages.php" class="nav-link">
+                    <i class="fas fa-comments"></i>
                     Messages
-                    <?php if (getUnreadMessageCount($_SESSION['user_id'], 'student') > 0): ?>
-                        <span class="badge badge-unread"><?php echo getUnreadMessageCount($_SESSION['user_id'], 'student'); ?></span>
+                    <?php 
+                    $unread_count = getUnreadMessageCount($_SESSION['user_id'], 'admin');
+                    if ($unread_count > 0): ?>
+                        <span class="sidebar-badge"><?php echo $unread_count; ?></span>
                     <?php endif; ?>
                 </a>
             </li>
             <li class="nav-item">
-                <a href="admin-system-logs.php" class="nav-link active">
+                <a href="admin-settings-logs.php" class="nav-link active">
                     <i class="fas fa-cog"></i>
                     System Logs
                 </a>

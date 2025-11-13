@@ -1599,6 +1599,7 @@ function getGradeDescription($grade) {
             </a>
         </div>
     </div>
+    
     <div class="main-content">
         <?php if ($success_message): ?>
             <div class="alert-success">

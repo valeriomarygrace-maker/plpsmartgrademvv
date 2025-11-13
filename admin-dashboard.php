@@ -507,6 +507,33 @@ $partners = getConversationPartners($admin_id, 'admin');
                 height: 300px;
             }
         }
+        .unread-badge {
+            background: #ff4444;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 0.75rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: auto;
+        }
+
+        .sidebar-badge {
+            background: #ff4444;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 0.75rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: auto;
+            font-weight: 600;
+            animation: pulse 2s infinite;
+        }
     </style>
 </head>
 <body>
@@ -523,7 +550,7 @@ $partners = getConversationPartners($admin_id, 'admin');
         
         <ul class="nav-menu">
             <li class="nav-item">
-                <a href="admin-dashboard.php" class="nav-link">
+                <a href="admin-dashboard.php" class="nav-link active">
                     <i class="fas fa-chart-line"></i>
                     Dashboard
                 </a>
@@ -535,15 +562,20 @@ $partners = getConversationPartners($admin_id, 'admin');
                 </a>
             </li>
             <li class="nav-item">
-                <a href="admin-messages.php" class="nav-link active">
+                <a href="admin-messages.php" class="nav-link ">
                     <i class="fas fa-comments"></i>
                     Messages
+                    <?php 
+                    $unread_count = getUnreadMessageCount($_SESSION['user_id'], 'admin');
+                    if ($unread_count > 0): ?>
+                        <span class="sidebar-badge"><?php echo $unread_count; ?></span>
+                    <?php endif; ?>
                 </a>
             </li>
             <li class="nav-item">
-                <a href="admin-settings.php" class="nav-link">
+                <a href="admin-settings-logs.php" class="nav-link">
                     <i class="fas fa-cog"></i>
-                    System Settings
+                    System Logs
                 </a>
             </li>
         </ul>
