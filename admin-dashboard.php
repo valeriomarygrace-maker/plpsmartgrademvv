@@ -4,6 +4,43 @@ requireAdminRole();
 
 $admin_id = $_SESSION['user_id'];
 $admin = getAdminByEmail($_SESSION['user_email']);
+
+// Initialize variables
+$admin = null;
+$total_students = 0;
+$total_subjects = 0;
+$recent_students = [];
+$error_message = '';
+
+try {
+    // Get admin info
+    $admin = getAdminByEmail($_SESSION['user_email']);
+    
+    if (!$admin) {
+        $error_message = 'Admin record not found.';
+    } else {
+        // Get total students count
+        $students = supabaseFetchAll('students');
+        $total_students = $students ? count($students) : 0;
+        
+        // Get total subjects count
+        $subjects = supabaseFetchAll('subjects');
+        $total_subjects = $subjects ? count($subjects) : 0;
+        
+        // Get recent students (last 5)
+        if ($students) {
+            usort($students, function($a, $b) {
+                $dateA = isset($a['created_at']) ? strtotime($a['created_at']) : 0;
+                $dateB = isset($b['created_at']) ? strtotime($b['created_at']) : 0;
+                return $dateB - $dateA;
+            });
+            $recent_students = array_slice($students, 0, 5);
+        }
+    }
+} catch (Exception $e) {
+    $error_message = 'Database error: ' . $e->getMessage();
+    error_log("Error in admin-dashboard.php: " . $e->getMessage());
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
