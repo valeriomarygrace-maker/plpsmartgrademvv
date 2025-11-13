@@ -1756,13 +1756,14 @@ function getGradeDescription($grade) {
                     <?php if ($hasScores): ?>
                         <div class="performance-value"><?php echo number_format($termGrade, 1); ?>%</div>
                         <div class="performance-label" style="margin-top: 0.5rem; font-size: 0.9rem; color: var(--text-medium);">
-                            <?php echo getGradeDescription($termGrade); ?>
-                            <?php if ($ml_confidence > 0): ?>
-                                <div class="ml-confidence">
-                                    <i class="fas fa-brain"></i>
-                                    <?php echo number_format($ml_confidence, 1); ?>% confident
-                                </div>
-                            <?php endif; ?>
+                            <?php
+                            if ($termGrade >= 90) echo 'Excellent';
+                            elseif ($termGrade >= 85) echo 'Very Good';
+                            elseif ($termGrade >= 80) echo 'Good';
+                            elseif ($termGrade >= 75) echo 'Satisfactory';
+                            elseif ($termGrade >= 70) echo 'Passing';
+                            else echo 'Needs Improvement';
+                            ?>
                         </div>
                     <?php else: ?>
                         <div class="performance-value" style="color: var(--text-light);">--</div>
@@ -1771,16 +1772,10 @@ function getGradeDescription($grade) {
                 </div>
                 
                 <div class="performance-card">
-                    <div class="performance-label">Risk Level</div>
+                    <div class="performance-label">Class Standing</div>
                     <?php if ($hasScores): ?>
-                        <div class="performance-value" style="font-size: 1.5rem;">
-                            <span class="risk-badge <?php echo $riskLevel; ?>">
-                                <?php echo ucfirst(str_replace('_', ' ', $riskLevel)); ?>
-                            </span>
-                        </div>
-                        <div class="performance-label" style="margin-top: 0.5rem; font-size: 0.9rem; color: var(--text-medium);">
-                            <?php echo $riskDescription; ?>
-                        </div>
+                        <div class="performance-value"><?php echo number_format($totalClassStanding, 1); ?>%</div>
+                        <div class="performance-label">of <?php echo $totalClassStandingPercentage; ?>%</div>
                     <?php else: ?>
                         <div class="performance-value" style="color: var(--text-light);">--</div>
                         <div class="performance-label">No scores added</div>
