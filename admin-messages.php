@@ -3,6 +3,7 @@ require_once 'config.php';
 requireAdminRole();
 
 $admin_id = $_SESSION['user_id'];
+$admin = getAdminById($admin_id);
 $students = supabaseFetchAll('students', 'fullname.asc');
 
 // Handle sending message
@@ -75,7 +76,6 @@ $messages = getAdminMessages($admin_id);
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* Copy all the same CSS from student-messages.php */
         :root {
             --plp-green: #006341;
             --plp-green-light: #008856;
@@ -179,7 +179,7 @@ $messages = getAdminMessages($admin_id);
 
         .nav-menu {
             list-style: none;
-            flex-grow: 0.30;
+            flex-grow: 1;
             margin-top: 0.7rem;
         }
 
@@ -192,7 +192,7 @@ $messages = getAdminMessages($admin_id);
             display: flex;
             align-items: center;
             gap: 0.75rem;
-            padding: 0.50rem;
+            padding: 0.75rem 1rem;
             color: var(--text-medium);
             text-decoration: none;
             border-radius: var(--border-radius);
@@ -203,7 +203,7 @@ $messages = getAdminMessages($admin_id);
         .nav-link:hover:not(.active) {
             background: var(--plp-green-lighter);
             color: var(--plp-green);
-            transform: translateY(-3px);
+            transform: translateY(-2px);
         }
 
         .nav-link.active {
@@ -214,10 +214,10 @@ $messages = getAdminMessages($admin_id);
 
         .sidebar-footer {
             border-top: 3px solid rgba(0, 99, 65, 0.1);
+            padding-top: 1rem;
         }
 
         .logout-btn {
-            margin-top:1rem;
             background: transparent;
             color: var(--text-medium);
             padding: 0.75rem 1rem;
@@ -250,15 +250,12 @@ $messages = getAdminMessages($admin_id);
 
         .header {
             background: white;
-            padding: 0.6rem 1.25rem;
+            padding: 1rem 1.5rem;
             border-radius: var(--border-radius);
             box-shadow: var(--box-shadow);
             margin-bottom: 1.5rem; 
             background: var(--plp-green-gradient);
             color: white;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
         }
 
         .welcome {
@@ -632,7 +629,7 @@ $messages = getAdminMessages($admin_id);
                                 }
                             }
                             ?>
-                            <div class="student-item" data-student-id="<?= $student['id'] ?>" data-student-name="<?= htmlspecialchars($student['fullname']) ?>" data-student-course="<?= htmlspecialchars($student['course']) ?>">
+                            <div class="student-item" data-student-id="<?= $student['id'] ?>" data-student-name="<?= htmlspecialchars($student['fullname']) ?>" data-student-course="<?= htmlspecialchars($student['course']) ?>" data-student-section="<?= htmlspecialchars($student['section']) ?>">
                                 <div class="student-avatar">
                                     <?= strtoupper(substr($student['fullname'], 0, 1)) ?>
                                 </div>
@@ -706,12 +703,13 @@ $messages = getAdminMessages($admin_id);
                 currentStudentId = this.dataset.studentId;
                 currentStudentName = this.dataset.studentName;
                 const studentCourse = this.dataset.studentCourse;
+                const studentSection = this.dataset.studentSection;
                 
                 // Update chat header
                 document.getElementById('chat-header').style.display = 'flex';
                 document.getElementById('current-student-name').textContent = currentStudentName;
                 document.getElementById('current-student-avatar').textContent = currentStudentName.charAt(0).toUpperCase();
-                document.getElementById('current-student-details').textContent = studentCourse;
+                document.getElementById('current-student-details').textContent = studentCourse + ' - ' + studentSection;
                 document.getElementById('no-chat-selected').style.display = 'none';
                 document.getElementById('message-input-container').style.display = 'block';
                 
