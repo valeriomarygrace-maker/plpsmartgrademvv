@@ -12,17 +12,6 @@ CREATE TABLE public.admins (
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT admins_pkey PRIMARY KEY (id)
 );
-CREATE TABLE public.messages (
-  id integer NOT NULL DEFAULT nextval('messages_id_seq'::regclass),
-  sender_id bigint NOT NULL,
-  sender_type character varying NOT NULL CHECK (sender_type::text = ANY (ARRAY['student'::character varying::text, 'admin'::character varying::text])),
-  receiver_id bigint NOT NULL,
-  receiver_type character varying NOT NULL CHECK (receiver_type::text = ANY (ARRAY['student'::character varying::text, 'admin'::character varying::text])),
-  message text NOT NULL,
-  is_read boolean DEFAULT false,
-  created_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT messages_pkey PRIMARY KEY (id)
-);
 CREATE TABLE public.otp_verification (
   id bigint NOT NULL DEFAULT nextval('otp_verification_id_seq'::regclass),
   email character varying NOT NULL,

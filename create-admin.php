@@ -1,24 +1,20 @@
 <?php
 require_once 'config.php';
 
-// Create admin account
-$adminData = [
-    'username' => 'admin',
-    'email' => 'admin@plpasig.edu.ph',
-    'password' => hashPassword('plpadmin123'),
-    'fullname' => 'Administrator',
-    'role' => 'admin',
-    'is_active' => true
-];
+$email = 'admin@plpasig.edu.ph'; // Change to your admin email
+$new_password = 'admin123';
 
-$result = supabaseInsert('admins', $adminData);
+$hashed_password = hashPassword($new_password);
 
-if ($result !== false) {
-    echo "Admin account created successfully!<br>";
-    echo "Email: admin@plpasig.edu.ph<br>";
-    echo "Password: plpadmin123<br>";
-    echo "<a href='login.php'>Go to Login</a>";
+// Update admin password
+$result = supabaseUpdate('admins', 
+    ['password' => $hashed_password], 
+    ['email' => $email]
+);
+
+if ($result) {
+    echo "Admin password reset successfully. New password: $new_password";
 } else {
-    echo "Error creating admin account. It might already exist.";
+    echo "Failed to reset admin password";
 }
 ?>

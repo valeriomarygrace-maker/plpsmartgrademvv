@@ -3,22 +3,19 @@
 $supabase_url = getenv('SUPABASE_URL') ?: 'https://xwvrgpxcceivakzrwwji.supabase.co';
 $supabase_key = getenv('SUPABASE_KEY') ?: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh3dnJncHhjY2VpdmFrenJ3d2ppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE3MjQ0NzQsImV4cCI6MjA3NzMwMDQ3NH0.ovd8v3lqsYtJU78D4iM6CyAyvi6jK4FUbYUjydFi4FM';
 
-// Start session only if not already started
 if (session_status() === PHP_SESSION_NONE) {
     session_set_cookie_params([
-        'lifetime' => 0,
+        'lifetime' => 86400, // 24 hours
         'path' => '/',
         'domain' => '',
-        'secure' => isset($_SERVER['HTTPS']),
+        'secure' => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on',
         'httponly' => true,
-        'samesite' => 'Strict'
+        'samesite' => 'Lax' 
     ]);
     session_start();
 }
 
-/**
- * Simple Supabase API Helper Function
- */
+// In config.php, update the supabaseFetch function:
 function supabaseFetch($table, $filters = [], $method = 'GET', $data = null) {
     global $supabase_url, $supabase_key;
     
@@ -50,6 +47,7 @@ function supabaseFetch($table, $filters = [], $method = 'GET', $data = null) {
         CURLOPT_HTTPHEADER => $headers,
         CURLOPT_SSL_VERIFYPEER => false,
         CURLOPT_TIMEOUT => 30,
+        CURLOPT_FAILONERROR => true // Add this
     ]);
     
     if ($method === 'POST') {
@@ -67,13 +65,14 @@ function supabaseFetch($table, $filters = [], $method = 'GET', $data = null) {
     $error = curl_error($ch);
     curl_close($ch);
     
+    // Enhanced error logging
     if ($error) {
-        error_log("cURL Error: $error");
+        error_log("cURL Error for table $table: $error - URL: $url");
         return false;
     }
     
     if ($httpCode >= 400) {
-        error_log("HTTP Error $httpCode for table: $table");
+        error_log("HTTP Error $httpCode for table: $table - Response: $response");
         return false;
     }
     

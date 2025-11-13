@@ -7,21 +7,28 @@ $success = '';
 $showSignupModal = false;
 $email = '';
 
-// Handle login form submission
+// In login.php, after the login POST handling, add debug info:
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && isset($_POST['password']) && !isset($_POST['signup'])) {
     $email = sanitizeInput($_POST['email']);
     $password = $_POST['password'];
     
+    error_log("Login attempt for email: $email"); // Debug log
+    
     // Validate PLP email
     if (!isValidPLPEmail($email)) {
         $error = 'Your email address is not valid.';
+        error_log("Invalid PLP email: $email"); // Debug log
     } else {
         // First, check if it's an admin
         $admin = getAdminByEmail($email);
+        error_log("Admin check result: " . ($admin ? 'Found' : 'Not found')); // Debug log
         
         if ($admin) {
             // Admin login
+            error_log("Admin found: " . $admin['email']); // Debug log
             if (verifyPassword($password, $admin['password'])) {
+                error_log("Admin password verified"); // Debug log
+                
                 // Regenerate session for security
                 regenerateSession();
                 
@@ -32,22 +39,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && isset($_P
                 $_SESSION['user_name'] = $admin['fullname'];
                 $_SESSION['login_time'] = time();
                 
+                error_log("Session set, redirecting to admin dashboard"); // Debug log
+                
                 // Redirect to admin dashboard
                 header('Location: admin-dashboard.php');
                 exit;
             } else {
                 $error = 'Invalid password. Please try again.';
+                error_log("Admin password verification failed"); // Debug log
             }
         } else {
             // Check if email exists in students table
             $student = getStudentByEmail($email);
+            error_log("Student check result: " . ($student ? 'Found' : 'Not found')); // Debug log
             
             if ($student) {
+                error_log("Student found: " . $student['email']); // Debug log
                 // Check if student has a password set
                 if (empty($student['password'])) {
                     $error = 'No password set for this account.';
                     $showSignupModal = true;
+                    error_log("Student has no password set"); // Debug log
                 } elseif (verifyPassword($password, $student['password'])) {
+                    error_log("Student password verified"); // Debug log
+                    
                     // Regenerate session for security
                     regenerateSession();
                     
@@ -58,15 +73,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && isset($_P
                     $_SESSION['user_name'] = $student['fullname'];
                     $_SESSION['login_time'] = time();
                     
+                    error_log("Session set, redirecting to student dashboard"); // Debug log
+                    
                     // Redirect to student dashboard
                     header('Location: student-dashboard.php');
                     exit;
                 } else {
                     $error = 'Invalid password. Please try again.';
+                    error_log("Student password verification failed"); // Debug log
                 }
             } else {
                 $error = 'Email not found in our system. Please sign up first.';
                 $showSignupModal = true;
+                error_log("Email not found in system: $email"); // Debug log
             }
         }
     }
