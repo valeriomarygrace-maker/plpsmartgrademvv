@@ -17,12 +17,13 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // Debug session
-error_log("=== CONFIG SESSION DEBUG ===");
+error_log("=== SESSION DEBUG ===");
 error_log("Session ID: " . session_id());
 error_log("Session Status: " . session_status());
+error_log("Session Data: " . print_r($_SESSION, true));
 
 /**
- * Enhanced Supabase API Helper Function
+ * Simple Supabase API Helper Function
  */
 function supabaseFetch($table, $filters = [], $method = 'GET', $data = null) {
     global $supabase_url, $supabase_key;
@@ -186,8 +187,6 @@ function hashPassword($password) {
 function verifyPassword($password, $hashedPassword) {
     $result = password_verify($password, $hashedPassword);
     error_log("Password verification: " . ($result ? "SUCCESS" : "FAILED"));
-    error_log("Input password length: " . strlen($password));
-    error_log("Stored hash: " . $hashedPassword);
     return $result;
 }
 
@@ -252,11 +251,18 @@ function sanitizeInput($data) {
 }
 
 function isLoggedIn() {
-    return isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true;
+    $logged_in = isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true;
+    error_log("isLoggedIn check: " . ($logged_in ? "TRUE" : "FALSE"));
+    if ($logged_in) {
+        error_log("User type: " . ($_SESSION['user_type'] ?? 'UNKNOWN'));
+        error_log("User email: " . ($_SESSION['user_email'] ?? 'UNKNOWN'));
+    }
+    return $logged_in;
 }
 
 function requireLogin() {
     if (!isLoggedIn()) {
+        error_log("requireLogin: User not logged in, redirecting to login.php");
         header('Location: login.php');
         exit;
     }
@@ -264,6 +270,7 @@ function requireLogin() {
 
 function requireStudentRole() {
     if (!isLoggedIn() || $_SESSION['user_type'] !== 'student') {
+        error_log("requireStudentRole: Access denied, redirecting to login.php");
         header('Location: login.php');
         exit;
     }
@@ -298,9 +305,9 @@ if (isset($_SESSION['created']) && (time() - $_SESSION['created'] > 28800)) {
  */
 function getAdminByEmail($email) {
     $admins = supabaseFetch('admins', ['email' => $email]);
-    error_log("ADMIN SEARCH for $email: " . ($admins ? "FOUND " . count($admins) . " records" : "NOT FOUND"));
+    error_log("Admin search for $email: " . ($admins ? "FOUND" : "NOT FOUND"));
     if ($admins && count($admins) > 0) {
-        error_log("ADMIN DETAILS: " . print_r($admins[0], true));
+        error_log("Admin data found: " . print_r($admins[0], true));
     }
     return $admins && count($admins) > 0 ? $admins[0] : null;
 }
@@ -316,9 +323,18 @@ function adminExists($email) {
 }
 
 function requireAdminRole() {
-    if (!isLoggedIn() || $_SESSION['user_type'] !== 'admin') {
+    if (!isLoggedIn()) {
+        error_log("requireAdminRole: User not logged in");
         header('Location: login.php');
         exit;
     }
+    
+    if ($_SESSION['user_type'] !== 'admin') {
+        error_log("requireAdminRole: User is not admin. User type: " . ($_SESSION['user_type'] ?? 'UNKNOWN'));
+        header('Location: login.php');
+        exit;
+    }
+    
+    error_log("requireAdminRole: User is admin, access granted");
 }
 ?>

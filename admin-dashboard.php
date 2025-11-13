@@ -6,35 +6,26 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-error_log("=== ADMIN DASHBOARD ACCESS ATTEMPT ===");
+// Enhanced debug logging
+error_log("=== ADMIN DASHBOARD ACCESS ===");
 error_log("Session ID: " . session_id());
 error_log("Session Data: " . print_r($_SESSION, true));
 
 // Check if user is logged in and has correct role
-if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
-    error_log("ACCESS DENIED: Not logged in - Session data missing");
+if (!isLoggedIn()) {
+    error_log("User not logged in, redirecting to login.php");
     header('Location: login.php');
     exit;
 }
 
-if (!isset($_SESSION['user_type']) || $_SESSION['user_type'] !== 'admin') {
-    error_log("ACCESS DENIED: Wrong user type - Expected: admin, Got: " . ($_SESSION['user_type'] ?? 'NOT SET'));
-    header('Location: login.php');
-    exit;
-}
+// For admin dashboard - require admin role
+requireAdminRole();
 
-// Verify admin still exists in database
-$admin = getAdminByEmail($_SESSION['user_email']);
-if (!$admin) {
-    error_log("ACCESS DENIED: Admin not found in database - " . $_SESSION['user_email']);
-    session_destroy();
-    header('Location: login.php');
-    exit;
-}
-
-error_log("ACCESS GRANTED: Admin " . $_SESSION['user_email']);
+// If we get here, user is logged in as admin
+error_log("Admin access granted to dashboard");
 
 // Initialize variables
+$admin = null;
 $total_students = 0;
 $total_subjects = 0;
 $recent_students = [];
@@ -46,7 +37,10 @@ try {
     
     if (!$admin) {
         $error_message = 'Admin record not found.';
+        error_log("Admin record not found for email: " . $_SESSION['user_email']);
     } else {
+        error_log("Admin data retrieved: " . $admin['fullname']);
+        
         // Get total students count
         $students = supabaseFetchAll('students');
         $total_students = $students ? count($students) : 0;
@@ -69,6 +63,8 @@ try {
     $error_message = 'Database error: ' . $e->getMessage();
     error_log("Error in admin-dashboard.php: " . $e->getMessage());
 }
+
+error_log("=== ADMIN DASHBOARD LOADED SUCCESSFULLY ===");
 ?>
 
 <!DOCTYPE html>

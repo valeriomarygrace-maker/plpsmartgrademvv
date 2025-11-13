@@ -13,9 +13,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && isset($_P
     $password = $_POST['password'];
     
     // Debug logging
-    error_log("=== ADMIN LOGIN ATTEMPT STARTED ===");
+    error_log("=== LOGIN ATTEMPT STARTED ===");
     error_log("Email: $email");
-    error_log("Password: [HIDDEN]");
     error_log("Session ID: " . session_id());
     
     // Validate PLP email
@@ -27,58 +26,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && isset($_P
         $admin = getAdminByEmail($email);
         
         if ($admin) {
-            error_log("ADMIN FOUND - Proceeding with login");
-            error_log("Admin ID: " . $admin['id']);
-            error_log("Admin Email: " . $admin['email']);
-            error_log("Admin Fullname: " . $admin['fullname']);
-            error_log("Admin Password Hash: " . $admin['password']);
-            error_log("Admin Active: " . ($admin['is_active'] ? 'YES' : 'NO'));
-            
-            // Check if admin is active
-            if (!$admin['is_active']) {
-                $error = 'Admin account is deactivated.';
-                error_log("ADMIN ACCOUNT DEACTIVATED");
-            } else {
-                // Admin login - Enhanced password verification
-                error_log("Starting password verification...");
-                $passwordMatch = verifyPassword($password, $admin['password']);
+            error_log("ADMIN FOUND: " . $admin['email']);
+            // Admin login
+            if (verifyPassword($password, $admin['password'])) {
+                error_log("ADMIN PASSWORD VERIFIED SUCCESSFULLY");
                 
-                if ($passwordMatch) {
-                    error_log("ADMIN PASSWORD VERIFIED SUCCESSFULLY");
-                    
-                    // Regenerate session for security
-                    regenerateSession();
-                    
-                    // Set session variables
-                    $_SESSION['logged_in'] = true;
-                    $_SESSION['user_email'] = $email;
-                    $_SESSION['user_type'] = 'admin';
-                    $_SESSION['user_id'] = $admin['id'];
-                    $_SESSION['user_name'] = $admin['fullname'];
-                    $_SESSION['login_time'] = time();
-                    $_SESSION['ip_address'] = $_SERVER['REMOTE_ADDR'];
-                    
-                    error_log("SESSION VARIABLES SET:");
-                    error_log("- logged_in: " . $_SESSION['logged_in']);
-                    error_log("- user_email: " . $_SESSION['user_email']);
-                    error_log("- user_type: " . $_SESSION['user_type']);
-                    error_log("- user_id: " . $_SESSION['user_id']);
-                    error_log("- user_name: " . $_SESSION['user_name']);
-                    
-                    // Force session write
-                    session_write_close();
-                    
-                    error_log("Redirecting to admin-dashboard.php");
-                    
-                    // Redirect to admin dashboard
-                    header('Location: admin-dashboard.php');
-                    exit;
-                } else {
-                    $error = 'Invalid password. Please try again.';
-                    error_log("ADMIN PASSWORD VERIFICATION FAILED");
-                    error_log("Expected: " . $admin['password']);
-                    error_log("Provided: [HIDDEN]");
-                }
+                // Regenerate session for security
+                regenerateSession();
+                
+                $_SESSION['logged_in'] = true;
+                $_SESSION['user_email'] = $email;
+                $_SESSION['user_type'] = 'admin';
+                $_SESSION['user_id'] = $admin['id'];
+                $_SESSION['user_name'] = $admin['fullname'];
+                $_SESSION['login_time'] = time();
+                
+                error_log("SESSION SET - User type: " . $_SESSION['user_type']);
+                error_log("SESSION DATA: " . print_r($_SESSION, true));
+                
+                // Force session write and redirect
+                session_write_close();
+                error_log("Redirecting to admin-dashboard.php");
+                header('Location: admin-dashboard.php');
+                exit;
+            } else {
+                $error = 'Invalid password. Please try again.';
+                error_log("ADMIN PASSWORD VERIFICATION FAILED");
             }
         } else {
             // Check if email exists in students table
@@ -105,6 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && isset($_P
                     $_SESSION['login_time'] = time();
                     
                     error_log("SESSION SET - Redirecting to student dashboard");
+                    error_log("SESSION DATA: " . print_r($_SESSION, true));
                     
                     // Force session write and redirect
                     session_write_close();
@@ -181,7 +155,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
     }
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
