@@ -1,5 +1,11 @@
 <?php
 require_once 'config.php';
+
+// Debug session
+error_log("Session status: " . session_status());
+error_log("Logged in: " . (isLoggedIn() ? 'Yes' : 'No'));
+error_log("User type: " . ($_SESSION['user_type'] ?? 'Not set'));
+
 requireStudentRole();
 
 $student_id = $_SESSION['user_id'];
@@ -7,7 +13,7 @@ $student = getStudentById($student_id);
 $admins = supabaseFetchAll('admins', 'fullname.asc');
 
 // Handle sending message
-if ($_POST['action'] === 'send_message') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'send_message') {
     $receiver_id = sanitizeInput($_POST['receiver_id']);
     $message = sanitizeInput($_POST['message']);
     
@@ -34,7 +40,8 @@ if ($_POST['action'] === 'send_message') {
 function getStudentMessages($student_id) {
     global $supabase_url, $supabase_key;
     
-    $url = $supabase_url . "/rest/v1/messages?or=(sender_id.eq.{$student_id},receiver_id.eq.{$student_id})&sender_type=eq.student&receiver_type=eq.admin&order=created_at.asc";
+    // Get all messages where student is involved with any admin
+    $url = $supabase_url . "/rest/v1/messages?select=*&or=(and(sender_id.eq.{$student_id},sender_type.eq.student),and(receiver_id.eq.{$student_id},receiver_type.eq.student))&order=created_at.asc";
     
     $ch = curl_init();
     $headers = [
@@ -59,6 +66,7 @@ function getStudentMessages($student_id) {
         return json_decode($response, true) ?: [];
     }
     
+    error_log("Failed to fetch messages. HTTP Code: $httpCode");
     return [];
 }
 
@@ -212,27 +220,33 @@ $messages = getStudentMessages($student_id);
         
         <div class="messages-content">
             <div class="admins-list">
-                <?php foreach ($admins as $admin): ?>
-                    <?php 
-                    $unread_count = 0;
-                    foreach ($messages as $msg) {
-                        if ($msg['sender_id'] == $admin['id'] && $msg['sender_type'] == 'admin' && !$msg['is_read']) {
-                            $unread_count++;
+                <?php if (!empty($admins)): ?>
+                    <?php foreach ($admins as $admin): ?>
+                        <?php 
+                        $unread_count = 0;
+                        foreach ($messages as $msg) {
+                            if ($msg['sender_id'] == $admin['id'] && $msg['sender_type'] == 'admin' && !$msg['is_read']) {
+                                $unread_count++;
+                            }
                         }
-                    }
-                    ?>
-                    <div class="admin-item" data-admin-id="<?= $admin['id'] ?>">
-                        <div class="admin-name">
-                            <?= htmlspecialchars($admin['fullname']) ?>
-                            <?php if ($unread_count > 0): ?>
-                                <span class="unread-badge"><?= $unread_count ?></span>
-                            <?php endif; ?>
+                        ?>
+                        <div class="admin-item" data-admin-id="<?= $admin['id'] ?>" data-admin-name="<?= htmlspecialchars($admin['fullname']) ?>">
+                            <div class="admin-name">
+                                <?= htmlspecialchars($admin['fullname']) ?>
+                                <?php if ($unread_count > 0): ?>
+                                    <span class="unread-badge"><?= $unread_count ?></span>
+                                <?php endif; ?>
+                            </div>
+                            <div class="admin-role">
+                                Administrator
+                            </div>
                         </div>
-                        <div class="admin-role">
-                            Administrator
-                        </div>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <div class="admin-item">
+                        <div class="admin-name">No administrators found</div>
                     </div>
-                <?php endforeach; ?>
+                <?php endif; ?>
             </div>
             
             <div class="chat-container">
@@ -264,7 +278,7 @@ $messages = getStudentMessages($student_id);
                 this.classList.add('active');
                 
                 currentAdminId = this.dataset.adminId;
-                currentAdminName = this.querySelector('.admin-name').textContent.split(' ')[0];
+                currentAdminName = this.dataset.adminName;
                 
                 document.getElementById('current-admin-name').textContent = `Chat with ${currentAdminName}`;
                 document.getElementById('message-input').style.display = 'flex';
@@ -278,8 +292,13 @@ $messages = getStudentMessages($student_id);
         function loadMessages() {
             if (!currentAdminId) return;
             
-            fetch('get-messages.php?admin_id=' + currentAdminId + '&user_type=student')
-                .then(response => response.json())
+            fetch('get_messages.php?admin_id=' + currentAdminId + '&user_type=student')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
                 .then(messages => {
                     const messagesArea = document.getElementById('messages-area');
                     messagesArea.innerHTML = '';
@@ -309,6 +328,9 @@ $messages = getStudentMessages($student_id);
                     
                     // Mark messages as read
                     markMessagesAsRead();
+                })
+                .catch(error => {
+                    console.error('Error loading messages:', error);
                 });
         }
 
@@ -331,7 +353,13 @@ $messages = getStudentMessages($student_id);
                 if (result.success) {
                     document.getElementById('message-text').value = '';
                     loadMessages();
+                } else {
+                    alert('Failed to send message');
                 }
+            })
+            .catch(error => {
+                console.error('Error sending message:', error);
+                alert('Error sending message');
             });
         }
 
@@ -339,7 +367,7 @@ $messages = getStudentMessages($student_id);
         function markMessagesAsRead() {
             if (!currentAdminId) return;
             
-            fetch('mark-read.php', {
+            fetch('mark_read.php', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -348,7 +376,7 @@ $messages = getStudentMessages($student_id);
                     admin_id: currentAdminId,
                     user_type: 'student'
                 })
-            });
+            }).catch(error => console.error('Error marking as read:', error));
         }
 
         // Auto-refresh messages

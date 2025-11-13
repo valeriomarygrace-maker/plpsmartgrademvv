@@ -1,6 +1,5 @@
 <?php
 require_once 'config.php';
-require_once 'student-header.php';
 
 // Start session if not already started
 if (session_status() === PHP_SESSION_NONE) {

@@ -1,7 +1,6 @@
 <?php
 require_once 'config.php';
 require_once 'ml-helpers.php';
-require_once 'student-header.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();

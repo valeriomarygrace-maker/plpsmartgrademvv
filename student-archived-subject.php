@@ -1,6 +1,5 @@
 <?php
 require_once 'config.php';
-require_once 'student-header.php';
 
 if (!isset($_SESSION['logged_in']) || $_SESSION['user_type'] !== 'student') {
     header('Location: login.php');
