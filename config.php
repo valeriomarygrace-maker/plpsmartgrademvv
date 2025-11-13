@@ -549,11 +549,12 @@ function getRecentConversations($user_id, $user_type) {
 }
 
 /**
- * Get messages between two users
+ * Get messages between two specific users
  */
 function getMessagesBetweenUsers($user1_id, $user1_type, $user2_id, $user2_type) {
     global $supabase_url, $supabase_key;
     
+    // Build the query to get messages between two specific users
     $url = $supabase_url . "/rest/v1/messages?select=*&or=(and(sender_id.eq.{$user1_id},sender_type.eq.{$user1_type},receiver_id.eq.{$user2_id},receiver_type.eq.{$user2_type}),and(sender_id.eq.{$user2_id},sender_type.eq.{$user2_type},receiver_id.eq.{$user1_id},receiver_type.eq.{$user1_type}))&order=created_at.asc";
     
     $ch = curl_init();
@@ -579,6 +580,7 @@ function getMessagesBetweenUsers($user1_id, $user1_type, $user2_id, $user2_type)
         return json_decode($response, true) ?: [];
     }
     
+    error_log("Failed to fetch messages. HTTP Code: $httpCode");
     return [];
 }
 
@@ -605,5 +607,6 @@ if (isset($_SESSION['created']) && (time() - $_SESSION['created'] > 28800)) {
         exit;
     }
 }
+
 
 ?>
