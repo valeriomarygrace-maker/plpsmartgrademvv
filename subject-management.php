@@ -1,6 +1,7 @@
 <?php
 require_once 'config.php';
 require_once 'ml-helpers.php';
+require_once 'student_ml_predictor.py';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
