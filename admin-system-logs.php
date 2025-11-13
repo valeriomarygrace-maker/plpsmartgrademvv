@@ -577,7 +577,7 @@ if (!empty($filter_date) && is_array($logs)) {
                 </a>
             </li>
             <li class="nav-item">
-                <a href="admin-settings-logs.php" class="nav-link active">
+                <a href="admin-system-logs.php" class="nav-link active">
                     <i class="fas fa-cog"></i>
                     System Logs
                 </a>

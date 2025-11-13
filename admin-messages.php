@@ -574,7 +574,7 @@ $partners = getConversationPartners($admin_id, 'admin');
                 </a>
             </li>
             <li class="nav-item">
-                <a href="admin-settings-logs.php" class="nav-link">
+                <a href="admin-system-logs.php" class="nav-link">
                     <i class="fas fa-cog"></i>
                     System Logs
                 </a>
