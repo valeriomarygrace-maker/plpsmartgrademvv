@@ -1,6 +1,11 @@
 <?php
 require_once 'config.php';
 
+// Debug session
+error_log("Session status: " . session_status());
+error_log("Logged in: " . (isLoggedIn() ? 'Yes' : 'No'));
+error_log("User type: " . ($_SESSION['user_type'] ?? 'Not set'));
+
 requireStudentRole();
 
 $student_id = $_SESSION['user_id'];
@@ -31,13 +36,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     exit;
 }
 
-// Get unread count for badge
-$unread_count = getUnreadMessageCount($student_id, 'student');
-
 // Get messages for student
 function getStudentMessages($student_id) {
     global $supabase_url, $supabase_key;
     
+    // Get all messages where student is involved with any admin
     $url = $supabase_url . "/rest/v1/messages?select=*&or=(and(sender_id.eq.{$student_id},sender_type.eq.student),and(receiver_id.eq.{$student_id},receiver_type.eq.student))&order=created_at.asc";
     
     $ch = curl_init();
@@ -63,6 +66,7 @@ function getStudentMessages($student_id) {
         return json_decode($response, true) ?: [];
     }
     
+    error_log("Failed to fetch messages. HTTP Code: $httpCode");
     return [];
 }
 
@@ -73,627 +77,190 @@ $messages = getStudentMessages($student_id);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Messages - PLP SmartGrade</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <title>Messages - Student Performance Tracking System</title>
     <style>
-        :root {
-            --plp-green: #006341;
-            --plp-green-light: #008856;
-            --plp-green-lighter: #e0f2e9;
-            --plp-green-pale: #f5fbf8;
-            --plp-green-gradient: linear-gradient(135deg, #006341 0%, #008856 100%);
-            --plp-gold: #FFD700;
-            --plp-dark-green: #004d33;
-            --plp-light-green: #f8fcf9;
-            --plp-pale-green: #e8f5e9;
-            --text-dark: #2d3748;
-            --text-medium: #4a5568;
-            --text-light: #718096;
-            --border-radius: 12px;
-            --border-radius-lg: 16px;
-            --box-shadow: 0 4px 12px rgba(0, 99, 65, 0.1);
-            --box-shadow-lg: 0 8px 24px rgba(0, 99, 65, 0.15);
-            --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-            --danger: #dc3545;
-            --warning: #ffc107;
-            --success: #28a745;
-            --info: #17a2b8;
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Poppins', sans-serif;
-            background: var(--plp-green-pale);
-            display: flex;
-            min-height: 100vh;
-            color: var(--text-dark);
-            line-height: 1.6;
-        }
-
-        .sidebar {
-            width: 320px;
-            background: white;
-            box-shadow: var(--box-shadow);
-            padding: 1.5rem;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            position: sticky;
-            top: 0;
-            border-right: 1px solid rgba(0, 99, 65, 0.1);
-        }
-
-        .sidebar-header {
-            text-align: center;
-            border-bottom: 1px solid rgba(0, 99, 65, 0.1);
-        }
-
-        .logo-container {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .logo {
-            width: 130px;
-            height: 130px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-            transition: var(--transition);
-        }
-
-        .logo:hover {
-            transform: scale(1.05);
-        }
-
-        .logo img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-            padding: 5px;
-        }
-
-        .portal-title {
-            color: var(--plp-green);
-            font-size: 1.3rem;
-            font-weight: 700;
-            letter-spacing: 0.5px;
-        }
-
-        .student-email {
-            color: var(--text-medium);
-            font-size: 0.85rem;
-            margin-bottom: 1rem;
-            word-break: break-all;
-            padding: 0.5rem;
-            border-radius: 6px;
-            font-weight: 500;
-        }
-
-        .nav-menu {
-            list-style: none;
-            flex-grow: 0.30;
-            margin-top: 0.7rem;
-        }
-
-        .nav-item {
-            margin-bottom: 0.7rem;
-            position: relative;
-        }
-
-        .nav-link {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            padding: 0.50rem;
-            color: var(--text-medium);
-            text-decoration: none;
-            border-radius: var(--border-radius);
-            transition: var(--transition);
-            font-weight: 500;
-        }
-
-        .nav-link:hover:not(.active) {
-            background: var(--plp-green-lighter);
-            color: var(--plp-green);
-            transform: translateY(-3px);
-        }
-
-        .nav-link.active {
-            background: var(--plp-green-gradient);
-            color: white;
-            box-shadow: var(--box-shadow);
-        }
-
-        .sidebar-footer {
-            border-top: 3px solid rgba(0, 99, 65, 0.1);
-        }
-
-        .logout-btn {
-            margin-top:1rem;
-            background: transparent;
-            color: var(--text-medium);
-            padding: 0.75rem 1rem;
-            border: none;
-            border-radius: var(--border-radius);
-            cursor: pointer;
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            width: 100%;
-            font-weight: 500;
-            transition: var(--transition);
-        }
-
-        .logout-btn:hover {
-            background: #fee2e2;
-            color: #b91c1c;
-            transform: translateX(5px);
-        }
-
-        .main-content {
-            flex: 1;
-            padding: 1rem 2.5rem; 
-            background: var(--plp-green-pale);
-            max-width: 100%;
-            margin: 0 auto;
-            width: 100%;
-        }
-
-        .header {
-            background: white;
-            padding: 0.6rem 1.25rem;
-            border-radius: var(--border-radius);
-            box-shadow: var(--box-shadow);
-            margin-bottom: 1.5rem; 
-            background: var(--plp-green-gradient);
-            color: white;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .welcome {
-            font-size: 1.5rem;
-            font-weight: 700;
-            letter-spacing: 0.5px;
-        }
-
-        /* Messages Specific Styles */
         .messages-container {
-            display: grid;
-            grid-template-columns: 350px 1fr;
-            gap: 2rem;
-            height: calc(100vh - 200px);
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f8f9fa;
+            min-height: 100vh;
         }
-
+        .messages-header {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .messages-content {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+            height: 70vh;
+        }
         .admins-list {
             background: white;
-            border-radius: var(--border-radius-lg);
-            box-shadow: var(--box-shadow);
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .admins-header {
-            padding: 1.5rem;
-            background: var(--plp-green-gradient);
-            color: white;
-        }
-
-        .admins-title {
-            font-size: 1.2rem;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-
-        .admin-items {
-            flex: 1;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
             overflow-y: auto;
         }
-
         .admin-item {
-            padding: 1.25rem;
-            border-bottom: 1px solid var(--plp-green-lighter);
+            padding: 15px;
+            border-bottom: 1px solid #eee;
             cursor: pointer;
-            transition: var(--transition);
-            display: flex;
-            align-items: center;
-            gap: 1rem;
+            transition: background 0.3s;
         }
-
         .admin-item:hover, .admin-item.active {
-            background: var(--plp-green-pale);
+            background: #e3f2fd;
         }
-
-        .admin-item.active {
-            border-left: 4px solid var(--plp-green);
-        }
-
-        .admin-avatar {
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            background: var(--plp-green-gradient);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: bold;
-            font-size: 1.2rem;
-        }
-
-        .admin-info {
-            flex: 1;
-        }
-
         .admin-name {
-            font-weight: 600;
-            color: var(--text-dark);
-            margin-bottom: 0.25rem;
+            font-weight: bold;
+            margin-bottom: 5px;
         }
-
         .admin-role {
-            font-size: 0.85rem;
-            color: var(--text-light);
+            font-size: 12px;
+            color: #666;
         }
-
-        .unread-badge {
-            background: var(--danger);
-            color: white;
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            font-size: 0.75rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 600;
-        }
-
         .chat-container {
             background: white;
-            border-radius: var(--border-radius-lg);
-            box-shadow: var(--box-shadow);
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
             display: flex;
             flex-direction: column;
-            overflow: hidden;
         }
-
         .chat-header {
-            padding: 1.5rem;
-            background: var(--plp-green-pale);
-            border-bottom: 1px solid var(--plp-green-lighter);
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .current-admin-avatar {
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            background: var(--plp-green-gradient);
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            padding: 15px 20px;
+            border-bottom: 1px solid #eee;
+            background: #4caf50;
             color: white;
-            font-weight: bold;
-            font-size: 1.2rem;
+            border-radius: 10px 10px 0 0;
         }
-
-        .current-admin-info h3 {
-            color: var(--text-dark);
-            margin-bottom: 0.25rem;
-        }
-
-        .current-admin-info p {
-            color: var(--text-light);
-            font-size: 0.9rem;
-        }
-
         .messages-area {
             flex: 1;
-            padding: 1.5rem;
+            padding: 20px;
             overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
             max-height: 400px;
         }
-
+        .message {
+            margin-bottom: 15px;
+            padding: 10px 15px;
+            border-radius: 15px;
+            max-width: 70%;
+            word-wrap: break-word;
+        }
+        .message.sent {
+            background: #4caf50;
+            color: white;
+            margin-left: auto;
+            border-bottom-right-radius: 5px;
+        }
+        .message.received {
+            background: #e9ecef;
+            color: #333;
+            border-bottom-left-radius: 5px;
+        }
+        .message-time {
+            font-size: 11px;
+            opacity: 0.7;
+            margin-top: 5px;
+        }
+        .message-input {
+            padding: 15px 20px;
+            border-top: 1px solid #eee;
+            display: flex;
+            gap: 10px;
+        }
+        .message-input textarea {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            resize: none;
+            height: 40px;
+        }
+        .send-btn {
+            background: #4caf50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+        }
+        .send-btn:hover {
+            background: #45a049;
+        }
         .no-chat-selected {
             display: flex;
             align-items: center;
             justify-content: center;
             height: 100%;
-            color: var(--text-light);
-            text-align: center;
+            color: #666;
         }
-
-        .no-chat-selected i {
-            font-size: 3rem;
-            color: var(--plp-green-lighter);
-            margin-bottom: 1rem;
-        }
-
-        .message {
-            max-width: 70%;
-            padding: 1rem 1.25rem;
-            border-radius: var(--border-radius);
-            position: relative;
-            animation: messageSlide 0.3s ease;
-        }
-
-        @keyframes messageSlide {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .message.sent {
-            background: var(--plp-green-gradient);
-            color: white;
-            margin-left: auto;
-            border-bottom-right-radius: 5px;
-        }
-
-        .message.received {
-            background: var(--plp-green-pale);
-            color: var(--text-dark);
-            border-bottom-left-radius: 5px;
-        }
-
-        .message-content {
-            margin-bottom: 0.5rem;
-            line-height: 1.5;
-        }
-
-        .message-time {
-            font-size: 0.75rem;
-            opacity: 0.7;
-            text-align: right;
-        }
-
-        .message-input-container {
-            padding: 1.5rem;
-            border-top: 1px solid var(--plp-green-lighter);
-            background: var(--plp-green-pale);
-        }
-
-        .message-input-wrapper {
-            display: flex;
-            gap: 1rem;
-            align-items: flex-end;
-        }
-
-        .message-input {
-            flex: 1;
-            padding: 1rem 1.5rem;
-            border: 2px solid var(--plp-green-lighter);
-            border-radius: 50px;
-            font-family: 'Poppins', sans-serif;
-            font-size: 1rem;
-            resize: none;
-            height: 60px;
-            transition: var(--transition);
-        }
-
-        .message-input:focus {
-            outline: none;
-            border-color: var(--plp-green);
-            box-shadow: 0 0 0 3px rgba(0, 99, 65, 0.1);
-        }
-
-        .send-btn {
-            background: var(--plp-green-gradient);
-            color: white;
-            border: none;
-            padding: 1rem 1.5rem;
-            border-radius: 50px;
-            cursor: pointer;
-            transition: var(--transition);
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            min-width: 120px;
-            justify-content: center;
-        }
-
-        .send-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 16px rgba(0, 99, 65, 0.3);
-        }
-
-        .send-btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .badge {
-            background: var(--danger);
+        .unread-badge {
+            background: #ff4444;
             color: white;
             border-radius: 50%;
             width: 20px;
             height: 20px;
-            font-size: 0.75rem;
-            display: flex;
+            font-size: 12px;
+            display: inline-flex;
             align-items: center;
             justify-content: center;
-            font-weight: 600;
-        }
-
-        @media (max-width: 768px) {
-            .messages-container {
-                grid-template-columns: 1fr;
-            }
-            
-            .admins-list {
-                display: none;
-            }
+            margin-left: 10px;
         }
     </style>
 </head>
 <body>
-    <div class="sidebar">
-        <div class="sidebar-header">
-            <div class="logo-container">
-                <div class="logo">
-                    <img src="plplogo.png" alt="PLP Logo">
-                </div>
-            </div>
-            <div class="portal-title">PLPSMARTGRADE</div>
-            <div class="student-email"><?php echo htmlspecialchars($_SESSION['user_email']); ?></div>
+    <div class="messages-container">
+        <div class="messages-header">
+            <h1>Messages</h1>
+            <p>Communicate with administrators</p>
         </div>
         
-        <ul class="nav-menu">
-            <li class="nav-item">
-                <a href="student-dashboard.php" class="nav-link">
-                    <i class="fas fa-chart-line"></i>
-                    Dashboard
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="student-profile.php" class="nav-link">
-                    <i class="fas fa-user"></i>
-                    Profile
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="student-subjects.php" class="nav-link">
-                    <i class="fas fa-book"></i>
-                    Subjects
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="student-messages.php" class="nav-link active">
-                    <i class="fas fa-envelope"></i>
-                    Messages
-                    <?php if ($unread_count > 0): ?>
-                        <span class="badge"><?php echo $unread_count; ?></span>
-                    <?php endif; ?>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="student-archived-subject.php" class="nav-link">
-                    <i class="fas fa-archive"></i>
-                    Archived Subjects
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="student-semester-grades.php" class="nav-link">
-                    <i class="fas fa-history"></i>
-                    History Records
-                </a>
-            </li>
-        </ul>
-
-        <div class="sidebar-footer">
-            <a href="logout.php" class="logout-btn">
-                <i class="fas fa-sign-out-alt"></i>
-                Logout
-            </a>
-        </div>
-    </div>
-
-    <div class="main-content">
-        <div class="header">
-            <div class="welcome">Messages</div>
-        </div>
-
-        <div class="messages-container">
+        <div class="messages-content">
             <div class="admins-list">
-                <div class="admins-header">
-                    <div class="admins-title">
-                        <i class="fas fa-users"></i>
-                        Administrators
-                    </div>
-                </div>
-                <div class="admin-items">
-                    <?php if (!empty($admins)): ?>
-                        <?php foreach ($admins as $admin): ?>
-                            <?php 
-                            $unread_count = 0;
-                            foreach ($messages as $msg) {
-                                if ($msg['sender_id'] == $admin['id'] && $msg['sender_type'] == 'admin' && !$msg['is_read']) {
-                                    $unread_count++;
-                                }
+                <?php if (!empty($admins)): ?>
+                    <?php foreach ($admins as $admin): ?>
+                        <?php 
+                        $unread_count = 0;
+                        foreach ($messages as $msg) {
+                            if ($msg['sender_id'] == $admin['id'] && $msg['sender_type'] == 'admin' && !$msg['is_read']) {
+                                $unread_count++;
                             }
-                            ?>
-                            <div class="admin-item" data-admin-id="<?= $admin['id'] ?>" data-admin-name="<?= htmlspecialchars($admin['fullname']) ?>">
-                                <div class="admin-avatar">
-                                    <?= strtoupper(substr($admin['fullname'], 0, 1)) ?>
-                                </div>
-                                <div class="admin-info">
-                                    <div class="admin-name"><?= htmlspecialchars($admin['fullname']) ?></div>
-                                    <div class="admin-role">Administrator</div>
-                                </div>
+                        }
+                        ?>
+                        <div class="admin-item" data-admin-id="<?= $admin['id'] ?>" data-admin-name="<?= htmlspecialchars($admin['fullname']) ?>">
+                            <div class="admin-name">
+                                <?= htmlspecialchars($admin['fullname']) ?>
                                 <?php if ($unread_count > 0): ?>
                                     <span class="unread-badge"><?= $unread_count ?></span>
                                 <?php endif; ?>
                             </div>
-                        <?php endforeach; ?>
-                    <?php else: ?>
-                        <div class="admin-item">
-                            <div class="admin-info">
-                                <div class="admin-name">No administrators found</div>
+                            <div class="admin-role">
+                                Administrator
                             </div>
                         </div>
-                    <?php endif; ?>
-                </div>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <div class="admin-item">
+                        <div class="admin-name">No administrators found</div>
+                    </div>
+                <?php endif; ?>
             </div>
             
             <div class="chat-container">
-                <div class="chat-header" id="chat-header" style="display: none;">
-                    <div class="current-admin-avatar" id="current-admin-avatar"></div>
-                    <div class="current-admin-info">
-                        <h3 id="current-admin-name">Administrator</h3>
-                        <p id="current-admin-status">Online</p>
-                    </div>
+                <div class="chat-header">
+                    <span id="current-admin-name">Select an administrator to start chatting</span>
                 </div>
-                
                 <div class="messages-area" id="messages-area">
-                    <div class="no-chat-selected" id="no-chat-selected">
-                        <div>
-                            <i class="fas fa-comments"></i>
-                            <h3>Select an administrator to start chatting</h3>
-                            <p>Choose from the list to view your conversation</p>
-                        </div>
+                    <div class="no-chat-selected">
+                        Please select an administrator to view messages
                     </div>
                 </div>
-                
-                <div class="message-input-container" id="message-input-container" style="display: none;">
-                    <div class="message-input-wrapper">
-                        <textarea 
-                            class="message-input" 
-                            id="message-text" 
-                            placeholder="Type your message..." 
-                            rows="1"
-                        ></textarea>
-                        <button class="send-btn" id="send-btn" onclick="sendMessage()">
-                            <i class="fas fa-paper-plane"></i>
-                            Send
-                        </button>
-                    </div>
+                <div class="message-input" style="display: none;" id="message-input">
+                    <textarea placeholder="Type your message..." id="message-text"></textarea>
+                    <button class="send-btn" onclick="sendMessage()">Send</button>
                 </div>
             </div>
         </div>
@@ -713,12 +280,8 @@ $messages = getStudentMessages($student_id);
                 currentAdminId = this.dataset.adminId;
                 currentAdminName = this.dataset.adminName;
                 
-                // Update chat header
-                document.getElementById('chat-header').style.display = 'flex';
-                document.getElementById('current-admin-name').textContent = currentAdminName;
-                document.getElementById('current-admin-avatar').textContent = currentAdminName.charAt(0).toUpperCase();
-                document.getElementById('no-chat-selected').style.display = 'none';
-                document.getElementById('message-input-container').style.display = 'block';
+                document.getElementById('current-admin-name').textContent = `Chat with ${currentAdminName}`;
+                document.getElementById('message-input').style.display = 'flex';
                 
                 loadMessages();
                 startAutoRefresh();
@@ -741,16 +304,7 @@ $messages = getStudentMessages($student_id);
                     messagesArea.innerHTML = '';
                     
                     if (messages.length === 0) {
-                        const noMessages = document.createElement('div');
-                        noMessages.className = 'no-chat-selected';
-                        noMessages.innerHTML = `
-                            <div>
-                                <i class="fas fa-comment-slash"></i>
-                                <h3>No messages yet</h3>
-                                <p>Start the conversation by sending a message</p>
-                            </div>
-                        `;
-                        messagesArea.appendChild(noMessages);
+                        messagesArea.innerHTML = '<div class="no-chat-selected">No messages yet. Start the conversation!</div>';
                         return;
                     }
                     
@@ -763,7 +317,7 @@ $messages = getStudentMessages($student_id);
                         });
                         
                         messageDiv.innerHTML = `
-                            <div class="message-content">${msg.message}</div>
+                            <div>${msg.message}</div>
                             <div class="message-time">${time}</div>
                         `;
                         
@@ -784,10 +338,6 @@ $messages = getStudentMessages($student_id);
         function sendMessage() {
             const messageText = document.getElementById('message-text').value.trim();
             if (!messageText || !currentAdminId) return;
-            
-            const sendBtn = document.getElementById('send-btn');
-            sendBtn.disabled = true;
-            sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
             
             const formData = new FormData();
             formData.append('action', 'send_message');
@@ -810,10 +360,6 @@ $messages = getStudentMessages($student_id);
             .catch(error => {
                 console.error('Error sending message:', error);
                 alert('Error sending message');
-            })
-            .finally(() => {
-                sendBtn.disabled = false;
-                sendBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send';
             });
         }
 
@@ -847,12 +393,6 @@ $messages = getStudentMessages($student_id);
                 e.preventDefault();
                 sendMessage();
             }
-        });
-
-        // Auto-resize textarea
-        document.getElementById('message-text')?.addEventListener('input', function() {
-            this.style.height = 'auto';
-            this.style.height = (this.scrollHeight) + 'px';
         });
 
         // Stop auto-refresh when leaving page
