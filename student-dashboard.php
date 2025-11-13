@@ -1226,6 +1226,12 @@ function calculateSubjectGradeFromScores($student_subject_id) {
                 </a>
             </li>
             <li class="nav-item">
+                <a href="student-messages.php" class="nav-link">
+                    <i class="fas fa-book"></i>
+                    Message
+                </a>
+            </li>
+            <li class="nav-item">
                 <a href="student-archived-subject.php" class="nav-link">
                     <i class="fas fa-archive"></i>
                     Archived Subjects

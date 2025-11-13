@@ -1,47 +1,19 @@
 <?php
 require_once 'config.php';
-
-// Check if user is logged in as admin
 requireAdminRole();
 
-// Get admin info
+$admin_id = $_SESSION['user_id'];
 $admin = getAdminByEmail($_SESSION['user_email']);
 
-if (!$admin) {
-    session_destroy();
-    header('Location: login.php');
-    exit;
-}
-
-// Initialize variables
-$error_message = '';
-$total_students = 0;
-$total_subjects = 0;
-$recent_students = [];
-
-// Get dashboard data
-$students = supabaseFetch('students', []);
-$total_students = $students ? count($students) : 0;
-
-$subjects = supabaseFetch('subjects', []);
-$total_subjects = $subjects ? count($subjects) : 0;
-
-// Get recent students
-if ($students) {
-    usort($students, function($a, $b) {
-        $dateA = isset($a['created_at']) ? strtotime($a['created_at']) : 0;
-        $dateB = isset($b['created_at']) ? strtotime($b['created_at']) : 0;
-        return $dateB - $dateA;
-    });
-    $recent_students = array_slice($students, 0, 5);
-}
+// Get conversation partners (students who have messaged with this admin)
+$partners = getConversationPartners($admin_id, 'admin');
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard - PLP SmartGrade</title>
+    <title>Admin Messages - PLP SmartGrade</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -63,10 +35,6 @@ if ($students) {
             --box-shadow: 0 4px 12px rgba(0, 99, 65, 0.1);
             --box-shadow-lg: 0 8px 24px rgba(0, 99, 65, 0.15);
             --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-            --danger: #dc3545;
-            --warning: #ffc107;
-            --success: #28a745;
-            --info: #17a2b8;
         }
 
         * {
@@ -237,84 +205,64 @@ if ($students) {
             letter-spacing: 0.5px;
         }
 
-        .dashboard-grid {
+        .messages-container {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 2rem;
+            grid-template-columns: 350px 1fr;
+            gap: 2rem;
+            height: calc(100vh - 120px);
         }
 
-        .card {
+        .students-list {
             background: white;
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--box-shadow);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .list-header {
+            background: var(--plp-green-gradient);
+            color: white;
             padding: 1.5rem;
-            border-radius: var(--border-radius);
-            box-shadow: var(--box-shadow);
-            border-left: 4px solid var(--plp-green);
-            transition: var(--transition);
-        }
-
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-            padding-bottom: 0.75rem;
-            border-bottom: 1px solid var(--plp-green-lighter);
-        }
-
-        .card-title {
-            color: var(--plp-green);
-            font-size: 1.1rem;
             font-weight: 600;
+            font-size: 1.1rem;
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 0.75rem;
         }
 
-        .metrics-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 1rem;
-        }
-
-        .metric-card {
-            border-radius: var(--border-radius);
-            box-shadow: var(--box-shadow);
-            border-left: 4px solid var(--plp-green);
-            background: white;
-            text-align: center;
-            padding: 1rem;
-            border-radius: var(--border-radius);
-            transition: var(--transition);
-        }
-
-        .metric-value {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: var(--plp-green);
-            margin-bottom: 0.25rem;
-        }
-
-        .metric-label {
-            font-size: 0.85rem;
-            color: var(--text-medium);
-            font-weight: 500;
-        }
-
-        .student-list {
-            list-style: none;
+        .students-container {
+            flex: 1;
+            overflow-y: auto;
         }
 
         .student-item {
-            padding: 0.75rem;
+            padding: 1.5rem;
             border-bottom: 1px solid var(--plp-green-lighter);
+            cursor: pointer;
+            transition: var(--transition);
             display: flex;
-            justify-content: space-between;
             align-items: center;
+            gap: 1rem;
         }
 
-        .student-item:last-child {
-            border-bottom: none;
+        .student-item:hover, .student-item.active {
+            background: var(--plp-green-pale);
+            border-left: 4px solid var(--plp-green);
+        }
+
+        .student-avatar {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            background: var(--plp-green-gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 1.1rem;
         }
 
         .student-info {
@@ -323,64 +271,216 @@ if ($students) {
 
         .student-name {
             font-weight: 600;
-            color: var(--plp-green);
-            font-size: 0.9rem;
+            color: var(--text-dark);
+            margin-bottom: 0.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
 
         .student-details {
-            color: var(--text-dark);
             font-size: 0.85rem;
+            color: var(--text-medium);
         }
 
-        .student-email {
+        .chat-container {
+            background: white;
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--box-shadow);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-header {
+            padding: 1.5rem 2rem;
+            background: var(--plp-green-gradient);
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .chat-header-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 1.2rem;
+        }
+
+        .chat-header-info {
+            flex: 1;
+        }
+
+        .chat-header-name {
+            font-weight: 600;
+            font-size: 1.2rem;
+        }
+
+        .chat-header-status {
+            font-size: 0.85rem;
+            opacity: 0.9;
+        }
+
+        .messages-area {
+            flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
+            background: var(--plp-green-pale);
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .message {
+            max-width: 70%;
+            padding: 1rem 1.5rem;
+            border-radius: var(--border-radius);
+            position: relative;
+            animation: messageSlide 0.3s ease-out;
+        }
+
+        @keyframes messageSlide {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message.sent {
+            background: var(--plp-green-gradient);
+            color: white;
+            margin-left: auto;
+            border-bottom-right-radius: 5px;
+        }
+
+        .message.received {
+            background: white;
+            color: var(--text-dark);
+            border: 1px solid var(--plp-green-lighter);
+            border-bottom-left-radius: 5px;
+            box-shadow: var(--box-shadow);
+        }
+
+        .message-content {
+            margin-bottom: 0.5rem;
+            line-height: 1.5;
+        }
+
+        .message-time {
+            font-size: 0.75rem;
+            opacity: 0.7;
+            text-align: right;
+        }
+
+        .message.received .message-time {
+            text-align: left;
+        }
+
+        .message-input-container {
+            padding: 1.5rem 2rem;
+            border-top: 1px solid var(--plp-green-lighter);
+            background: white;
+        }
+
+        .message-input-wrapper {
+            display: flex;
+            gap: 1rem;
+            align-items: flex-end;
+        }
+
+        .message-input {
+            flex: 1;
+            padding: 1rem 1.5rem;
+            border: 2px solid var(--plp-green-lighter);
+            border-radius: 50px;
+            font-family: 'Poppins', sans-serif;
+            font-size: 1rem;
+            resize: none;
+            height: 60px;
+            transition: var(--transition);
+        }
+
+        .message-input:focus {
+            outline: none;
+            border-color: var(--plp-green);
+            box-shadow: 0 0 0 3px rgba(0, 99, 65, 0.1);
+        }
+
+        .send-btn {
+            background: var(--plp-green-gradient);
+            color: white;
+            border: none;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .send-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--box-shadow-lg);
+        }
+
+        .no-chat-selected {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
             color: var(--text-medium);
-            font-size: 0.8rem;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .no-chat-selected i {
+            font-size: 4rem;
+            color: var(--plp-green-lighter);
+            margin-bottom: 1rem;
+        }
+
+        .no-chat-selected h3 {
+            color: var(--plp-green);
+            margin-bottom: 0.5rem;
+        }
+
+        .unread-badge {
+            background: #ff4444;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 0.75rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: auto;
         }
 
         .empty-state {
-            text-align: center;
             padding: 2rem;
+            text-align: center;
             color: var(--text-medium);
         }
 
         .empty-state i {
-            font-size: 2rem;
-            margin-bottom: 1rem;
+            font-size: 3rem;
             color: var(--plp-green-lighter);
-        }
-
-        .empty-state p {
-            font-size: 0.9rem;
-            margin-bottom: 0.5rem;
-        }
-
-        .alert-error {
-            background: #fed7d7;
-            color: #c53030;
-            padding: 1rem;
-            border-radius: var(--border-radius);
             margin-bottom: 1rem;
-            border-left: 4px solid #e53e3e;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-
-        .three-column-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 1.5rem;
-            margin-bottom: 2rem;
-        }
-
-        .three-column-grid .card {
-            margin-bottom: 0;
-        }
-
-        @media (max-width: 1200px) {
-            .three-column-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
         }
 
         @media (max-width: 768px) {
@@ -395,113 +495,17 @@ if ($students) {
             }
             
             .main-content {
-                padding: 1.5rem;
+                padding: 1rem;
             }
             
-            .header {
-                flex-direction: column;
-                gap: 1rem;
-                text-align: center;
-            }
-            
-            .dashboard-grid {
+            .messages-container {
                 grid-template-columns: 1fr;
+                height: auto;
             }
             
-            .metrics-grid {
-                grid-template-columns: 1fr;
+            .students-list {
+                height: 300px;
             }
-            
-            .three-column-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(4px);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
-        .modal.show {
-            display: flex;
-            opacity: 1;
-        }
-
-
-        .modal-content {
-            background: white;
-            padding: 2rem;
-            border-radius: var(--border-radius-lg);
-            box-shadow: var(--box-shadow-lg);
-            text-align: center;
-            max-width: 400px;
-            width: 90%;
-            transform: translateY(20px);
-            transition: transform 0.3s ease;
-        }
-
-        .modal.show .modal-content {
-            transform: translateY(0);
-        }
-
-        .modal-title {
-            color: var(--plp-green);
-            font-size: 1.5rem;
-            font-weight: 700;
-            margin-bottom: 1rem;
-        }
-
-        .modal-body {
-            margin-bottom: 2rem;
-            color: var(--text-medium);
-        }
-
-        .modal-actions {
-            display: flex;
-            justify-content: center;
-            gap: 1rem;
-        }
-
-        .modal-btn {
-            padding: 0.75rem 1.5rem;
-            border: none;
-            border-radius: var(--border-radius);
-            font-weight: 600;
-            cursor: pointer;
-            transition: var(--transition);
-            text-decoration: none;
-            display: inline-block;
-        }
-
-        .modal-btn-cancel {
-            background: var(--plp-green-lighter);
-            color: var(--plp-green);
-        }
-
-        .modal-btn-cancel:hover {
-            background: var(--plp-green-light);
-            color: white;
-            transform: translateY(-2px);
-        }
-
-        .modal-btn-confirm {
-            background: var(--plp-green-gradient);
-            color: white;
-        }
-
-        .modal-btn-confirm:hover {
-            background: linear-gradient(135deg, var(--plp-green-light), var(--plp-green));
-            transform: translateY(-2px);
         }
     </style>
 </head>
@@ -519,7 +523,7 @@ if ($students) {
         
         <ul class="nav-menu">
             <li class="nav-item">
-                <a href="admin-dashboard.php" class="nav-link active">
+                <a href="admin-dashboard.php" class="nav-link">
                     <i class="fas fa-chart-line"></i>
                     Dashboard
                 </a>
@@ -531,9 +535,9 @@ if ($students) {
                 </a>
             </li>
             <li class="nav-item">
-                <a href="admin-reports.php" class="nav-link">
-                    <i class="fas fa-chart-bar"></i>
-                    Reports
+                <a href="admin-messages.php" class="nav-link active">
+                    <i class="fas fa-comments"></i>
+                    Messages
                 </a>
             </li>
             <li class="nav-item">
@@ -553,208 +557,204 @@ if ($students) {
     </div>
 
     <div class="main-content">
-        <?php if ($error_message): ?>
-            <div class="alert-error">
-                <i class="fas fa-exclamation-circle"></i>
-                <?php echo $error_message; ?>
-            </div>
-        <?php endif; ?>
-        
         <div class="header">
-            <div class="welcome">Welcome, <?php echo htmlspecialchars(explode(' ', $admin['fullname'])[0]); ?>!</div>
+            <div class="welcome">Messages</div>
         </div>
 
-        <!-- Admin Statistics -->
-        <div class="dashboard-grid">
-            <div class="metrics-grid">
-                <div class="metric-card">
-                    <div class="metric-value"><?php echo $total_students; ?></div>
-                    <div class="metric-label">Total Students</div>
+        <div class="messages-container">
+            <div class="students-list">
+                <div class="list-header">
+                    <i class="fas fa-user-graduate"></i>
+                    Students
                 </div>
-                <div class="metric-card">
-                    <div class="metric-value"><?php echo $total_subjects; ?></div>
-                    <div class="metric-label">Total Subjects</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="three-column-grid">
-            <!-- Recent Students -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title">
-                        <i class="fas fa-user-graduate"></i>
-                        Recent Students
-                    </div>
-                    <a href="admin-students.php" style="color: var(--plp-green); text-decoration: none; font-size: 0.9rem;">
-                        View All
-                    </a>
-                </div>
-                <?php if (!empty($recent_students)): ?>
-                    <ul class="student-list">
-                        <?php foreach ($recent_students as $student): ?>
-                            <li class="student-item">
-                                <div class="student-info">
-                                    <div class="student-name"><?php echo htmlspecialchars($student['fullname']); ?></div>
-                                    <div class="student-details">
-                                        <?php echo htmlspecialchars($student['student_number']); ?> • 
-                                        <?php echo htmlspecialchars($student['section']); ?>
-                                    </div>
-                                    <div class="student-email"><?php echo htmlspecialchars($student['email']); ?></div>
+                <div class="students-container">
+                    <?php if (!empty($partners)): ?>
+                        <?php foreach ($partners as $partner): ?>
+                            <div class="student-item" data-student-id="<?= $partner['id'] ?>" data-student-name="<?= htmlspecialchars($partner['name']) ?>">
+                                <div class="student-avatar">
+                                    <?= strtoupper(substr($partner['name'], 0, 1)) ?>
                                 </div>
-                            </li>
+                                <div class="student-info">
+                                    <div class="student-name">
+                                        <?= htmlspecialchars($partner['name']) ?>
+                                        <?php if ($partner['unread_count'] > 0): ?>
+                                            <span class="unread-badge"><?= $partner['unread_count'] ?></span>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="student-details">
+                                        Student
+                                    </div>
+                                </div>
+                            </div>
                         <?php endforeach; ?>
-                    </ul>
-                <?php else: ?>
-                    <div class="empty-state">
-                        <i class="fas fa-user-graduate"></i>
-                        <p>No students found</p>
-                        <small>Students will appear here once they register</small>
-                    </div>
-                <?php endif; ?>
-            </div>
-
-            <!-- Quick Actions -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title">
-                        <i class="fas fa-bolt"></i>
-                        Quick Actions
-                    </div>
-                </div>
-                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-                    <a href="admin-students.php" style="
-                        display: flex; 
-                        align-items: center; 
-                        gap: 0.75rem; 
-                        padding: 0.75rem; 
-                        background: var(--plp-green-pale); 
-                        border-radius: var(--border-radius); 
-                        text-decoration: none; 
-                        color: var(--plp-green); 
-                        font-weight: 500;
-                        transition: var(--transition);
-                    ">
-                        <i class="fas fa-user-plus"></i>
-                        Add New Student
-                    </a>
-                    <a href="admin-subjects.php" style="
-                        display: flex; 
-                        align-items: center; 
-                        gap: 0.75rem; 
-                        padding: 0.75rem; 
-                        background: var(--plp-green-pale); 
-                        border-radius: var(--border-radius); 
-                        text-decoration: none; 
-                        color: var(--plp-green); 
-                        font-weight: 500;
-                        transition: var(--transition);
-                    ">
-                        <i class="fas fa-book-medical"></i>
-                        Add New Subject
-                    </a>
-                    <a href="admin-reports.php" style="
-                        display: flex; 
-                        align-items: center; 
-                        gap: 0.75rem; 
-                        padding: 0.75rem; 
-                        background: var(--plp-green-pale); 
-                        border-radius: var(--border-radius); 
-                        text-decoration: none; 
-                        color: var(--plp-green); 
-                        font-weight: 500;
-                        transition: var(--transition);
-                    ">
-                        <i class="fas fa-chart-pie"></i>
-                        Generate Reports
-                    </a>
+                    <?php else: ?>
+                        <div class="empty-state">
+                            <i class="fas fa-user-graduate"></i>
+                            <p>No students available</p>
+                        </div>
+                    <?php endif; ?>
                 </div>
             </div>
-
-            <!-- System Status -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title">
-                        <i class="fas fa-server"></i>
-                        System Status
+            
+            <div class="chat-container">
+                <div class="chat-header" id="chat-header" style="display: none;">
+                    <div class="chat-header-avatar" id="header-avatar">S</div>
+                    <div class="chat-header-info">
+                        <div class="chat-header-name" id="header-name">Student Name</div>
+                        <div class="chat-header-status">Online</div>
                     </div>
                 </div>
-                <div style="display: flex; flex-direction: column; gap: 1rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="color: var(--text-medium);">Database</span>
-                        <span style="color: var(--success); font-weight: 600;">
-                            <i class="fas fa-check-circle"></i> Online
-                        </span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="color: var(--text-medium);">ML Service</span>
-                        <span style="color: var(--success); font-weight: 600;">
-                            <i class="fas fa-check-circle"></i> Active
-                        </span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="color: var(--text-medium);">Last Backup</span>
-                        <span style="color: var(--text-medium); font-size: 0.85rem;">
-                            <?php echo date('M j, Y'); ?>
-                        </span>
+                
+                <div class="messages-area" id="messages-area">
+                    <div class="no-chat-selected">
+                        <i class="fas fa-comment-dots"></i>
+                        <h3>Select a Student</h3>
+                        <p>Choose a student from the list to start messaging</p>
                     </div>
                 </div>
-            </div>
-        </div>
-    </div>
-
-            <!--  Logout Modal -->
-    <div class="modal" id="logoutModal">
-        <div class="modal-content" style="max-width: 450px; text-align: center;">
-            <h3 style="color: var(--plp-green); font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem;">
-                Confirm Logout
-            </h3>
-            <div style="color: var(--text-medium); margin-bottom: 2rem; line-height: 1.6;">
-                Are you sure you want to logout? You'll need<br>
-                to log in again to access your account.
-            </div>
-            <div style="display: flex; justify-content: center; gap: 1rem;">
-                <button class="modal-btn modal-btn-cancel" id="cancelLogout" style="min-width: 120px;">
-                    Cancel
-                </button>
-                <button class="modal-btn modal-btn-confirm" id="confirmLogout" style="min-width: 120px;">
-                    Yes, Logout
-                </button>
+                
+                <div class="message-input-container" id="message-input" style="display: none;">
+                    <div class="message-input-wrapper">
+                        <textarea 
+                            class="message-input" 
+                            id="message-text" 
+                            placeholder="Type your message here..."
+                            rows="1"
+                        ></textarea>
+                        <button class="send-btn" onclick="sendMessage()">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
-        // Logout modal functionality
-        const logoutBtn = document.querySelector('.logout-btn');
-        const logoutModal = document.getElementById('logoutModal');
-        const cancelLogout = document.getElementById('cancelLogout');
-        const confirmLogout = document.getElementById('confirmLogout');
+        let currentStudentId = null;
+        let currentStudentName = null;
+        let refreshInterval = null;
 
-// Show modal when clicking logout button
-        logoutBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            logoutModal.classList.add('show');
-        });
-
-        // Hide modal when clicking cancel
-        cancelLogout.addEventListener('click', () => {
-            logoutModal.classList.remove('show');
-        });
-
-        // Handle logout confirmation
-        confirmLogout.addEventListener('click', () => {
-            window.location.href = 'logout.php';
-        });
-
-// Hide modal when clicking outside the modal content
-        const modals = [addSubjectModal, editSubjectModal, archiveSubjectModal, logoutModal];
-        modals.forEach(modal => {
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    modal.classList.remove('show');
-                }
+        // Student selection
+        document.querySelectorAll('.student-item').forEach(item => {
+            item.addEventListener('click', function() {
+                document.querySelectorAll('.student-item').forEach(i => i.classList.remove('active'));
+                this.classList.add('active');
+                
+                currentStudentId = this.dataset.studentId;
+                currentStudentName = this.dataset.studentName;
+                
+                // Update chat header
+                document.getElementById('chat-header').style.display = 'flex';
+                document.getElementById('header-name').textContent = currentStudentName;
+                document.getElementById('header-avatar').textContent = currentStudentName.charAt(0).toUpperCase();
+                document.getElementById('message-input').style.display = 'block';
+                
+                loadMessages();
+                startAutoRefresh();
             });
+        });
+
+        // Load messages for selected student
+        function loadMessages() {
+            if (!currentStudentId) return;
+            
+            fetch('get_messages.php?partner_id=' + currentStudentId + '&user_type=admin')
+                .then(response => response.json())
+                .then(messages => {
+                    const messagesArea = document.getElementById('messages-area');
+                    messagesArea.innerHTML = '';
+                    
+                    if (messages.length === 0) {
+                        messagesArea.innerHTML = `
+                            <div class="no-chat-selected">
+                                <i class="fas fa-comment-slash"></i>
+                                <h3>No Messages Yet</h3>
+                                <p>Start the conversation by sending a message</p>
+                            </div>
+                        `;
+                        return;
+                    }
+                    
+                    messages.forEach(msg => {
+                        const messageDiv = document.createElement('div');
+                        const isSent = msg.sender_type === 'admin';
+                        messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
+                        
+                        const time = new Date(msg.created_at).toLocaleTimeString([], { 
+                            hour: '2-digit', minute: '2-digit' 
+                        });
+                        
+                        messageDiv.innerHTML = `
+                            <div class="message-content">${msg.message}</div>
+                            <div class="message-time">${time}</div>
+                        `;
+                        
+                        messagesArea.appendChild(messageDiv);
+                    });
+                    
+                    messagesArea.scrollTop = messagesArea.scrollHeight;
+                })
+                .catch(error => {
+                    console.error('Error loading messages:', error);
+                });
+        }
+
+        // Send message
+        function sendMessage() {
+            const messageText = document.getElementById('message-text').value.trim();
+            if (!messageText || !currentStudentId) return;
+            
+            const formData = new FormData();
+            formData.append('receiver_id', currentStudentId);
+            formData.append('message', messageText);
+            
+            fetch('send_message.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    document.getElementById('message-text').value = '';
+                    loadMessages();
+                } else {
+                    alert('Failed to send message. Please try again.');
+                }
+            })
+            .catch(error => {
+                console.error('Error sending message:', error);
+                alert('Error sending message. Please try again.');
+            });
+        }
+
+        // Auto-refresh messages
+        function startAutoRefresh() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+            refreshInterval = setInterval(loadMessages, 3000);
+        }
+
+        // Enter key to send message
+        document.getElementById('message-text')?.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // Auto-resize textarea
+        document.getElementById('message-text')?.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+        });
+
+        // Stop auto-refresh when leaving page
+        window.addEventListener('beforeunload', function() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
         });
     </script>
 </body>

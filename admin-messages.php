@@ -14,182 +14,427 @@ $partners = getConversationPartners($admin_id, 'admin');
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Messages - PLP SmartGrade</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        .messages-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-            background: #f8f9fa;
-            min-height: 100vh;
+        :root {
+            --plp-green: #006341;
+            --plp-green-light: #008856;
+            --plp-green-lighter: #e0f2e9;
+            --plp-green-pale: #f5fbf8;
+            --plp-green-gradient: linear-gradient(135deg, #006341 0%, #008856 100%);
+            --plp-gold: #FFD700;
+            --plp-dark-green: #004d33;
+            --plp-light-green: #f8fcf9;
+            --plp-pale-green: #e8f5e9;
+            --text-dark: #2d3748;
+            --text-medium: #4a5568;
+            --text-light: #718096;
+            --border-radius: 12px;
+            --border-radius-lg: 16px;
+            --box-shadow: 0 4px 12px rgba(0, 99, 65, 0.1);
+            --box-shadow-lg: 0 8px 24px rgba(0, 99, 65, 0.15);
+            --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
         }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: var(--plp-green-pale);
+            color: var(--text-dark);
+            line-height: 1.6;
+        }
+
+        .messages-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
         .messages-header {
             background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
+            padding: 2rem;
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--box-shadow);
+            margin-bottom: 2rem;
+            border-left: 4px solid var(--plp-green);
         }
+
+        .messages-header h1 {
+            color: var(--plp-green);
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .messages-header h1 i {
+            background: var(--plp-green-pale);
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
         .messages-content {
             display: grid;
-            grid-template-columns: 300px 1fr;
-            gap: 20px;
+            grid-template-columns: 350px 1fr;
+            gap: 2rem;
             height: 70vh;
         }
+
         .students-list {
             background: white;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            overflow-y: auto;
-        }
-        .student-item {
-            padding: 15px;
-            border-bottom: 1px solid #eee;
-            cursor: pointer;
-            transition: background 0.3s;
-        }
-        .student-item:hover, .student-item.active {
-            background: #e3f2fd;
-        }
-        .student-name {
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-        .student-info {
-            font-size: 12px;
-            color: #666;
-        }
-        .chat-container {
-            background: white;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--box-shadow);
+            overflow: hidden;
             display: flex;
             flex-direction: column;
         }
-        .chat-header {
-            padding: 15px 20px;
-            border-bottom: 1px solid #eee;
-            background: var(--plp-green);
+
+        .list-header {
+            background: var(--plp-green-gradient);
             color: white;
-            border-radius: 10px 10px 0 0;
+            padding: 1.5rem;
+            font-weight: 600;
+            font-size: 1.1rem;
         }
+
+        .students-container {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .student-item {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--plp-green-lighter);
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .student-item:hover, .student-item.active {
+            background: var(--plp-green-pale);
+            border-left: 4px solid var(--plp-green);
+        }
+
+        .student-avatar {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            background: var(--plp-green-gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .student-info {
+            flex: 1;
+        }
+
+        .student-name {
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 0.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .student-details {
+            font-size: 0.85rem;
+            color: var(--text-medium);
+        }
+
+        .chat-container {
+            background: white;
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--box-shadow);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-header {
+            padding: 1.5rem 2rem;
+            background: var(--plp-green-gradient);
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .chat-header-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 1.2rem;
+        }
+
+        .chat-header-info {
+            flex: 1;
+        }
+
+        .chat-header-name {
+            font-weight: 600;
+            font-size: 1.2rem;
+        }
+
+        .chat-header-status {
+            font-size: 0.85rem;
+            opacity: 0.9;
+        }
+
         .messages-area {
             flex: 1;
-            padding: 20px;
+            padding: 2rem;
             overflow-y: auto;
-            max-height: 400px;
+            background: var(--plp-green-pale);
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
         }
+
         .message {
-            margin-bottom: 15px;
-            padding: 10px 15px;
-            border-radius: 15px;
             max-width: 70%;
-            word-wrap: break-word;
+            padding: 1rem 1.5rem;
+            border-radius: var(--border-radius);
+            position: relative;
+            animation: messageSlide 0.3s ease-out;
         }
+
+        @keyframes messageSlide {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
         .message.sent {
-            background: var(--plp-green);
+            background: var(--plp-green-gradient);
             color: white;
             margin-left: auto;
             border-bottom-right-radius: 5px;
         }
+
         .message.received {
-            background: #e9ecef;
-            color: #333;
+            background: white;
+            color: var(--text-dark);
+            border: 1px solid var(--plp-green-lighter);
             border-bottom-left-radius: 5px;
+            box-shadow: var(--box-shadow);
         }
+
+        .message-content {
+            margin-bottom: 0.5rem;
+            line-height: 1.5;
+        }
+
         .message-time {
-            font-size: 11px;
+            font-size: 0.75rem;
             opacity: 0.7;
-            margin-top: 5px;
+            text-align: right;
         }
-        .message-input {
-            padding: 15px 20px;
-            border-top: 1px solid #eee;
+
+        .message.received .message-time {
+            text-align: left;
+        }
+
+        .message-input-container {
+            padding: 1.5rem 2rem;
+            border-top: 1px solid var(--plp-green-lighter);
+            background: white;
+        }
+
+        .message-input-wrapper {
             display: flex;
-            gap: 10px;
+            gap: 1rem;
+            align-items: flex-end;
         }
-        .message-input textarea {
+
+        .message-input {
             flex: 1;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 20px;
+            padding: 1rem 1.5rem;
+            border: 2px solid var(--plp-green-lighter);
+            border-radius: 50px;
+            font-family: 'Poppins', sans-serif;
+            font-size: 1rem;
             resize: none;
-            height: 40px;
+            height: 60px;
+            transition: var(--transition);
         }
+
+        .message-input:focus {
+            outline: none;
+            border-color: var(--plp-green);
+            box-shadow: 0 0 0 3px rgba(0, 99, 65, 0.1);
+        }
+
         .send-btn {
-            background: var(--plp-green);
+            background: var(--plp-green-gradient);
             color: white;
             border: none;
-            padding: 10px 20px;
-            border-radius: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
             cursor: pointer;
-        }
-        .send-btn:hover {
-            background: var(--plp-dark-green);
-        }
-        .no-chat-selected {
+            transition: var(--transition);
             display: flex;
             align-items: center;
             justify-content: center;
-            height: 100%;
-            color: #666;
+            font-size: 1.2rem;
         }
+
+        .send-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--box-shadow-lg);
+        }
+
+        .no-chat-selected {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-medium);
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .no-chat-selected i {
+            font-size: 4rem;
+            color: var(--plp-green-lighter);
+            margin-bottom: 1rem;
+        }
+
+        .no-chat-selected h3 {
+            color: var(--plp-green);
+            margin-bottom: 0.5rem;
+        }
+
         .unread-badge {
             background: #ff4444;
             color: white;
             border-radius: 50%;
             width: 20px;
             height: 20px;
-            font-size: 12px;
+            font-size: 0.75rem;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            margin-left: 10px;
+            margin-left: auto;
+        }
+
+        .empty-state {
+            padding: 2rem;
+            text-align: center;
+            color: var(--text-medium);
+        }
+
+        .empty-state i {
+            font-size: 3rem;
+            color: var(--plp-green-lighter);
+            margin-bottom: 1rem;
         }
     </style>
 </head>
 <body>
     <div class="messages-container">
         <div class="messages-header">
-            <h1>Messages</h1>
-            <p>Communicate with students</p>
+            <h1>
+                <i class="fas fa-comments"></i>
+                Messages
+            </h1>
+            <p style="color: var(--text-medium);">Communicate with students</p>
         </div>
         
         <div class="messages-content">
             <div class="students-list">
-                <?php if (!empty($partners)): ?>
-                    <?php foreach ($partners as $partner): ?>
-                        <div class="student-item" data-student-id="<?= $partner['id'] ?>">
-                            <div class="student-name">
-                                <?= htmlspecialchars($partner['name']) ?>
-                                <?php if ($partner['unread_count'] > 0): ?>
-                                    <span class="unread-badge"><?= $partner['unread_count'] ?></span>
-                                <?php endif; ?>
+                <div class="list-header">
+                    <i class="fas fa-users"></i>
+                    Students
+                </div>
+                <div class="students-container">
+                    <?php if (!empty($partners)): ?>
+                        <?php foreach ($partners as $partner): ?>
+                            <div class="student-item" data-student-id="<?= $partner['id'] ?>" data-student-name="<?= htmlspecialchars($partner['name']) ?>">
+                                <div class="student-avatar">
+                                    <?= strtoupper(substr($partner['name'], 0, 1)) ?>
+                                </div>
+                                <div class="student-info">
+                                    <div class="student-name">
+                                        <?= htmlspecialchars($partner['name']) ?>
+                                        <?php if ($partner['unread_count'] > 0): ?>
+                                            <span class="unread-badge"><?= $partner['unread_count'] ?></span>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="student-details">
+                                        Student
+                                    </div>
+                                </div>
                             </div>
-                            <div class="student-info">
-                                Student
-                            </div>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <div class="empty-state">
+                            <i class="fas fa-user-graduate"></i>
+                            <p>No students available</p>
                         </div>
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <div class="student-item">
-                        <div class="student-name">No conversations yet</div>
-                        <div class="student-info">Start a conversation with a student</div>
-                    </div>
-                <?php endif; ?>
+                    <?php endif; ?>
+                </div>
             </div>
             
             <div class="chat-container">
-                <div class="chat-header">
-                    <span id="current-student-name">Select a student to start chatting</span>
-                </div>
-                <div class="messages-area" id="messages-area">
-                    <div class="no-chat-selected">
-                        Please select a student to view messages
+                <div class="chat-header" id="chat-header" style="display: none;">
+                    <div class="chat-header-avatar" id="header-avatar">S</div>
+                    <div class="chat-header-info">
+                        <div class="chat-header-name" id="header-name">Student Name</div>
+                        <div class="chat-header-status">Online</div>
                     </div>
                 </div>
-                <div class="message-input" style="display: none;" id="message-input">
-                    <textarea placeholder="Type your message..." id="message-text"></textarea>
-                    <button class="send-btn" onclick="sendMessage()">Send</button>
+                
+                <div class="messages-area" id="messages-area">
+                    <div class="no-chat-selected">
+                        <i class="fas fa-comment-dots"></i>
+                        <h3>Select a Student</h3>
+                        <p>Choose a student from the list to start messaging</p>
+                    </div>
+                </div>
+                
+                <div class="message-input-container" id="message-input" style="display: none;">
+                    <div class="message-input-wrapper">
+                        <textarea 
+                            class="message-input" 
+                            id="message-text" 
+                            placeholder="Type your message here..."
+                            rows="1"
+                        ></textarea>
+                        <button class="send-btn" onclick="sendMessage()">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -207,10 +452,13 @@ $partners = getConversationPartners($admin_id, 'admin');
                 this.classList.add('active');
                 
                 currentStudentId = this.dataset.studentId;
-                currentStudentName = this.querySelector('.student-name').textContent.split(' ')[0];
+                currentStudentName = this.dataset.studentName;
                 
-                document.getElementById('current-student-name').textContent = `Chat with ${currentStudentName}`;
-                document.getElementById('message-input').style.display = 'flex';
+                // Update chat header
+                document.getElementById('chat-header').style.display = 'flex';
+                document.getElementById('header-name').textContent = currentStudentName;
+                document.getElementById('header-avatar').textContent = currentStudentName.charAt(0).toUpperCase();
+                document.getElementById('message-input').style.display = 'block';
                 
                 loadMessages();
                 startAutoRefresh();
@@ -228,20 +476,27 @@ $partners = getConversationPartners($admin_id, 'admin');
                     messagesArea.innerHTML = '';
                     
                     if (messages.length === 0) {
-                        messagesArea.innerHTML = '<div class="no-chat-selected">No messages yet. Start the conversation!</div>';
+                        messagesArea.innerHTML = `
+                            <div class="no-chat-selected">
+                                <i class="fas fa-comment-slash"></i>
+                                <h3>No Messages Yet</h3>
+                                <p>Start the conversation by sending a message</p>
+                            </div>
+                        `;
                         return;
                     }
                     
                     messages.forEach(msg => {
                         const messageDiv = document.createElement('div');
-                        messageDiv.className = `message ${msg.sender_type === 'admin' ? 'sent' : 'received'}`;
+                        const isSent = msg.sender_type === 'admin';
+                        messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
                         
                         const time = new Date(msg.created_at).toLocaleTimeString([], { 
                             hour: '2-digit', minute: '2-digit' 
                         });
                         
                         messageDiv.innerHTML = `
-                            <div>${msg.message}</div>
+                            <div class="message-content">${msg.message}</div>
                             <div class="message-time">${time}</div>
                         `;
                         
@@ -249,6 +504,9 @@ $partners = getConversationPartners($admin_id, 'admin');
                     });
                     
                     messagesArea.scrollTop = messagesArea.scrollHeight;
+                })
+                .catch(error => {
+                    console.error('Error loading messages:', error);
                 });
         }
 
@@ -270,7 +528,13 @@ $partners = getConversationPartners($admin_id, 'admin');
                 if (result.success) {
                     document.getElementById('message-text').value = '';
                     loadMessages();
+                } else {
+                    alert('Failed to send message. Please try again.');
                 }
+            })
+            .catch(error => {
+                console.error('Error sending message:', error);
+                alert('Error sending message. Please try again.');
             });
         }
 
@@ -288,6 +552,12 @@ $partners = getConversationPartners($admin_id, 'admin');
                 e.preventDefault();
                 sendMessage();
             }
+        });
+
+        // Auto-resize textarea
+        document.getElementById('message-text')?.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
         });
 
         // Stop auto-refresh when leaving page

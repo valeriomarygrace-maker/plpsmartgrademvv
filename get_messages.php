@@ -19,7 +19,7 @@ if ($user_type === 'student') {
 // Mark unread messages as read
 $unread_ids = [];
 foreach ($messages as $msg) {
-    if (!$msg['is_read'] && $msg['receiver_id'] == $user_id) {
+    if (!$msg['is_read'] && $msg['receiver_id'] == $user_id && $msg['receiver_type'] == $user_type) {
         $unread_ids[] = $msg['id'];
     }
 }
