@@ -815,7 +815,7 @@ function searchStudents($query) {
                 </a>
             </li>
             <li class="nav-item">
-                <a href="student-messages.php" class="nav-link active">
+                <a href="student-messages.php" class="nav-link">
                     <i class="fas fa-envelope"></i>
                     Messages
                     <?php if (getUnreadMessageCount($_SESSION['user_id'], 'student') > 0): ?>

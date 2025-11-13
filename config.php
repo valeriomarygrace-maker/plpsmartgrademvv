@@ -480,99 +480,34 @@ if (isset($_SESSION['created']) && (time() - $_SESSION['created'] > 28800)) {
     }
 }
 /**
- * Messaging Functions
+ * Get unread message count for user
  */
-function sendMessage($from_user_id, $from_user_type, $to_user_id, $to_user_type, $subject, $message, $priority = 'normal') {
-    $message_data = [
-        'from_user_id' => $from_user_id,
-        'from_user_type' => $from_user_type,
-        'to_user_id' => $to_user_id,
-        'to_user_type' => $to_user_type,
-        'subject' => $subject,
-        'message' => $message,
-        'priority' => $priority,
-        'is_read' => false,
-        'created_at' => date('Y-m-d H:i:s')
-    ];
-    
-    return supabaseInsert('messages', $message_data);
-}
-
-function getMessagesForUser($user_id, $user_type, $limit = 50, $offset = 0) {
-    global $supabase_url, $supabase_key;
-    
-    $url = $supabase_url . "/rest/v1/messages?to_user_id=eq.$user_id&to_user_type=eq.$user_type&order=created_at.desc&limit=$limit&offset=$offset";
-    
-    $ch = curl_init();
-    $headers = [
-        'apikey: ' . $supabase_key,
-        'Authorization: Bearer ' . $supabase_key,
-        'Content-Type: ' . 'application/json'
-    ];
-    
-    curl_setopt_array($ch, [
-        CURLOPT_URL => $url,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER => $headers,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_TIMEOUT => 30,
-    ]);
-    
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $error = curl_error($ch);
-    curl_close($ch);
-    
-    if ($error) {
-        error_log("cURL Error: $error");
-        return false;
-    }
-    
-    if ($httpCode >= 400) {
-        error_log("HTTP Error $httpCode for messages");
-        return false;
-    }
-    
-    $result = json_decode($response, true);
-    return $result ?: [];
-}
-
 function getUnreadMessageCount($user_id, $user_type) {
-    $messages = getMessagesForUser($user_id, $user_type, 1000);
-    if (!$messages) return 0;
+    $filters = [
+        'receiver_id' => $user_id,
+        'receiver_type' => $user_type,
+        'is_read' => false
+    ];
     
-    $unread = 0;
-    foreach ($messages as $message) {
-        if (!$message['is_read']) {
-            $unread++;
-        }
-    }
-    return $unread;
+    $messages = supabaseFetch('messages', $filters);
+    return $messages ? count($messages) : 0;
 }
 
-function markMessageAsRead($message_id) {
-    return supabaseUpdate('messages', ['is_read' => true], ['id' => $message_id]);
-}
-
-function getMessageById($message_id) {
-    $messages = supabaseFetch('messages', ['id' => $message_id]);
-    return $messages && count($messages) > 0 ? $messages[0] : null;
-}
-
-function deleteMessage($message_id) {
-    return supabaseDelete('messages', ['id' => $message_id]);
-}
-
-function getSentMessages($user_id, $user_type, $limit = 50) {
+/**
+ * Get recent conversations for user
+ */
+function getRecentConversations($user_id, $user_type) {
     global $supabase_url, $supabase_key;
     
-    $url = $supabase_url . "/rest/v1/messages?from_user_id=eq.$user_id&from_user_type=eq.$user_type&order=created_at.desc&limit=$limit";
+    $opposite_type = $user_type === 'admin' ? 'student' : 'admin';
+    
+    $url = $supabase_url . "/rest/v1/messages?select=*&or=(sender_id.eq.{$user_id},receiver_id.eq.{$user_id})&order=created_at.desc";
     
     $ch = curl_init();
     $headers = [
         'apikey: ' . $supabase_key,
         'Authorization: Bearer ' . $supabase_key,
-        'Content-Type: ' . 'application/json'
+        'Content-Type: application/json'
     ];
     
     curl_setopt_array($ch, [
@@ -585,20 +520,35 @@ function getSentMessages($user_id, $user_type, $limit = 50) {
     
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $error = curl_error($ch);
     curl_close($ch);
     
-    if ($error) {
-        error_log("cURL Error: $error");
-        return false;
+    if ($httpCode === 200) {
+        $messages = json_decode($response, true) ?: [];
+        
+        // Group by conversation partner
+        $conversations = [];
+        foreach ($messages as $message) {
+            $partner_id = $message['sender_id'] == $user_id ? $message['receiver_id'] : $message['sender_id'];
+            $key = $partner_id . '_' . $opposite_type;
+            
+            if (!isset($conversations[$key])) {
+                $conversations[$key] = [
+                    'partner_id' => $partner_id,
+                    'partner_type' => $opposite_type,
+                    'last_message' => $message['message'],
+                    'last_message_time' => $message['created_at'],
+                    'unread_count' => 0
+                ];
+            }
+            
+            if (!$message['is_read'] && $message['receiver_id'] == $user_id) {
+                $conversations[$key]['unread_count']++;
+            }
+        }
+        
+        return array_values($conversations);
     }
     
-    if ($httpCode >= 400) {
-        error_log("HTTP Error $httpCode for sent messages");
-        return false;
-    }
-    
-    $result = json_decode($response, true);
-    return $result ?: [];
+    return [];
 }
 ?>
