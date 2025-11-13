@@ -3,7 +3,7 @@
 $supabase_url = getenv('SUPABASE_URL') ?: 'https://xwvrgpxcceivakzrwwji.supabase.co';
 $supabase_key = getenv('SUPABASE_KEY') ?: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh3dnJncHhjY2VpdmFrenJ3d2ppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE3MjQ0NzQsImV4cCI6MjA3NzMwMDQ3NH0.ovd8v3lqsYtJU78D4iM6CyAyvi6jK4FUbYUjydFi4FM';
 
-// Enhanced Session Configuration
+// Simulan ang session sa VERY TOP
 if (session_status() === PHP_SESSION_NONE) {
     session_set_cookie_params([
         'lifetime' => 86400,
@@ -17,7 +17,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // Debug session
-error_log("=== SESSION DEBUG ===");
+error_log("=== CONFIG.PHP LOADED ===");
 error_log("Session ID: " . session_id());
 error_log("Session Status: " . session_status());
 error_log("Session Data: " . print_r($_SESSION, true));
@@ -238,9 +238,10 @@ function getStudentSubjects($student_id) {
  * Session Security Functions
  */
 function regenerateSession() {
+    $old_session_id = session_id();
     session_regenerate_id(true);
     $_SESSION['created'] = time();
-    error_log("Session regenerated: " . session_id());
+    error_log("Session regenerated from $old_session_id to " . session_id());
 }
 
 function sanitizeInput($data) {
@@ -336,5 +337,9 @@ function requireAdminRole() {
     }
     
     error_log("requireAdminRole: User is admin, access granted");
+}
+
+function isLoginPage() {
+    return basename($_SERVER['PHP_SELF']) === 'login.php';
 }
 ?>

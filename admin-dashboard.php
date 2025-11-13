@@ -1,15 +1,10 @@
 <?php
 require_once 'config.php';
 
-// Start session if not already started
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
 // Enhanced debug logging
-error_log("=== ADMIN DASHBOARD ACCESS ===");
+error_log("=== ADMIN DASHBOARD ACCESS ATTEMPT ===");
 error_log("Session ID: " . session_id());
-error_log("Session Data: " . print_r($_SESSION, true));
+error_log("Initial Session Data: " . print_r($_SESSION, true));
 
 // Check if user is logged in and has correct role
 if (!isLoggedIn()) {
@@ -19,10 +14,14 @@ if (!isLoggedIn()) {
 }
 
 // For admin dashboard - require admin role
-requireAdminRole();
+if ($_SESSION['user_type'] !== 'admin') {
+    error_log("User is not admin. User type: " . ($_SESSION['user_type'] ?? 'UNKNOWN') . " - Redirecting to login");
+    header('Location: login.php');
+    exit;
+}
 
 // If we get here, user is logged in as admin
-error_log("Admin access granted to dashboard");
+error_log("Admin access granted to dashboard - User: " . $_SESSION['user_email']);
 
 // Initialize variables
 $admin = null;
@@ -38,8 +37,12 @@ try {
     if (!$admin) {
         $error_message = 'Admin record not found.';
         error_log("Admin record not found for email: " . $_SESSION['user_email']);
+        // If admin record not found, log out user
+        session_destroy();
+        header('Location: login.php');
+        exit;
     } else {
-        error_log("Admin data retrieved: " . $admin['fullname']);
+        error_log("Admin data retrieved successfully: " . $admin['fullname']);
         
         // Get total students count
         $students = supabaseFetchAll('students');

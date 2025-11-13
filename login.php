@@ -7,6 +7,18 @@ $success = '';
 $showSignupModal = false;
 $email = '';
 
+// Check if user is already logged in
+if (isLoggedIn()) {
+    error_log("User already logged in, redirecting to appropriate dashboard");
+    if ($_SESSION['user_type'] === 'admin') {
+        header('Location: admin-dashboard.php');
+        exit;
+    } else {
+        header('Location: student-dashboard.php');
+        exit;
+    }
+}
+
 // Handle login form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && isset($_POST['password']) && !isset($_POST['signup'])) {
     $email = sanitizeInput($_POST['email']);
@@ -15,7 +27,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && isset($_P
     // Debug logging
     error_log("=== LOGIN ATTEMPT STARTED ===");
     error_log("Email: $email");
-    error_log("Session ID: " . session_id());
+    error_log("Session ID before login: " . session_id());
+    error_log("Current Session Data: " . print_r($_SESSION, true));
     
     // Validate PLP email
     if (!isValidPLPEmail($email)) {
@@ -31,9 +44,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && isset($_P
             if (verifyPassword($password, $admin['password'])) {
                 error_log("ADMIN PASSWORD VERIFIED SUCCESSFULLY");
                 
+                // Clear any existing session data
+                $_SESSION = array();
+                
                 // Regenerate session for security
                 regenerateSession();
                 
+                // Set session variables
                 $_SESSION['logged_in'] = true;
                 $_SESSION['user_email'] = $email;
                 $_SESSION['user_type'] = 'admin';
@@ -41,14 +58,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && isset($_P
                 $_SESSION['user_name'] = $admin['fullname'];
                 $_SESSION['login_time'] = time();
                 
-                error_log("SESSION SET - User type: " . $_SESSION['user_type']);
-                error_log("SESSION DATA: " . print_r($_SESSION, true));
+                error_log("SESSION SET SUCCESSFULLY - User type: " . $_SESSION['user_type']);
+                error_log("NEW SESSION DATA: " . print_r($_SESSION, true));
                 
-                // Force session write and redirect
+                // Force immediate session write
                 session_write_close();
-                error_log("Redirecting to admin-dashboard.php");
+                
+                error_log("REDIRECTING TO ADMIN-DASHBOARD.PHP");
+                
+                // Use JavaScript redirect as backup
+                echo '<script>window.location.href = "admin-dashboard.php";</script>';
+                // PHP redirect
                 header('Location: admin-dashboard.php');
                 exit;
+                
             } else {
                 $error = 'Invalid password. Please try again.';
                 error_log("ADMIN PASSWORD VERIFICATION FAILED");
@@ -66,6 +89,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && isset($_P
                     error_log("STUDENT HAS NO PASSWORD SET");
                 } elseif (verifyPassword($password, $student['password'])) {
                     error_log("STUDENT PASSWORD VERIFIED SUCCESSFULLY");
+                    
+                    // Clear any existing session data
+                    $_SESSION = array();
                     
                     // Regenerate session for security
                     regenerateSession();
