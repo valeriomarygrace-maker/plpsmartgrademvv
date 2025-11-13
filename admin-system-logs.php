@@ -33,6 +33,9 @@ $system_logs = getSystemLogs($filters, $limit, $offset);
 $total_logs = countSystemLogs($filters);
 $total_pages = ceil($total_logs / $limit);
 $current_page = floor($offset / $limit) + 1;
+
+// Get admin info for sidebar
+$admin = getAdminByEmail($_SESSION['user_email']);
 ?>
 
 <!DOCTYPE html>
@@ -44,13 +47,16 @@ $current_page = floor($offset / $limit) + 1;
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* Add your existing admin styles here */
         :root {
             --plp-green: #006341;
             --plp-green-light: #008856;
             --plp-green-lighter: #e0f2e9;
             --plp-green-pale: #f5fbf8;
             --plp-green-gradient: linear-gradient(135deg, #006341 0%, #008856 100%);
+            --plp-gold: #FFD700;
+            --plp-dark-green: #004d33;
+            --plp-light-green: #f8fcf9;
+            --plp-pale-green: #e8f5e9;
             --text-dark: #2d3748;
             --text-medium: #4a5568;
             --text-light: #718096;
@@ -59,6 +65,178 @@ $current_page = floor($offset / $limit) + 1;
             --box-shadow: 0 4px 12px rgba(0, 99, 65, 0.1);
             --box-shadow-lg: 0 8px 24px rgba(0, 99, 65, 0.15);
             --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            --danger: #dc3545;
+            --warning: #ffc107;
+            --success: #28a745;
+            --info: #17a2b8;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: var(--plp-green-pale);
+            display: flex;
+            min-height: 100vh;
+            color: var(--text-dark);
+            line-height: 1.6;
+        }
+
+        .sidebar {
+            width: 320px;
+            background: white;
+            box-shadow: var(--box-shadow);
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            position: sticky;
+            top: 0;
+            border-right: 1px solid rgba(0, 99, 65, 0.1);
+        }
+
+        .sidebar-header {
+            text-align: center;
+            border-bottom: 1px solid rgba(0, 99, 65, 0.1);
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo {
+            width: 130px;
+            height: 130px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            transition: var(--transition);
+        }
+
+        .logo:hover {
+            transform: scale(1.05);
+        }
+
+        .logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            padding: 5px;
+        }
+
+        .portal-title {
+            color: var(--plp-green);
+            font-size: 1.3rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .admin-email {
+            color: var(--text-medium);
+            font-size: 0.85rem;
+            margin-bottom: 1rem;
+            word-break: break-all;
+            padding: 0.5rem;
+            border-radius: 6px;
+            font-weight: 500;
+        }
+
+        .nav-menu {
+            list-style: none;
+            flex-grow: 1;
+            margin-top: 0.7rem;
+        }
+
+        .nav-item {
+            margin-bottom: 0.7rem;
+            position: relative;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.50rem;
+            color: var(--text-medium);
+            text-decoration: none;
+            border-radius: var(--border-radius);
+            transition: var(--transition);
+            font-weight: 500;
+        }
+
+        .nav-link:hover:not(.active) {
+            background: var(--plp-green-lighter);
+            color: var(--plp-green);
+            transform: translateY(-3px);
+        }
+
+        .nav-link.active {
+            background: var(--plp-green-gradient);
+            color: white;
+            box-shadow: var(--box-shadow);
+        }
+
+        .sidebar-footer {
+            border-top: 3px solid rgba(0, 99, 65, 0.1);
+        }
+
+        .logout-btn {
+            margin-top:1rem;
+            background: transparent;
+            color: var(--text-medium);
+            padding: 0.75rem 1rem;
+            border: none;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            width: 100%;
+            font-weight: 500;
+            transition: var(--transition);
+        }
+
+        .logout-btn:hover {
+            background: #fee2e2;
+            color: #b91c1c;
+            transform: translateX(5px);
+        }
+
+        .main-content {
+            flex: 1;
+            padding: 1rem 2.5rem; 
+            background: var(--plp-green-pale);
+            max-width: 100%;
+            margin: 0 auto;
+            width: 100%;
+            overflow-y: auto;
+        }
+
+        .header {
+            background: white;
+            padding: 0.6rem 1.25rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            margin-bottom: 1.5rem; 
+            background: var(--plp-green-gradient);
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .welcome {
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
         }
 
         .container {
@@ -197,7 +375,7 @@ $current_page = floor($offset / $limit) + 1;
             color: #92400e;
         }
 
-        .action-other {
+        .action-signup {
             background: #e0e7ff;
             color: #3730a3;
         }
@@ -226,15 +404,205 @@ $current_page = floor($offset / $limit) + 1;
             margin-bottom: 1rem;
             color: var(--plp-green-lighter);
         }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+            }
+            
+            .main-content {
+                padding: 1.5rem;
+            }
+            
+            .header {
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }
+            
+            .filters-form {
+                grid-template-columns: 1fr;
+            }
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal.show {
+            display: flex;
+            opacity: 1;
+        }
+
+
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--box-shadow-lg);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+            transform: translateY(20px);
+            transition: transform 0.3s ease;
+        }
+
+        .modal.show .modal-content {
+            transform: translateY(0);
+        }
+
+        .modal-title {
+            color: var(--plp-green);
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+
+        .modal-body {
+            margin-bottom: 2rem;
+            color: var(--text-medium);
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+        }
+
+        .modal-btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: var(--border-radius);
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .modal-btn-cancel {
+            background: var(--plp-green-lighter);
+            color: var(--plp-green);
+        }
+
+        .modal-btn-cancel:hover {
+            background: var(--plp-green-light);
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .modal-btn-confirm {
+            background: var(--plp-green-gradient);
+            color: white;
+        }
+
+        .modal-btn-confirm:hover {
+            background: linear-gradient(135deg, var(--plp-green-light), var(--plp-green));
+            transform: translateY(-2px);
+        }
+        .unread-badge {
+            background: #ff4444;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 0.75rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: auto;
+        }
+
+        .sidebar-badge {
+            background: #ff4444;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 0.75rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: auto;
+            font-weight: 600;
+            animation: pulse 2s infinite;
+        }
     </style>
 </head>
 <body>
-    <!-- Include your admin sidebar and header -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <div class="logo-container">
+                <div class="logo">
+                    <img src="plplogo.png" alt="PLP Logo">
+                </div>
+            </div>
+            <div class="portal-title">PLPSMARTGRADE</div>
+            <div class="admin-email"><?php echo htmlspecialchars($admin['email']); ?></div>
+        </div>
+        
+        <ul class="nav-menu">
+            <li class="nav-item">
+                <a href="admin-dashboard.php" class="nav-link">
+                    <i class="fas fa-chart-line"></i>
+                    Dashboard
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="admin-students.php" class="nav-link">
+                    <i class="fas fa-users"></i>
+                    Students
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="admin-subjects.php" class="nav-link">
+                    <i class="fas fa-book"></i>
+                    Subjects
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="admin-messages.php" class="nav-link">
+                    <i class="fas fa-comments"></i>
+                    Messages
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="admin-system-logs.php" class="nav-link active">
+                    <i class="fas fa-clipboard-list"></i>
+                    System Logs
+                </a>
+            </li>
+        </ul>
+
+        <div class="sidebar-footer">
+            <a href="logout.php" class="logout-btn">
+                <i class="fas fa-sign-out-alt"></i>
+                Logout
+            </a>
+        </div>
+    </div>
 
     <div class="main-content">
         <div class="header">
-            <h1>System Logs</h1>
-            <p>Monitor user activities and system events</p>
+            <div class="welcome">System Logs</div>
         </div>
 
         <div class="container">
@@ -255,6 +623,7 @@ $current_page = floor($offset / $limit) + 1;
                         <option value="">All Actions</option>
                         <option value="login" <?php echo isset($filters['action']) && $filters['action'] === 'login' ? 'selected' : ''; ?>>Login</option>
                         <option value="logout" <?php echo isset($filters['action']) && $filters['action'] === 'logout' ? 'selected' : ''; ?>>Logout</option>
+                        <option value="signup" <?php echo isset($filters['action']) && $filters['action'] === 'signup' ? 'selected' : ''; ?>>Signup</option>
                     </select>
                 </div>
 
@@ -288,8 +657,6 @@ $current_page = floor($offset / $limit) + 1;
                                 <th>User Email</th>
                                 <th>User Type</th>
                                 <th>Action</th>
-                                <th>Description</th>
-                                <th>IP Address</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -307,8 +674,6 @@ $current_page = floor($offset / $limit) + 1;
                                             <?php echo ucfirst($log['action']); ?>
                                         </span>
                                     </td>
-                                    <td><?php echo htmlspecialchars($log['description']); ?></td>
-                                    <td><?php echo htmlspecialchars($log['ip_address']); ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
@@ -346,5 +711,59 @@ $current_page = floor($offset / $limit) + 1;
             <?php endif; ?>
         </div>
     </div>
+        <!-- Logout Modal -->
+    <div class="modal" id="logoutModal">
+        <div class="modal-content" style="max-width: 450px; text-align: center;">
+            <h3 style="color: var(--plp-green); font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem;">
+                Confirm Logout
+            </h3>
+            <div style="color: var(--text-medium); margin-bottom: 2rem; line-height: 1.6;">
+                Are you sure you want to logout? You'll need<br>
+                to log in again to access your account.
+            </div>
+            <div style="display: flex; justify-content: center; gap: 1rem;">
+                <button class="modal-btn modal-btn-cancel" id="cancelLogout" style="min-width: 120px;">
+                    Cancel
+                </button>
+                <button class="modal-btn modal-btn-confirm" id="confirmLogout" style="min-width: 120px;">
+                    Yes, Logout
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Logout modal functionality
+        const logoutBtn = document.querySelector('.logout-btn');
+        const logoutModal = document.getElementById('logoutModal');
+        const cancelLogout = document.getElementById('cancelLogout');
+        const confirmLogout = document.getElementById('confirmLogout');
+
+        // Show modal when clicking logout button
+        logoutBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            logoutModal.classList.add('show');
+        });
+
+        // Hide modal when clicking cancel
+        cancelLogout.addEventListener('click', () => {
+            logoutModal.classList.remove('show');
+        });
+
+        // Handle logout confirmation
+        confirmLogout.addEventListener('click', () => {
+            window.location.href = 'logout.php';
+        });
+
+        // Hide modal when clicking outside the modal content
+        const modals = [addSubjectModal, editSubjectModal, archiveSubjectModal, logoutModal];
+        modals.forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.remove('show');
+                }
+            });
+        });
+    </script>
 </body>
 </html>
