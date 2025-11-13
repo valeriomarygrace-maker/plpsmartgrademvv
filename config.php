@@ -3,25 +3,17 @@
 $supabase_url = getenv('SUPABASE_URL') ?: 'https://xwvrgpxcceivakzrwwji.supabase.co';
 $supabase_key = getenv('SUPABASE_KEY') ?: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh3dnJncHhjY2VpdmFrenJ3d2ppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE3MjQ0NzQsImV4cCI6MjA3NzMwMDQ3NH0.ovd8v3lqsYtJU78D4iM6CyAyvi6jK4FUbYUjydFi4FM';
 
-// Enhanced session security
+// Start session only if not already started
 if (session_status() === PHP_SESSION_NONE) {
     session_set_cookie_params([
-        'lifetime' => 86400, // 24 hours
+        'lifetime' => 0,
         'path' => '/',
-        'domain' => $_SERVER['HTTP_HOST'] ?? '',
+        'domain' => '',
         'secure' => isset($_SERVER['HTTPS']),
         'httponly' => true,
-        'samesite' => 'Lax'
+        'samesite' => 'Strict'
     ]);
     session_start();
-    
-    // Regenerate session ID periodically for security
-    if (!isset($_SESSION['created'])) {
-        $_SESSION['created'] = time();
-    } else if (time() - $_SESSION['created'] > 1800) { // 30 minutes
-        session_regenerate_id(true);
-        $_SESSION['created'] = time();
-    }
 }
 
 /**
@@ -480,7 +472,7 @@ function logUserAction($user_email, $user_type, $action, $description = '') {
 }
 
 /**
- * Messaging Functions - UPDATED AND IMPROVED
+ * Messaging Functions
  */
 
 /**
@@ -498,247 +490,7 @@ function getUnreadMessageCount($user_id, $user_type) {
 }
 
 /**
- * Get recent conversations for user
- */
-function getRecentConversations($user_id, $user_type) {
-    global $supabase_url, $supabase_key;
-    
-    $opposite_type = $user_type === 'admin' ? 'student' : 'admin';
-    
-    $url = $supabase_url . "/rest/v1/messages?select=*&or=(sender_id.eq.{$user_id},receiver_id.eq.{$user_id})&order=created_at.desc";
-    
-    $ch = curl_init();
-    $headers = [
-        'apikey: ' . $supabase_key,
-        'Authorization: Bearer ' . $supabase_key,
-        'Content-Type: application/json'
-    ];
-    
-    curl_setopt_array($ch, [
-        CURLOPT_URL => $url,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER => $headers,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_TIMEOUT => 30,
-    ]);
-    
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    
-    if ($httpCode === 200) {
-        $messages = json_decode($response, true) ?: [];
-        
-        // Group by conversation partner
-        $conversations = [];
-        foreach ($messages as $message) {
-            $partner_id = $message['sender_id'] == $user_id ? $message['receiver_id'] : $message['sender_id'];
-            $key = $partner_id . '_' . $opposite_type;
-            
-            if (!isset($conversations[$key])) {
-                $conversations[$key] = [
-                    'partner_id' => $partner_id,
-                    'partner_type' => $opposite_type,
-                    'last_message' => $message['message'],
-                    'last_message_time' => $message['created_at'],
-                    'unread_count' => 0
-                ];
-            }
-            
-            if (!$message['is_read'] && $message['receiver_id'] == $user_id) {
-                $conversations[$key]['unread_count']++;
-            }
-        }
-        
-        return array_values($conversations);
-    }
-    
-    return [];
-}
 
-/**
- * Get messages between two specific users - IMPROVED VERSION
- */
-function getMessagesBetweenUsers($user1_id, $user1_type, $user2_id, $user2_type) {
-    global $supabase_url, $supabase_key;
-    
-    // Build the query to get messages between two specific users
-    $url = $supabase_url . "/rest/v1/messages?select=*";
-    
-    // Build the complex OR condition for both directions of messaging
-    $conditions = [
-        "and(sender_id.eq.{$user1_id},sender_type.eq.{$user1_type},receiver_id.eq.{$user2_id},receiver_type.eq.{$user2_type})",
-        "and(sender_id.eq.{$user2_id},sender_type.eq.{$user2_type},receiver_id.eq.{$user1_id},receiver_type.eq.{$user1_type})"
-    ];
-    
-    $url .= "&or=(" . implode(",", $conditions) . ")";
-    $url .= "&order=created_at.asc";
-    
-    $ch = curl_init();
-    $headers = [
-        'apikey: ' . $supabase_key,
-        'Authorization: Bearer ' . $supabase_key,
-        'Content-Type: application/json'
-    ];
-    
-    curl_setopt_array($ch, [
-        CURLOPT_URL => $url,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER => $headers,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_TIMEOUT => 30,
-    ]);
-    
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $error = curl_error($ch);
-    curl_close($ch);
-    
-    if ($error) {
-        error_log("cURL Error in getMessagesBetweenUsers: $error");
-        return [];
-    }
-    
-    if ($httpCode >= 400) {
-        error_log("HTTP Error $httpCode in getMessagesBetweenUsers for URL: $url");
-        return [];
-    }
-    
-    $result = json_decode($response, true);
-    
-    if (!is_array($result)) {
-        error_log("Invalid response format from getMessagesBetweenUsers");
-        return [];
-    }
-    
-    return $result;
-}
 
-/**
- * Mark messages as read - IMPROVED VERSION
- */
-function markMessagesAsRead($sender_id, $sender_type, $receiver_id, $receiver_type) {
-    global $supabase_url, $supabase_key;
-    
-    // Use PATCH to update multiple records
-    $url = $supabase_url . "/rest/v1/messages";
-    
-    // Build the filter for unread messages from this sender to this receiver
-    $filters = [
-        "sender_id=eq.{$sender_id}",
-        "sender_type=eq.{$sender_type}",
-        "receiver_id=eq.{$receiver_id}",
-        "receiver_type=eq.{$receiver_type}",
-        "is_read=eq.false"
-    ];
-    
-    $url .= "?" . implode('&', $filters);
-    
-    $ch = curl_init();
-    $headers = [
-        'apikey: ' . $supabase_key,
-        'Authorization: Bearer ' . $supabase_key,
-        'Content-Type: application/json',
-        'Prefer: return=minimal'
-    ];
-    
-    curl_setopt_array($ch, [
-        CURLOPT_URL => $url,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_CUSTOMREQUEST => 'PATCH',
-        CURLOPT_POSTFIELDS => json_encode(['is_read' => true]),
-        CURLOPT_HTTPHEADER => $headers,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_TIMEOUT => 30,
-    ]);
-    
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $error = curl_error($ch);
-    curl_close($ch);
-    
-    if ($error) {
-        error_log("cURL Error in markMessagesAsRead: $error");
-        return false;
-    }
-    
-    return $httpCode === 200 || $httpCode === 204;
-}
 
-/**
- * Get messages for student (for student-messages.php)
- */
-function getStudentMessages($student_id) {
-    global $supabase_url, $supabase_key;
-    
-    $url = $supabase_url . "/rest/v1/messages?select=*&or=(and(sender_id.eq.{$student_id},sender_type.eq.student),and(receiver_id.eq.{$student_id},receiver_type.eq.student))&order=created_at.asc";
-    
-    $ch = curl_init();
-    $headers = [
-        'apikey: ' . $supabase_key,
-        'Authorization: Bearer ' . $supabase_key,
-        'Content-Type: application/json'
-    ];
-    
-    curl_setopt_array($ch, [
-        CURLOPT_URL => $url,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER => $headers,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_TIMEOUT => 30,
-    ]);
-    
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    
-    if ($httpCode === 200) {
-        return json_decode($response, true) ?: [];
-    }
-    
-    return [];
-}
-
-/**
- * Get messages for admin (for admin-messages.php)
- */
-function getAdminMessages($admin_id) {
-    global $supabase_url, $supabase_key;
-    
-    $url = $supabase_url . "/rest/v1/messages?select=*&or=(and(sender_id.eq.{$admin_id},sender_type.eq.admin),and(receiver_id.eq.{$admin_id},receiver_type.eq.admin))&order=created_at.asc";
-    
-    $ch = curl_init();
-    $headers = [
-        'apikey: ' . $supabase_key,
-        'Authorization: Bearer ' . $supabase_key,
-        'Content-Type: application/json'
-    ];
-    
-    curl_setopt_array($ch, [
-        CURLOPT_URL => $url,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER => $headers,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_TIMEOUT => 30,
-    ]);
-    
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    
-    if ($httpCode === 200) {
-        return json_decode($response, true) ?: [];
-    }
-    
-    return [];
-}
-
-// Session timeout check
-if (isset($_SESSION['created']) && (time() - $_SESSION['created'] > 28800)) {
-    session_destroy();
-    if (basename($_SERVER['PHP_SELF']) !== 'login.php') {
-        header('Location: login.php');
-        exit;
-    }
-}
 ?>

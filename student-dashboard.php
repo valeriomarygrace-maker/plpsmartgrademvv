@@ -7,6 +7,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+
 if (!isset($_SESSION['logged_in']) || $_SESSION['user_type'] !== 'student') {
     header('Location: login.php');
     exit;
@@ -26,6 +27,7 @@ $recent_scores = [];
 $performance_metrics = [];
 $semester_risk_data = [];
 $error_message = '';
+
 
 try {
     // Get student info using Supabase

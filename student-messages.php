@@ -760,11 +760,11 @@ $messages = getStudentMessages($student_id);
                     }
                     return response.json();
                 })
-                .then(result => {
+                .then(messages => {
                     const messagesArea = document.getElementById('messages-area');
                     messagesArea.innerHTML = '';
                     
-                    if (!result.success || !result.messages || result.messages.length === 0) {
+                    if (messages.length === 0) {
                         const noMessages = document.createElement('div');
                         noMessages.className = 'no-chat-selected';
                         noMessages.innerHTML = `
@@ -778,7 +778,7 @@ $messages = getStudentMessages($student_id);
                         return;
                     }
                     
-                    result.messages.forEach(msg => {
+                    messages.forEach(msg => {
                         const messageDiv = document.createElement('div');
                         messageDiv.className = `message ${msg.sender_type === 'student' ? 'sent' : 'received'}`;
                         
@@ -787,7 +787,7 @@ $messages = getStudentMessages($student_id);
                         });
                         
                         messageDiv.innerHTML = `
-                            <div class="message-content">${escapeHtml(msg.message)}</div>
+                            <div class="message-content">${msg.message}</div>
                             <div class="message-time">${time}</div>
                         `;
                         
@@ -873,7 +873,7 @@ $messages = getStudentMessages($student_id);
             if (refreshInterval) {
                 clearInterval(refreshInterval);
             }
-            refreshInterval = setInterval(loadMessages, 2000); // Refresh every 2 seconds
+            refreshInterval = setInterval(loadMessages, 3000);
         }
 
         // Enter key to send message
@@ -896,16 +896,6 @@ $messages = getStudentMessages($student_id);
                 clearInterval(refreshInterval);
             }
         });
-
-        // Utility function to escape HTML
-        function escapeHtml(unsafe) {
-            return unsafe
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&#039;");
-        }
     </script>
 </body>
 </html>
