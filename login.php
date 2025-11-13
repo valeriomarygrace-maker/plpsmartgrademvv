@@ -1,15 +1,13 @@
 <?php
 require_once 'config.php';
 
-// Initialize variables
 $error = '';
 $success = '';
 $showSignupModal = false;
 $email = '';
 
-// Check if user is already logged in
-if (isLoggedIn()) {
-    error_log("User already logged in, redirecting to appropriate dashboard");
+// Check if already logged in
+if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
     if ($_SESSION['user_type'] === 'admin') {
         header('Location: admin-dashboard.php');
         exit;
@@ -24,106 +22,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && isset($_P
     $email = sanitizeInput($_POST['email']);
     $password = $_POST['password'];
     
-    // Debug logging
-    error_log("=== LOGIN ATTEMPT STARTED ===");
-    error_log("Email: $email");
-    error_log("Session ID before login: " . session_id());
-    error_log("Current Session Data: " . print_r($_SESSION, true));
-    
-    // Validate PLP email
     if (!isValidPLPEmail($email)) {
         $error = 'Your email address is not valid.';
-        error_log("INVALID EMAIL FORMAT: $email");
     } else {
-        // First, check if it's an admin
+        // Check admin first
         $admin = getAdminByEmail($email);
         
         if ($admin) {
-            error_log("ADMIN FOUND: " . $admin['email']);
             // Admin login
             if (verifyPassword($password, $admin['password'])) {
-                error_log("ADMIN PASSWORD VERIFIED SUCCESSFULLY");
-                
-                // Clear any existing session data
-                $_SESSION = array();
-                
-                // Regenerate session for security
-                regenerateSession();
-                
-                // Set session variables
                 $_SESSION['logged_in'] = true;
                 $_SESSION['user_email'] = $email;
                 $_SESSION['user_type'] = 'admin';
                 $_SESSION['user_id'] = $admin['id'];
                 $_SESSION['user_name'] = $admin['fullname'];
-                $_SESSION['login_time'] = time();
                 
-                error_log("SESSION SET SUCCESSFULLY - User type: " . $_SESSION['user_type']);
-                error_log("NEW SESSION DATA: " . print_r($_SESSION, true));
-                
-                // Force immediate session write
-                session_write_close();
-                
-                error_log("REDIRECTING TO ADMIN-DASHBOARD.PHP");
-                
-                // Use JavaScript redirect as backup
-                echo '<script>window.location.href = "admin-dashboard.php";</script>';
-                // PHP redirect
                 header('Location: admin-dashboard.php');
                 exit;
-                
             } else {
                 $error = 'Invalid password. Please try again.';
-                error_log("ADMIN PASSWORD VERIFICATION FAILED");
             }
         } else {
-            // Check if email exists in students table
+            // Check student
             $student = getStudentByEmail($email);
             
             if ($student) {
-                error_log("STUDENT FOUND: " . $student['email']);
-                // Check if student has a password set
                 if (empty($student['password'])) {
                     $error = 'No password set for this account.';
                     $showSignupModal = true;
-                    error_log("STUDENT HAS NO PASSWORD SET");
                 } elseif (verifyPassword($password, $student['password'])) {
-                    error_log("STUDENT PASSWORD VERIFIED SUCCESSFULLY");
-                    
-                    // Clear any existing session data
-                    $_SESSION = array();
-                    
-                    // Regenerate session for security
-                    regenerateSession();
-                    
                     $_SESSION['logged_in'] = true;
                     $_SESSION['user_email'] = $email;
                     $_SESSION['user_type'] = 'student';
                     $_SESSION['user_id'] = $student['id'];
                     $_SESSION['user_name'] = $student['fullname'];
-                    $_SESSION['login_time'] = time();
                     
-                    error_log("SESSION SET - Redirecting to student dashboard");
-                    error_log("SESSION DATA: " . print_r($_SESSION, true));
-                    
-                    // Force session write and redirect
-                    session_write_close();
                     header('Location: student-dashboard.php');
                     exit;
                 } else {
                     $error = 'Invalid password. Please try again.';
-                    error_log("STUDENT PASSWORD VERIFICATION FAILED");
                 }
             } else {
                 $error = 'Email not found in our system. Please sign up first.';
                 $showSignupModal = true;
-                error_log("EMAIL NOT FOUND IN SYSTEM: $email");
             }
         }
     }
-    error_log("=== LOGIN ATTEMPT ENDED ===");
 }
-    
+
 // Handle signup
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
     $student_number = sanitizeInput($_POST['student_number']);
@@ -131,12 +77,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
     $email = sanitizeInput($_POST['email']);
     $password = $_POST['password'];
     $confirm_password = $_POST['confirm_password'];
-    $year_level = 2;
     $semester = sanitizeInput($_POST['semester']);
     $section = sanitizeInput($_POST['section']);
-    $course = 'BS Information Technology';
     
-    // Basic validation
     if (empty($student_number) || empty($fullname) || empty($email) || empty($password) || empty($semester) || empty($section)) {
         $error = 'All fields are required.';
         $showSignupModal = true;
@@ -150,25 +93,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
         $error = 'Password must be at least 6 characters long.';
         $showSignupModal = true;
     } else {
-        // Check if student already exists
         $existingStudent = getStudentByEmail($email);
         if ($existingStudent) {
             $error = 'Email is already exists.';
             $showSignupModal = true;
         } else {
-            // Insert new student with hashed password
             $studentData = [
                 'student_number' => $student_number,
                 'fullname' => $fullname,
                 'email' => $email,
                 'password' => hashPassword($password),
-                'year_level' => $year_level,
+                'year_level' => 2,
                 'semester' => $semester,
                 'section' => $section,
-                'course' => $course
+                'course' => 'BS Information Technology'
             ];
             
-            $result = supabaseInsert('students', $studentData);
+            $result = supabaseFetch('students', [], 'POST', $studentData);
             
             if ($result !== false) {
                 $success = 'Registration successful! ';

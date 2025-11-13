@@ -3,24 +3,10 @@
 $supabase_url = getenv('SUPABASE_URL') ?: 'https://xwvrgpxcceivakzrwwji.supabase.co';
 $supabase_key = getenv('SUPABASE_KEY') ?: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh3dnJncHhjY2VpdmFrenJ3d2ppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE3MjQ0NzQsImV4cCI6MjA3NzMwMDQ3NH0.ovd8v3lqsYtJU78D4iM6CyAyvi6jK4FUbYUjydFi4FM';
 
-// Simulan ang session sa VERY TOP
+// Start session
 if (session_status() === PHP_SESSION_NONE) {
-    session_set_cookie_params([
-        'lifetime' => 86400,
-        'path' => '/',
-        'domain' => '',
-        'secure' => false,
-        'httponly' => true,
-        'samesite' => 'Lax'
-    ]);
     session_start();
 }
-
-// Debug session
-error_log("=== CONFIG.PHP LOADED ===");
-error_log("Session ID: " . session_id());
-error_log("Session Status: " . session_status());
-error_log("Session Data: " . print_r($_SESSION, true));
 
 /**
  * Simple Supabase API Helper Function
@@ -30,7 +16,6 @@ function supabaseFetch($table, $filters = [], $method = 'GET', $data = null) {
     
     $url = $supabase_url . "/rest/v1/$table";
     
-    // Build query string from filters
     $queryParams = [];
     foreach ($filters as $key => $value) {
         if ($value !== null) {
@@ -70,111 +55,19 @@ function supabaseFetch($table, $filters = [], $method = 'GET', $data = null) {
     
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $error = curl_error($ch);
     curl_close($ch);
     
-    if ($error) {
-        error_log("cURL Error: $error");
-        return false;
-    }
-    
     if ($httpCode >= 400) {
-        error_log("HTTP Error $httpCode for table: $table");
         return false;
-    }
-    
-    // For DELETE requests, return success if no error
-    if ($method === 'DELETE' && $httpCode === 200) {
-        return true;
     }
     
     $result = json_decode($response, true);
     
-    // Handle empty responses
     if ($result === null && $httpCode === 200) {
         return true;
     }
     
     return $result;
-}
-
-/**
- * Insert data into Supabase table
- */
-function supabaseInsert($table, $data) {
-    $result = supabaseFetch($table, [], 'POST', $data);
-    
-    if ($result && isset($result[0])) {
-        return $result[0];
-    }
-    
-    return $result;
-}
-
-/**
- * Update data in Supabase table
- */
-function supabaseUpdate($table, $data, $filters) {
-    $result = supabaseFetch($table, $filters, 'PATCH', $data);
-    
-    if ($result && isset($result[0])) {
-        return $result[0];
-    }
-    
-    return $result;
-}
-
-/**
- * Delete data from Supabase table
- */
-function supabaseDelete($table, $filters) {
-    return supabaseFetch($table, $filters, 'DELETE');
-}
-
-/**
- * Fetch all records from a table with optional ordering
- */
-function supabaseFetchAll($table, $orderBy = null) {
-    global $supabase_url, $supabase_key;
-    
-    $url = $supabase_url . "/rest/v1/$table";
-    
-    if ($orderBy) {
-        $url .= "?order=$orderBy";
-    }
-    
-    $ch = curl_init();
-    $headers = [
-        'apikey: ' . $supabase_key,
-        'Authorization: Bearer ' . $supabase_key,
-        'Content-Type: ' . 'application/json'
-    ];
-    
-    curl_setopt_array($ch, [
-        CURLOPT_URL => $url,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER => $headers,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_TIMEOUT => 30,
-    ]);
-    
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $error = curl_error($ch);
-    curl_close($ch);
-    
-    if ($error) {
-        error_log("cURL Error: $error");
-        return false;
-    }
-    
-    if ($httpCode >= 400) {
-        error_log("HTTP Error $httpCode for table: $table");
-        return false;
-    }
-    
-    $result = json_decode($response, true);
-    return $result ?: [];
 }
 
 /**
@@ -185,9 +78,7 @@ function hashPassword($password) {
 }
 
 function verifyPassword($password, $hashedPassword) {
-    $result = password_verify($password, $hashedPassword);
-    error_log("Password verification: " . ($result ? "SUCCESS" : "FAILED"));
-    return $result;
+    return password_verify($password, $hashedPassword);
 }
 
 /**
@@ -195,110 +86,15 @@ function verifyPassword($password, $hashedPassword) {
  */
 function getStudentByEmail($email) {
     $students = supabaseFetch('students', ['email' => $email]);
-    error_log("Student search for $email: " . ($students ? "FOUND" : "NOT FOUND"));
     return $students && count($students) > 0 ? $students[0] : null;
-}
-
-function getStudentById($id) {
-    $students = supabaseFetch('students', ['id' => $id]);
-    return $students && count($students) > 0 ? $students[0] : null;
-}
-
-function studentExists($email) {
-    $students = supabaseFetch('students', ['email' => $email]);
-    return $students && count($students) > 0;
 }
 
 function isValidPLPEmail($email) {
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         return false;
     }
-    
     $domain = substr(strrchr($email, "@"), 1);
     return strtolower($domain) === 'plpasig.edu.ph';
-}
-
-/**
- * Subject Functions
- */
-function getSubjectById($id) {
-    $subjects = supabaseFetch('subjects', ['id' => $id]);
-    return $subjects && count($subjects) > 0 ? $subjects[0] : null;
-}
-
-function getSubjectsBySemester($semester) {
-    return supabaseFetch('subjects', ['semester' => $semester]);
-}
-
-function getStudentSubjects($student_id) {
-    return supabaseFetch('student_subjects', ['student_id' => $student_id]);
-}
-
-/**
- * Session Security Functions
- */
-function regenerateSession() {
-    $old_session_id = session_id();
-    session_regenerate_id(true);
-    $_SESSION['created'] = time();
-    error_log("Session regenerated from $old_session_id to " . session_id());
-}
-
-function sanitizeInput($data) {
-    if (is_array($data)) {
-        return array_map('sanitizeInput', $data);
-    }
-    return htmlspecialchars(trim($data), ENT_QUOTES, 'UTF-8');
-}
-
-function isLoggedIn() {
-    $logged_in = isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true;
-    error_log("isLoggedIn check: " . ($logged_in ? "TRUE" : "FALSE"));
-    if ($logged_in) {
-        error_log("User type: " . ($_SESSION['user_type'] ?? 'UNKNOWN'));
-        error_log("User email: " . ($_SESSION['user_email'] ?? 'UNKNOWN'));
-    }
-    return $logged_in;
-}
-
-function requireLogin() {
-    if (!isLoggedIn()) {
-        error_log("requireLogin: User not logged in, redirecting to login.php");
-        header('Location: login.php');
-        exit;
-    }
-}
-
-function requireStudentRole() {
-    if (!isLoggedIn() || $_SESSION['user_type'] !== 'student') {
-        error_log("requireStudentRole: Access denied, redirecting to login.php");
-        header('Location: login.php');
-        exit;
-    }
-}
-
-/**
- * Utility Functions
- */
-function formatDate($date_string, $format = 'M j, Y') {
-    if (empty($date_string)) {
-        return 'N/A';
-    }
-    return date($format, strtotime($date_string));
-}
-
-function calculateGrade($score, $max_score) {
-    if ($max_score <= 0) return 0;
-    return ($score / $max_score) * 100;
-}
-
-// Session timeout check
-if (isset($_SESSION['created']) && (time() - $_SESSION['created'] > 28800)) {
-    session_destroy();
-    if (basename($_SERVER['PHP_SELF']) !== 'login.php') {
-        header('Location: login.php');
-        exit;
-    }
 }
 
 /**
@@ -306,40 +102,24 @@ if (isset($_SESSION['created']) && (time() - $_SESSION['created'] > 28800)) {
  */
 function getAdminByEmail($email) {
     $admins = supabaseFetch('admins', ['email' => $email]);
-    error_log("Admin search for $email: " . ($admins ? "FOUND" : "NOT FOUND"));
-    if ($admins && count($admins) > 0) {
-        error_log("Admin data found: " . print_r($admins[0], true));
-    }
     return $admins && count($admins) > 0 ? $admins[0] : null;
-}
-
-function getAdminById($id) {
-    $admins = supabaseFetch('admins', ['id' => $id]);
-    return $admins && count($admins) > 0 ? $admins[0] : null;
-}
-
-function adminExists($email) {
-    $admins = supabaseFetch('admins', ['email' => $email]);
-    return $admins && count($admins) > 0;
 }
 
 function requireAdminRole() {
-    if (!isLoggedIn()) {
-        error_log("requireAdminRole: User not logged in");
+    if (!isset($_SESSION['logged_in']) || $_SESSION['user_type'] !== 'admin') {
         header('Location: login.php');
         exit;
     }
-    
-    if ($_SESSION['user_type'] !== 'admin') {
-        error_log("requireAdminRole: User is not admin. User type: " . ($_SESSION['user_type'] ?? 'UNKNOWN'));
-        header('Location: login.php');
-        exit;
-    }
-    
-    error_log("requireAdminRole: User is admin, access granted");
 }
 
-function isLoginPage() {
-    return basename($_SERVER['PHP_SELF']) === 'login.php';
+function requireStudentRole() {
+    if (!isset($_SESSION['logged_in']) || $_SESSION['user_type'] !== 'student') {
+        header('Location: login.php');
+        exit;
+    }
+}
+
+function sanitizeInput($data) {
+    return htmlspecialchars(trim($data), ENT_QUOTES, 'UTF-8');
 }
 ?>

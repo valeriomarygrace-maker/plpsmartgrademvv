@@ -1,73 +1,35 @@
 <?php
 require_once 'config.php';
 
-// Enhanced debug logging
-error_log("=== ADMIN DASHBOARD ACCESS ATTEMPT ===");
-error_log("Session ID: " . session_id());
-error_log("Initial Session Data: " . print_r($_SESSION, true));
+// Check if user is logged in as admin
+requireAdminRole();
 
-// Check if user is logged in and has correct role
-if (!isLoggedIn()) {
-    error_log("User not logged in, redirecting to login.php");
+// Get admin info
+$admin = getAdminByEmail($_SESSION['user_email']);
+
+if (!$admin) {
+    session_destroy();
     header('Location: login.php');
     exit;
 }
 
-// For admin dashboard - require admin role
-if ($_SESSION['user_type'] !== 'admin') {
-    error_log("User is not admin. User type: " . ($_SESSION['user_type'] ?? 'UNKNOWN') . " - Redirecting to login");
-    header('Location: login.php');
-    exit;
-}
+// Get dashboard data
+$students = supabaseFetch('students', []);
+$total_students = $students ? count($students) : 0;
 
-// If we get here, user is logged in as admin
-error_log("Admin access granted to dashboard - User: " . $_SESSION['user_email']);
+$subjects = supabaseFetch('subjects', []);
+$total_subjects = $subjects ? count($subjects) : 0;
 
-// Initialize variables
-$admin = null;
-$total_students = 0;
-$total_subjects = 0;
+// Get recent students
 $recent_students = [];
-$error_message = '';
-
-try {
-    // Get admin info
-    $admin = getAdminByEmail($_SESSION['user_email']);
-    
-    if (!$admin) {
-        $error_message = 'Admin record not found.';
-        error_log("Admin record not found for email: " . $_SESSION['user_email']);
-        // If admin record not found, log out user
-        session_destroy();
-        header('Location: login.php');
-        exit;
-    } else {
-        error_log("Admin data retrieved successfully: " . $admin['fullname']);
-        
-        // Get total students count
-        $students = supabaseFetchAll('students');
-        $total_students = $students ? count($students) : 0;
-        
-        // Get total subjects count
-        $subjects = supabaseFetchAll('subjects');
-        $total_subjects = $subjects ? count($subjects) : 0;
-        
-        // Get recent students (last 5)
-        if ($students) {
-            usort($students, function($a, $b) {
-                $dateA = isset($a['created_at']) ? strtotime($a['created_at']) : 0;
-                $dateB = isset($b['created_at']) ? strtotime($b['created_at']) : 0;
-                return $dateB - $dateA;
-            });
-            $recent_students = array_slice($students, 0, 5);
-        }
-    }
-} catch (Exception $e) {
-    $error_message = 'Database error: ' . $e->getMessage();
-    error_log("Error in admin-dashboard.php: " . $e->getMessage());
+if ($students) {
+    usort($students, function($a, $b) {
+        $dateA = isset($a['created_at']) ? strtotime($a['created_at']) : 0;
+        $dateB = isset($b['created_at']) ? strtotime($b['created_at']) : 0;
+        return $dateB - $dateA;
+    });
+    $recent_students = array_slice($students, 0, 5);
 }
-
-error_log("=== ADMIN DASHBOARD LOADED SUCCESSFULLY ===");
 ?>
 
 <!DOCTYPE html>
