@@ -585,7 +585,7 @@ if (!empty($filter_date) && is_array($logs)) {
         
         <ul class="nav-menu">
             <li class="nav-item">
-                <a href="admin-dashboard.php" class="nav-link">
+                <a href="admin-dashboard.php" class="nav-link active">
                     <i class="fas fa-chart-line"></i>
                     Dashboard
                 </a>
@@ -593,25 +593,13 @@ if (!empty($filter_date) && is_array($logs)) {
             <li class="nav-item">
                 <a href="admin-students.php" class="nav-link">
                     <i class="fas fa-users"></i>
-                    Students
+                    Manage Students
                 </a>
             </li>
             <li class="nav-item">
-                <a href="admin-subjects.php" class="nav-link">
-                    <i class="fas fa-book"></i>
-                    Subjects
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="admin-system-logs.php" class="nav-link active">
-                    <i class="fas fa-clipboard-list"></i>
-                    System Logs
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="admin-settings.php" class="nav-link">
+                <a href="admin-system-logs.php" class="nav-link">
                     <i class="fas fa-cog"></i>
-                    Settings
+                    System Logs
                 </a>
             </li>
         </ul>
