@@ -6,20 +6,35 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+error_log("=== ADMIN DASHBOARD ACCESS ===");
+error_log("Session ID: " . session_id());
+error_log("Session Data: " . print_r($_SESSION, true));
+
 // Check if user is logged in and has correct role
-if (!isset($_SESSION['logged_in']) || !$_SESSION['logged_in']) {
+if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
+    error_log("ACCESS DENIED: Not logged in");
     header('Location: login.php');
     exit;
 }
 
-// For admin dashboard
 if ($_SESSION['user_type'] !== 'admin') {
+    error_log("ACCESS DENIED: Wrong user type");
     header('Location: login.php');
     exit;
 }
+
+// Verify admin still exists in database
+$admin = getAdminByEmail($_SESSION['user_email']);
+if (!$admin) {
+    error_log("ACCESS DENIED: Admin not found in database");
+    session_destroy();
+    header('Location: login.php');
+    exit;
+}
+
+error_log("ACCESS GRANTED: Admin " . $_SESSION['user_email']);
 
 // Initialize variables
-$admin = null;
 $total_students = 0;
 $total_subjects = 0;
 $recent_students = [];

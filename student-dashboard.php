@@ -6,20 +6,35 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+error_log("=== STUDENT DASHBOARD ACCESS ===");
+error_log("Session ID: " . session_id());
+error_log("Session Data: " . print_r($_SESSION, true));
+
 // Check if user is logged in and has correct role
-if (!isset($_SESSION['logged_in']) || !$_SESSION['logged_in']) {
+if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
+    error_log("ACCESS DENIED: Not logged in");
     header('Location: login.php');
     exit;
 }
 
-// For student dashboard  
 if ($_SESSION['user_type'] !== 'student') {
+    error_log("ACCESS DENIED: Wrong user type");
     header('Location: login.php');
     exit;
 }
+
+// Verify student still exists in database
+$student = getStudentByEmail($_SESSION['user_email']);
+if (!$student) {
+    error_log("ACCESS DENIED: Student not found in database");
+    session_destroy();
+    header('Location: login.php');
+    exit;
+}
+
+error_log("ACCESS GRANTED: Student " . $_SESSION['user_email']);
 
 // Initialize variables
-$student = null;
 $active_subjects = [];
 $recent_scores = [];
 $performance_metrics = [];
@@ -73,7 +88,6 @@ try {
         $semester_risk_data = getSemesterRiskData($student['id']);
         
     }
-    
 } catch (Exception $e) {
     $error_message = 'Database error: ' . $e->getMessage();
     error_log("Error in student-dashboard.php: " . $e->getMessage());

@@ -3,18 +3,23 @@
 $supabase_url = getenv('SUPABASE_URL') ?: 'https://xwvrgpxcceivakzrwwji.supabase.co';
 $supabase_key = getenv('SUPABASE_KEY') ?: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh3dnJncHhjY2VpdmFrenJ3d2ppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE3MjQ0NzQsImV4cCI6MjA3NzMwMDQ3NH0.ovd8v3lqsYtJU78D4iM6CyAyvi6jK4FUbYUjydFi4FM';
 
-// Start session only if not already started
+// Enhanced Session Configuration
 if (session_status() === PHP_SESSION_NONE) {
     session_set_cookie_params([
-        'lifetime' => 86400, // 24 hours
+        'lifetime' => 86400,
         'path' => '/',
         'domain' => '',
-        'secure' => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on',
+        'secure' => false,
         'httponly' => true,
         'samesite' => 'Lax'
     ]);
     session_start();
 }
+
+// Debug session
+error_log("=== SESSION DEBUG ===");
+error_log("Session ID: " . session_id());
+error_log("Session Status: " . session_status());
 
 /**
  * Simple Supabase API Helper Function
@@ -40,7 +45,7 @@ function supabaseFetch($table, $filters = [], $method = 'GET', $data = null) {
     $headers = [
         'apikey: ' . $supabase_key,
         'Authorization: Bearer ' . $supabase_key,
-        'Content-Type: application/json',
+        'Content-Type: ' . 'application/json',
         'Prefer: return=representation'
     ];
     
@@ -50,7 +55,6 @@ function supabaseFetch($table, $filters = [], $method = 'GET', $data = null) {
         CURLOPT_HTTPHEADER => $headers,
         CURLOPT_SSL_VERIFYPEER => false,
         CURLOPT_TIMEOUT => 30,
-        CURLOPT_FAILONERROR => true
     ]);
     
     if ($method === 'POST') {
@@ -69,12 +73,12 @@ function supabaseFetch($table, $filters = [], $method = 'GET', $data = null) {
     curl_close($ch);
     
     if ($error) {
-        error_log("cURL Error for table $table: $error - URL: $url");
+        error_log("cURL Error: $error");
         return false;
     }
     
     if ($httpCode >= 400) {
-        error_log("HTTP Error $httpCode for table: $table - Response: $response");
+        error_log("HTTP Error $httpCode for table: $table");
         return false;
     }
     
@@ -100,7 +104,7 @@ function supabaseInsert($table, $data) {
     $result = supabaseFetch($table, [], 'POST', $data);
     
     if ($result && isset($result[0])) {
-        return $result[0]; // Return the inserted record
+        return $result[0];
     }
     
     return $result;
@@ -113,7 +117,7 @@ function supabaseUpdate($table, $data, $filters) {
     $result = supabaseFetch($table, $filters, 'PATCH', $data);
     
     if ($result && isset($result[0])) {
-        return $result[0]; // Return the updated record
+        return $result[0];
     }
     
     return $result;
@@ -180,7 +184,9 @@ function hashPassword($password) {
 }
 
 function verifyPassword($password, $hashedPassword) {
-    return password_verify($password, $hashedPassword);
+    $result = password_verify($password, $hashedPassword);
+    error_log("Password verification: " . ($result ? "SUCCESS" : "FAILED"));
+    return $result;
 }
 
 /**
@@ -188,6 +194,7 @@ function verifyPassword($password, $hashedPassword) {
  */
 function getStudentByEmail($email) {
     $students = supabaseFetch('students', ['email' => $email]);
+    error_log("Student search for $email: " . ($students ? "FOUND" : "NOT FOUND"));
     return $students && count($students) > 0 ? $students[0] : null;
 }
 
@@ -226,13 +233,13 @@ function getStudentSubjects($student_id) {
     return supabaseFetch('student_subjects', ['student_id' => $student_id]);
 }
 
-
 /**
  * Session Security Functions
  */
 function regenerateSession() {
     session_regenerate_id(true);
     $_SESSION['created'] = time();
+    error_log("Session regenerated: " . session_id());
 }
 
 function sanitizeInput($data) {
@@ -283,11 +290,13 @@ if (isset($_SESSION['created']) && (time() - $_SESSION['created'] > 28800)) {
         exit;
     }
 }
+
 /**
  * Admin Functions
  */
 function getAdminByEmail($email) {
     $admins = supabaseFetch('admins', ['email' => $email]);
+    error_log("Admin search for $email: " . ($admins ? "FOUND" : "NOT FOUND"));
     return $admins && count($admins) > 0 ? $admins[0] : null;
 }
 
@@ -307,5 +316,4 @@ function requireAdminRole() {
         exit;
     }
 }
-
 ?>
