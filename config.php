@@ -225,183 +225,6 @@ function getStudentSubjects($student_id) {
     return supabaseFetch('student_subjects', ['student_id' => $student_id]);
 }
 
-/**
- * Admin Functions
- */
-function getAdminByEmail($email) {
-    $admins = supabaseFetch('admins', ['email' => $email]);
-    return $admins && count($admins) > 0 ? $admins[0] : null;
-}
-
-function getAdminById($id) {
-    $admins = supabaseFetch('admins', ['id' => $id]);
-    return $admins && count($admins) > 0 ? $admins[0] : null;
-}
-
-function adminExists($email) {
-    $admins = supabaseFetch('admins', ['email' => $email]);
-    return $admins && count($admins) > 0;
-}
-
-function requireAdminRole() {
-    if (!isLoggedIn() || $_SESSION['user_type'] !== 'admin') {
-        header('Location: login.php');
-        exit;
-    }
-}
-
-/**
- * Log user login activity
- */
-function logUserLogin($user_email, $user_type, $user_id) {
-    $log_data = [
-        'user_email' => $user_email,
-        'user_type' => $user_type,
-        'user_id' => $user_id,
-        'action' => 'login',
-        'description' => 'User logged into the system',
-        'ip_address' => $_SERVER['REMOTE_ADDR'] ?? 'Unknown',
-        'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown',
-        'created_at' => date('Y-m-d H:i:s')
-    ];
-    
-    return supabaseInsert('system_logs', $log_data);
-}
-
-/**
- * Log user logout activity
- */
-function logUserLogout($user_email, $user_type, $user_id) {
-    $log_data = [
-        'user_email' => $user_email,
-        'user_type' => $user_type,
-        'user_id' => $user_id,
-        'action' => 'logout',
-        'description' => 'User logged out of the system',
-        'ip_address' => $_SERVER['REMOTE_ADDR'] ?? 'Unknown',
-        'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown',
-        'created_at' => date('Y-m-d H:i:s')
-    ];
-    
-    return supabaseInsert('system_logs', $log_data);
-}
-
-/**
- * Get system logs with filters
- */
-function getSystemLogs($filters = [], $limit = 100, $offset = 0) {
-    global $supabase_url, $supabase_key;
-    
-    $url = $supabase_url . "/rest/v1/system_logs";
-    
-    // Build query parameters
-    $queryParams = [];
-    if (!empty($filters)) {
-        foreach ($filters as $key => $value) {
-            if ($value !== null) {
-                $queryParams[] = "$key=eq.$value";
-            }
-        }
-    }
-    
-    // Add ordering and pagination
-    $queryParams[] = "order=created_at.desc";
-    $queryParams[] = "limit=$limit";
-    $queryParams[] = "offset=$offset";
-    
-    if (!empty($queryParams)) {
-        $url .= "?" . implode('&', $queryParams);
-    }
-    
-    $ch = curl_init();
-    $headers = [
-        'apikey: ' . $supabase_key,
-        'Authorization: Bearer ' . $supabase_key,
-        'Content-Type: ' . 'application/json'
-    ];
-    
-    curl_setopt_array($ch, [
-        CURLOPT_URL => $url,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER => $headers,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_TIMEOUT => 30,
-    ]);
-    
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $error = curl_error($ch);
-    curl_close($ch);
-    
-    if ($error) {
-        error_log("cURL Error: $error");
-        return false;
-    }
-    
-    if ($httpCode >= 400) {
-        error_log("HTTP Error $httpCode for system_logs");
-        return false;
-    }
-    
-    $result = json_decode($response, true);
-    return $result ?: [];
-}
-
-/**
- * Get login/logout statistics
- */
-function getLoginStatistics($days = 30) {
-    $startDate = date('Y-m-d H:i:s', strtotime("-$days days"));
-    
-    // Get total logins
-    $loginLogs = getSystemLogs(['action' => 'login'], 1000);
-    $logoutLogs = getSystemLogs(['action' => 'logout'], 1000);
-    
-    $stats = [
-        'total_logins' => is_array($loginLogs) ? count($loginLogs) : 0,
-        'total_logouts' => is_array($logoutLogs) ? count($logoutLogs) : 0,
-        'recent_logins' => 0,
-        'recent_logouts' => 0,
-        'unique_students' => 0,
-        'unique_admins' => 0
-    ];
-    
-    // Count recent activities
-    if (is_array($loginLogs)) {
-        foreach ($loginLogs as $log) {
-            if (strtotime($log['created_at']) >= strtotime($startDate)) {
-                $stats['recent_logins']++;
-            }
-        }
-    }
-    
-    if (is_array($logoutLogs)) {
-        foreach ($logoutLogs as $log) {
-            if (strtotime($log['created_at']) >= strtotime($startDate)) {
-                $stats['recent_logouts']++;
-            }
-        }
-    }
-    
-    // Get unique users
-    if (is_array($loginLogs)) {
-        $students = [];
-        $admins = [];
-        
-        foreach ($loginLogs as $log) {
-            if ($log['user_type'] === 'student') {
-                $students[$log['user_email']] = true;
-            } elseif ($log['user_type'] === 'admin') {
-                $admins[$log['user_email']] = true;
-            }
-        }
-        
-        $stats['unique_students'] = count($students);
-        $stats['unique_admins'] = count($admins);
-    }
-    
-    return $stats;
-}
 
 /**
  * Session Security Functions
@@ -451,26 +274,6 @@ function calculateGrade($score, $max_score) {
     return ($score / $max_score) * 100;
 }
 
-/**
- * Log user actions to system logs
- */
-function logUserAction($user_email, $user_type, $action, $description = '') {
-    $ip_address = $_SERVER['REMOTE_ADDR'] ?? 'Unknown';
-    $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown';
-    
-    $log_data = [
-        'user_email' => $user_email,
-        'user_type' => $user_type,
-        'action' => $action,
-        'description' => $description,
-        'ip_address' => $ip_address,
-        'user_agent' => $user_agent,
-        'created_at' => date('Y-m-d H:i:s')
-    ];
-    
-    return supabaseInsert('system_logs', $log_data);
-}
-
 // Session timeout check
 if (isset($_SESSION['created']) && (time() - $_SESSION['created'] > 28800)) {
     session_destroy();
@@ -479,5 +282,30 @@ if (isset($_SESSION['created']) && (time() - $_SESSION['created'] > 28800)) {
         exit;
     }
 }
+/**
+ * Admin Functions
+ */
+function getAdminByEmail($email) {
+    $admins = supabaseFetch('admins', ['email' => $email]);
+    return $admins && count($admins) > 0 ? $admins[0] : null;
+}
+
+function getAdminById($id) {
+    $admins = supabaseFetch('admins', ['id' => $id]);
+    return $admins && count($admins) > 0 ? $admins[0] : null;
+}
+
+function adminExists($email) {
+    $admins = supabaseFetch('admins', ['email' => $email]);
+    return $admins && count($admins) > 0;
+}
+
+function requireAdminRole() {
+    if (!isLoggedIn() || $_SESSION['user_type'] !== 'admin') {
+        header('Location: login.php');
+        exit;
+    }
+}
+
 
 ?>

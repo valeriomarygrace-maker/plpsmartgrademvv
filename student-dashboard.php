@@ -7,17 +7,9 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-
 if (!isset($_SESSION['logged_in']) || $_SESSION['user_type'] !== 'student') {
     header('Location: login.php');
     exit;
-}
-
-$unread_count = 0;
-try {
-    $unread_count = getUnreadMessageCount($_SESSION['user_id'], 'student');
-} catch (Exception $e) {
-    $unread_count = 0;
 }
 
 // Initialize variables
@@ -27,7 +19,6 @@ $recent_scores = [];
 $performance_metrics = [];
 $semester_risk_data = [];
 $error_message = '';
-
 
 try {
     // Get student info using Supabase
