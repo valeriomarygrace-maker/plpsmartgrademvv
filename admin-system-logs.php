@@ -523,12 +523,12 @@ if (!empty($filter_date) && is_array($logs)) {
                 </div>
             </div>
             <div class="portal-title">PLPSMARTGRADE</div>
-            <div class="admin-email"><?php echo htmlspecialchars($_SESSION['user_email']); ?></div>
+            <div class="admin-email"><?php echo htmlspecialchars($admin['email']); ?></div>
         </div>
         
         <ul class="nav-menu">
             <li class="nav-item">
-                <a href="admin-dashboard.php" class="nav-link ">
+                <a href="admin-dashboard.php" class="nav-link">
                     <i class="fas fa-chart-line"></i>
                     Dashboard
                 </a>
@@ -537,6 +537,15 @@ if (!empty($filter_date) && is_array($logs)) {
                 <a href="admin-students.php" class="nav-link">
                     <i class="fas fa-users"></i>
                     Manage Students
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="student-messages.php" class="nav-link">
+                    <i class="fas fa-envelope"></i>
+                    Messages
+                    <?php if (getUnreadMessageCount($_SESSION['user_id'], 'student') > 0): ?>
+                        <span class="badge badge-unread"><?php echo getUnreadMessageCount($_SESSION['user_id'], 'student'); ?></span>
+                    <?php endif; ?>
                 </a>
             </li>
             <li class="nav-item">
