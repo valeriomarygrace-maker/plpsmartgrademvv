@@ -6,19 +6,19 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-error_log("=== ADMIN DASHBOARD ACCESS ===");
+error_log("=== ADMIN DASHBOARD ACCESS ATTEMPT ===");
 error_log("Session ID: " . session_id());
 error_log("Session Data: " . print_r($_SESSION, true));
 
 // Check if user is logged in and has correct role
 if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
-    error_log("ACCESS DENIED: Not logged in");
+    error_log("ACCESS DENIED: Not logged in - Session data missing");
     header('Location: login.php');
     exit;
 }
 
-if ($_SESSION['user_type'] !== 'admin') {
-    error_log("ACCESS DENIED: Wrong user type");
+if (!isset($_SESSION['user_type']) || $_SESSION['user_type'] !== 'admin') {
+    error_log("ACCESS DENIED: Wrong user type - Expected: admin, Got: " . ($_SESSION['user_type'] ?? 'NOT SET'));
     header('Location: login.php');
     exit;
 }
@@ -26,7 +26,7 @@ if ($_SESSION['user_type'] !== 'admin') {
 // Verify admin still exists in database
 $admin = getAdminByEmail($_SESSION['user_email']);
 if (!$admin) {
-    error_log("ACCESS DENIED: Admin not found in database");
+    error_log("ACCESS DENIED: Admin not found in database - " . $_SESSION['user_email']);
     session_destroy();
     header('Location: login.php');
     exit;

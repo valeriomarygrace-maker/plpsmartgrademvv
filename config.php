@@ -17,12 +17,12 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // Debug session
-error_log("=== SESSION DEBUG ===");
+error_log("=== CONFIG SESSION DEBUG ===");
 error_log("Session ID: " . session_id());
 error_log("Session Status: " . session_status());
 
 /**
- * Simple Supabase API Helper Function
+ * Enhanced Supabase API Helper Function
  */
 function supabaseFetch($table, $filters = [], $method = 'GET', $data = null) {
     global $supabase_url, $supabase_key;
@@ -186,6 +186,8 @@ function hashPassword($password) {
 function verifyPassword($password, $hashedPassword) {
     $result = password_verify($password, $hashedPassword);
     error_log("Password verification: " . ($result ? "SUCCESS" : "FAILED"));
+    error_log("Input password length: " . strlen($password));
+    error_log("Stored hash: " . $hashedPassword);
     return $result;
 }
 
@@ -296,7 +298,10 @@ if (isset($_SESSION['created']) && (time() - $_SESSION['created'] > 28800)) {
  */
 function getAdminByEmail($email) {
     $admins = supabaseFetch('admins', ['email' => $email]);
-    error_log("Admin search for $email: " . ($admins ? "FOUND" : "NOT FOUND"));
+    error_log("ADMIN SEARCH for $email: " . ($admins ? "FOUND " . count($admins) . " records" : "NOT FOUND"));
+    if ($admins && count($admins) > 0) {
+        error_log("ADMIN DETAILS: " . print_r($admins[0], true));
+    }
     return $admins && count($admins) > 0 ? $admins[0] : null;
 }
 
