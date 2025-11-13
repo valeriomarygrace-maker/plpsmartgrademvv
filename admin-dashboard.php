@@ -10,6 +10,7 @@ $admin = null;
 $total_students = 0;
 $total_subjects = 0;
 $recent_students = [];
+$semester_risk_data = [];
 $error_message = '';
 
 try {
@@ -36,10 +37,123 @@ try {
             });
             $recent_students = array_slice($students, 0, 3);
         }
+
+        // Get semester risk analysis data
+        $semester_risk_data = getSemesterRiskAnalysis();
     }
 } catch (Exception $e) {
     $error_message = 'Database error: ' . $e->getMessage();
     error_log("Error in admin-dashboard.php: " . $e->getMessage());
+}
+
+/**
+ * Get semester risk analysis data
+ */
+function getSemesterRiskAnalysis() {
+    $data = [
+        'first_semester' => [
+            'total_students' => 0,
+            'high_risk' => 0,
+            'low_risk' => 0,
+            'moderate_risk' => 0,
+            'no_data' => 0
+        ],
+        'second_semester' => [
+            'total_students' => 0,
+            'high_risk' => 0,
+            'low_risk' => 0,
+            'moderate_risk' => 0,
+            'no_data' => 0
+        ],
+        'overall_totals' => [
+            'total_students' => 0,
+            'high_risk' => 0,
+            'low_risk' => 0,
+            'moderate_risk' => 0,
+            'no_data' => 0
+        ]
+    ];
+
+    try {
+        // Get all students
+        $all_students = supabaseFetchAll('students');
+        
+        if ($all_students && is_array($all_students)) {
+            foreach ($all_students as $student) {
+                $student_id = $student['id'];
+                $student_semester = strtolower($student['semester'] ?? '');
+                
+                // Initialize risk counts for this student
+                $student_high_risk = 0;
+                $student_low_risk = 0;
+                $student_moderate_risk = 0;
+                $student_has_data = false;
+
+                // Get all subjects for this student
+                $student_subjects = supabaseFetch('student_subjects', [
+                    'student_id' => $student_id,
+                    'deleted_at' => null
+                ]);
+
+                if ($student_subjects && is_array($student_subjects)) {
+                    foreach ($student_subjects as $subject_record) {
+                        // Get performance data
+                        $performance_data = supabaseFetch('subject_performance', [
+                            'student_subject_id' => $subject_record['id']
+                        ]);
+
+                        if ($performance_data && count($performance_data) > 0) {
+                            $performance = $performance_data[0];
+                            $risk_level = $performance['risk_level'] ?? 'no-data';
+                            $student_has_data = true;
+
+                            switch ($risk_level) {
+                                case 'high_risk':
+                                    $student_high_risk++;
+                                    break;
+                                case 'low_risk':
+                                    $student_low_risk++;
+                                    break;
+                                case 'moderate_risk':
+                                    $student_moderate_risk++;
+                                    break;
+                            }
+                        }
+                    }
+                }
+
+                // Determine overall risk for student (based on highest risk subject)
+                $student_overall_risk = 'no_data';
+                if ($student_has_data) {
+                    if ($student_high_risk > 0) {
+                        $student_overall_risk = 'high_risk';
+                    } elseif ($student_moderate_risk > 0) {
+                        $student_overall_risk = 'moderate_risk';
+                    } elseif ($student_low_risk > 0) {
+                        $student_overall_risk = 'low_risk';
+                    }
+                }
+
+                // Categorize by semester
+                if (strpos($student_semester, 'first') !== false || strpos($student_semester, '1') !== false) {
+                    $data['first_semester']['total_students']++;
+                    $data['first_semester'][$student_overall_risk]++;
+                } elseif (strpos($student_semester, 'second') !== false || strpos($student_semester, '2') !== false) {
+                    $data['second_semester']['total_students']++;
+                    $data['second_semester'][$student_overall_risk]++;
+                }
+
+                // Add to overall totals
+                $data['overall_totals']['total_students']++;
+                $data['overall_totals'][$student_overall_risk]++;
+            }
+        }
+
+    } catch (Exception $e) {
+        error_log("Error getting semester risk analysis: " . $e->getMessage());
+    }
+
+    return $data;
 }
 ?>
 <!DOCTYPE html>
@@ -50,6 +164,7 @@ try {
     <title>Admin Dashboard - PLP SmartGrade</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
             --plp-green: #006341;
@@ -383,6 +498,43 @@ try {
             margin-bottom: 0;
         }
 
+        .risk-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .risk-stat-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem;
+            border-radius: var(--border-radius);
+            background: var(--plp-green-pale);
+        }
+
+        .risk-stat-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 500;
+        }
+
+        .risk-stat-value {
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .risk-high { color: var(--danger); }
+        .risk-moderate { color: var(--warning); }
+        .risk-low { color: var(--success); }
+        .risk-no-data { color: var(--text-light); }
+
+        .semester-risk-chart {
+            height: 200px;
+            margin-top: 1rem;
+        }
+
         @media (max-width: 1200px) {
             .three-column-grid {
                 grid-template-columns: repeat(2, 1fr);
@@ -536,6 +688,12 @@ try {
             font-weight: 600;
             animation: pulse 2s infinite;
         }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
     </style>
 </head>
 <body>
@@ -652,60 +810,100 @@ try {
                 <?php endif; ?>
             </div>
 
-            <!-- Quick Actions -->
+            <!-- Semester Risk Analysis -->
             <div class="card">
                 <div class="card-header">
                     <div class="card-title">
-                        <i class="fas fa-bolt"></i>
-                        Quick Actions
+                        <i class="fas fa-chart-bar"></i>
+                        Semester Risk Analysis
                     </div>
                 </div>
-                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-                    <a href="admin-students.php" style="
-                        display: flex; 
-                        align-items: center; 
-                        gap: 0.75rem; 
-                        padding: 0.75rem; 
-                        background: var(--plp-green-pale); 
-                        border-radius: var(--border-radius); 
-                        text-decoration: none; 
-                        color: var(--plp-green); 
-                        font-weight: 500;
-                        transition: var(--transition);
-                    ">
-                        <i class="fas fa-user-plus"></i>
-                        Add New Student
-                    </a>
-                    <a href="admin-subjects.php" style="
-                        display: flex; 
-                        align-items: center; 
-                        gap: 0.75rem; 
-                        padding: 0.75rem; 
-                        background: var(--plp-green-pale); 
-                        border-radius: var(--border-radius); 
-                        text-decoration: none; 
-                        color: var(--plp-green); 
-                        font-weight: 500;
-                        transition: var(--transition);
-                    ">
-                        <i class="fas fa-book-medical"></i>
-                        Add New Subject
-                    </a>
-                    <a href="admin-reports.php" style="
-                        display: flex; 
-                        align-items: center; 
-                        gap: 0.75rem; 
-                        padding: 0.75rem; 
-                        background: var(--plp-green-pale); 
-                        border-radius: var(--border-radius); 
-                        text-decoration: none; 
-                        color: var(--plp-green); 
-                        font-weight: 500;
-                        transition: var(--transition);
-                    ">
-                        <i class="fas fa-chart-pie"></i>
-                        Generate Reports
-                    </a>
+                <div class="risk-stats">
+                    <!-- First Semester -->
+                    <div style="margin-bottom: 1.5rem;">
+                        <h4 style="color: var(--plp-green); margin-bottom: 0.75rem; font-size: 0.9rem;">
+                            <i class="fas fa-calendar-alt"></i> First Semester
+                        </h4>
+                        <div class="risk-stat-item">
+                            <div class="risk-stat-label">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <span>High Risk</span>
+                            </div>
+                            <div class="risk-stat-value risk-high">
+                                <?php echo $semester_risk_data['first_semester']['high_risk']; ?>
+                            </div>
+                        </div>
+                        <div class="risk-stat-item">
+                            <div class="risk-stat-label">
+                                <i class="fas fa-minus-circle"></i>
+                                <span>Moderate Risk</span>
+                            </div>
+                            <div class="risk-stat-value risk-moderate">
+                                <?php echo $semester_risk_data['first_semester']['moderate_risk']; ?>
+                            </div>
+                        </div>
+                        <div class="risk-stat-item">
+                            <div class="risk-stat-label">
+                                <i class="fas fa-check-circle"></i>
+                                <span>Low Risk</span>
+                            </div>
+                            <div class="risk-stat-value risk-low">
+                                <?php echo $semester_risk_data['first_semester']['low_risk']; ?>
+                            </div>
+                        </div>
+                        <div class="risk-stat-item">
+                            <div class="risk-stat-label">
+                                <i class="fas fa-question-circle"></i>
+                                <span>No Data</span>
+                            </div>
+                            <div class="risk-stat-value risk-no-data">
+                                <?php echo $semester_risk_data['first_semester']['no_data']; ?>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Second Semester -->
+                    <div>
+                        <h4 style="color: var(--plp-green); margin-bottom: 0.75rem; font-size: 0.9rem;">
+                            <i class="fas fa-calendar-alt"></i> Second Semester
+                        </h4>
+                        <div class="risk-stat-item">
+                            <div class="risk-stat-label">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <span>High Risk</span>
+                            </div>
+                            <div class="risk-stat-value risk-high">
+                                <?php echo $semester_risk_data['second_semester']['high_risk']; ?>
+                            </div>
+                        </div>
+                        <div class="risk-stat-item">
+                            <div class="risk-stat-label">
+                                <i class="fas fa-minus-circle"></i>
+                                <span>Moderate Risk</span>
+                            </div>
+                            <div class="risk-stat-value risk-moderate">
+                                <?php echo $semester_risk_data['second_semester']['moderate_risk']; ?>
+                            </div>
+                        </div>
+                        <div class="risk-stat-item">
+                            <div class="risk-stat-label">
+                                <i class="fas fa-check-circle"></i>
+                                <span>Low Risk</span>
+                            </div>
+                            <div class="risk-stat-value risk-low">
+                                <?php echo $semester_risk_data['second_semester']['low_risk']; ?>
+                            </div>
+                        </div>
+                        <div class="risk-stat-item">
+                            <div class="risk-stat-label">
+                                <i class="fas fa-question-circle"></i>
+                                <span>No Data</span>
+                            </div>
+                            <div class="risk-stat-value risk-no-data">
+                                <?php echo $semester_risk_data['second_semester']['no_data']; ?>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -741,7 +939,7 @@ try {
         </div>
     </div>
 
-            <!--  Logout Modal -->
+    <!-- Logout Modal -->
     <div class="modal" id="logoutModal">
         <div class="modal-content" style="max-width: 450px; text-align: center;">
             <h3 style="color: var(--plp-green); font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem;">
@@ -769,7 +967,7 @@ try {
         const cancelLogout = document.getElementById('cancelLogout');
         const confirmLogout = document.getElementById('confirmLogout');
 
-// Show modal when clicking logout button
+        // Show modal when clicking logout button
         logoutBtn.addEventListener('click', (e) => {
             e.preventDefault();
             logoutModal.classList.add('show');
@@ -785,14 +983,11 @@ try {
             window.location.href = 'logout.php';
         });
 
-// Hide modal when clicking outside the modal content
-        const modals = [addSubjectModal, editSubjectModal, archiveSubjectModal, logoutModal];
-        modals.forEach(modal => {
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    modal.classList.remove('show');
-                }
-            });
+        // Hide modal when clicking outside the modal content
+        logoutModal.addEventListener('click', (e) => {
+            if (e.target === logoutModal) {
+                logoutModal.classList.remove('show');
+            }
         });
     </script>
 </body>

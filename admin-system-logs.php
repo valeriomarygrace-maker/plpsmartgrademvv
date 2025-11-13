@@ -537,12 +537,6 @@ $admin = getAdminByEmail($_SESSION['user_email']);
                 </a>
             </li>
             <li class="nav-item">
-                <a href="admin-subjects.php" class="nav-link">
-                    <i class="fas fa-book"></i>
-                    Subjects
-                </a>
-            </li>
-            <li class="nav-item">
                 <a href="admin-messages.php" class="nav-link">
                     <i class="fas fa-comments"></i>
                     Messages
