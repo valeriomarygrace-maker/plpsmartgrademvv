@@ -1,9 +1,4 @@
 <?php
-// Prevent caching issues
-header("Cache-Control: no-cache, no-store, must-revalidate");
-header("Pragma: no-cache");
-header("Expires: 0");
-
 require_once 'config.php';
 requireAdminRole();
 
@@ -13,41 +8,26 @@ $students = supabaseFetchAll('students', 'fullname.asc');
 
 // Handle sending message
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'send_message') {
-    header('Content-Type: application/json');
+    $receiver_id = sanitizeInput($_POST['receiver_id']);
+    $message = sanitizeInput($_POST['message']);
     
-    $receiver_id = sanitizeInput($_POST['receiver_id'] ?? '');
-    $message = sanitizeInput($_POST['message'] ?? '');
-    
-    if (empty($message) || empty($receiver_id)) {
-        echo json_encode(['success' => false, 'error' => 'Message and receiver are required']);
-        exit;
-    }
-    
-    try {
+    if (!empty($message) && !empty($receiver_id)) {
         $message_data = [
             'sender_id' => $admin_id,
             'sender_type' => 'admin',
             'receiver_id' => $receiver_id,
             'receiver_type' => 'student',
             'message' => $message,
-            'is_read' => false,
-            'created_at' => date('Y-m-d H:i:s')
+            'is_read' => false
         ];
         
-        $result = supabaseInsert('messages', $message_data);
-        
-        if ($result) {
+        if (supabaseInsert('messages', $message_data)) {
             echo json_encode(['success' => true]);
             exit;
-        } else {
-            echo json_encode(['success' => false, 'error' => 'Database insertion failed']);
-            exit;
         }
-    } catch (Exception $e) {
-        error_log("Message sending error: " . $e->getMessage());
-        echo json_encode(['success' => false, 'error' => 'Server error']);
-        exit;
     }
+    echo json_encode(['success' => false]);
+    exit;
 }
 
 // Get unread count for badge
@@ -796,14 +776,9 @@ $messages = getAdminMessages($admin_id);
         // Send message
         function sendMessage() {
             const messageText = document.getElementById('message-text').value.trim();
-            if (!messageText || !currentStudentId) {
-                alert('Please select a recipient and enter a message');
-                return;
-            }
+            if (!messageText || !currentStudentId) return;
             
             const sendBtn = document.getElementById('send-btn');
-            const originalText = sendBtn.innerHTML;
-            
             sendBtn.disabled = true;
             sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
             
@@ -812,32 +787,26 @@ $messages = getAdminMessages($admin_id);
             formData.append('receiver_id', currentStudentId);
             formData.append('message', messageText);
             
-            fetch('admin-messages.php', {
+            fetch('admin_messages.php', {
                 method: 'POST',
                 body: formData
             })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok: ' + response.status);
-                }
-                return response.json();
-            })
+            .then(response => response.json())
             .then(result => {
                 if (result.success) {
                     document.getElementById('message-text').value = '';
-                    document.getElementById('message-text').style.height = 'auto';
                     loadMessages();
                 } else {
-                    alert('Failed to send message: ' + (result.error || 'Unknown error'));
+                    alert('Failed to send message');
                 }
             })
             .catch(error => {
                 console.error('Error sending message:', error);
-                alert('Error sending message. Please try again.');
+                alert('Error sending message');
             })
             .finally(() => {
                 sendBtn.disabled = false;
-                sendBtn.innerHTML = originalText;
+                sendBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send';
             });
         }
 
