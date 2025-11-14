@@ -341,10 +341,10 @@ function getSemesterRiskAnalysis() {
 
         .header {
             background: white;
-            padding: 0.6rem 1.25rem;
+            padding: 1.5rem 2rem;
             border-radius: var(--border-radius);
             box-shadow: var(--box-shadow);
-            margin-bottom: 1.5rem; 
+            margin-bottom: 2rem;
             background: var(--plp-green-gradient);
             color: white;
             display: flex;
@@ -352,15 +352,95 @@ function getSemesterRiskAnalysis() {
             align-items: center;
         }
 
-        .welcome {
-            font-size: 1.5rem;
-            font-weight: 700;
-            letter-spacing: 0.5px;
+        .welcome-section {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
         }
 
+        .welcome-icon {
+            font-size: 2.5rem;
+            opacity: 0.9;
+        }
+
+        .welcome-text h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+        }
+
+        .welcome-text p {
+            opacity: 0.9;
+            font-size: 1rem;
+        }
+
+        .date-display {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 0.75rem 1.5rem;
+            border-radius: var(--border-radius);
+            font-weight: 600;
+            backdrop-filter: blur(10px);
+        }
+
+        /* Enhanced Dashboard Grid */
         .dashboard-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 2fr));
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            border-left: 4px solid var(--plp-green);
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--box-shadow-lg);
+        }
+
+        .stat-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            background: var(--plp-green-gradient);
+            color: white;
+        }
+
+        .stat-content {
+            flex: 1;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--plp-green);
+            line-height: 1;
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: var(--text-medium);
+            font-weight: 500;
+        }
+
+        /* Three Column Layout */
+        .three-column-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
             gap: 1.5rem;
             margin-bottom: 2rem;
         }
@@ -370,8 +450,13 @@ function getSemesterRiskAnalysis() {
             padding: 1.5rem;
             border-radius: var(--border-radius);
             box-shadow: var(--box-shadow);
-            border-left: 4px solid var(--plp-green);
             transition: var(--transition);
+            height: 100%;
+        }
+
+        .card:hover {
+            transform: translateY(-3px);
+            box-shadow: var(--box-shadow-lg);
         }
 
         .card-header {
@@ -380,7 +465,7 @@ function getSemesterRiskAnalysis() {
             align-items: center;
             margin-bottom: 1rem;
             padding-bottom: 0.75rem;
-            border-bottom: 1px solid var(--plp-green-lighter);
+            border-bottom: 2px solid var(--plp-green-lighter);
         }
 
         .card-title {
@@ -392,50 +477,53 @@ function getSemesterRiskAnalysis() {
             gap: 0.5rem;
         }
 
-        .metrics-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 1rem;
-        }
-
-        .metric-card {
-            border-radius: var(--border-radius);
-            box-shadow: var(--box-shadow);
-            border-left: 4px solid var(--plp-green);
-            background: white;
-            text-align: center;
-            padding: 1rem;
-            border-radius: var(--border-radius);
+        .view-all {
+            color: var(--plp-green);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
             transition: var(--transition);
         }
 
-        .metric-value {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: var(--plp-green);
-            margin-bottom: 0.25rem;
+        .view-all:hover {
+            color: var(--plp-green-light);
+            transform: translateX(3px);
         }
 
-        .metric-label {
-            font-size: 0.85rem;
-            color: var(--text-medium);
-            font-weight: 500;
-        }
-
+        /* Enhanced Student List */
         .student-list {
             list-style: none;
         }
 
         .student-item {
-            padding: 0.75rem;
+            padding: 1rem;
             border-bottom: 1px solid var(--plp-green-lighter);
             display: flex;
-            justify-content: space-between;
             align-items: center;
+            gap: 1rem;
+            transition: var(--transition);
+        }
+
+        .student-item:hover {
+            background: var(--plp-green-pale);
+            border-radius: var(--border-radius);
         }
 
         .student-item:last-child {
             border-bottom: none;
+        }
+
+        .student-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--plp-green-gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 0.9rem;
         }
 
         .student-info {
@@ -446,62 +534,41 @@ function getSemesterRiskAnalysis() {
             font-weight: 600;
             color: var(--plp-green);
             font-size: 0.9rem;
+            margin-bottom: 0.25rem;
         }
 
         .student-details {
-            color: var(--text-dark);
-            font-size: 0.85rem;
+            color: var(--text-medium);
+            font-size: 0.8rem;
+            margin-bottom: 0.25rem;
         }
 
         .student-email {
-            color: var(--text-medium);
-            font-size: 0.8rem;
+            color: var(--text-light);
+            font-size: 0.75rem;
         }
 
-        .empty-state {
-            text-align: center;
-            padding: 2rem;
-            color: var(--text-medium);
-        }
-
-        .empty-state i {
-            font-size: 2rem;
-            margin-bottom: 1rem;
-            color: var(--plp-green-lighter);
-        }
-
-        .empty-state p {
-            font-size: 0.9rem;
-            margin-bottom: 0.5rem;
-        }
-
-        .alert-error {
-            background: #fed7d7;
-            color: #c53030;
-            padding: 1rem;
-            border-radius: var(--border-radius);
-            margin-bottom: 1rem;
-            border-left: 4px solid #e53e3e;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-
-        .three-column-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 1.5rem;
-            margin-bottom: 2rem;
-        }
-
-        .three-column-grid .card {
-            margin-bottom: 0;
-        }
-
+        /* Enhanced Risk Analysis */
         .risk-stats {
             display: flex;
             flex-direction: column;
             gap: 1rem;
+        }
+
+        .semester-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .semester-header {
+            color: var(--plp-green);
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--plp-green-lighter);
         }
 
         .risk-stat-item {
@@ -511,6 +578,11 @@ function getSemesterRiskAnalysis() {
             padding: 0.75rem;
             border-radius: var(--border-radius);
             background: var(--plp-green-pale);
+            transition: var(--transition);
+        }
+
+        .risk-stat-item:hover {
+            background: var(--plp-green-lighter);
         }
 
         .risk-stat-label {
@@ -523,57 +595,107 @@ function getSemesterRiskAnalysis() {
         .risk-stat-value {
             font-weight: 700;
             font-size: 1.1rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            background: white;
         }
 
-        .risk-high { color: var(--danger); }
-        .risk-moderate { color: var(--warning); }
-        .risk-low { color: var(--success); }
-        .risk-no-data { color: var(--text-light); }
-
-        .semester-risk-chart {
-            height: 200px;
-            margin-top: 1rem;
+        .risk-high { 
+            color: var(--danger);
+            border: 2px solid var(--danger);
+        }
+        .risk-moderate { 
+            color: var(--warning);
+            border: 2px solid var(--warning);
+        }
+        .risk-low { 
+            color: var(--success);
+            border: 2px solid var(--success);
+        }
+        .risk-no-data { 
+            color: var(--text-light);
+            border: 2px solid var(--text-light);
         }
 
-        @media (max-width: 1200px) {
-            .three-column-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
+        /* Empty States */
+        .empty-state {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-medium);
         }
 
-        @media (max-width: 768px) {
-            body {
-                flex-direction: column;
-            }
-            
-            .sidebar {
-                width: 100%;
-                height: auto;
-                position: relative;
-            }
-            
-            .main-content {
-                padding: 1.5rem;
-            }
-            
-            .header {
-                flex-direction: column;
-                gap: 1rem;
-                text-align: center;
-            }
-            
-            .dashboard-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .metrics-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .three-column-grid {
-                grid-template-columns: 1fr;
-            }
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            color: var(--plp-green-lighter);
         }
+
+        .empty-state p {
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .empty-state small {
+            color: var(--text-light);
+        }
+
+        /* Alerts */
+        .alert-error {
+            background: #fed7d7;
+            color: #c53030;
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            margin-bottom: 1rem;
+            border-left: 4px solid #e53e3e;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        /* Quick Actions */
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .action-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            text-align: center;
+            text-decoration: none;
+            color: var(--text-dark);
+            transition: var(--transition);
+            border: 2px solid transparent;
+        }
+
+        .action-card:hover {
+            transform: translateY(-3px);
+            box-shadow: var(--box-shadow-lg);
+            border-color: var(--plp-green);
+            color: var(--plp-green);
+        }
+
+        .action-icon {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            color: var(--plp-green);
+        }
+
+        .action-title {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .action-desc {
+            font-size: 0.85rem;
+            color: var(--text-medium);
+        }
+
+        /* Modal Styles */
         .modal {
             display: none;
             position: fixed;
@@ -594,7 +716,6 @@ function getSemesterRiskAnalysis() {
             display: flex;
             opacity: 1;
         }
-
 
         .modal-content {
             background: white;
@@ -661,6 +782,8 @@ function getSemesterRiskAnalysis() {
             background: linear-gradient(135deg, var(--plp-green-light), var(--plp-green));
             transform: translateY(-2px);
         }
+
+        /* Badges */
         .unread-badge {
             background: #ff4444;
             color: white;
@@ -694,6 +817,52 @@ function getSemesterRiskAnalysis() {
             50% { transform: scale(1.1); }
             100% { transform: scale(1); }
         }
+
+        /* Responsive Design */
+        @media (max-width: 1200px) {
+            .three-column-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+            }
+            
+            .main-content {
+                padding: 1rem;
+            }
+            
+            .header {
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }
+            
+            .welcome-section {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .three-column-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .quick-actions {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
@@ -716,7 +885,7 @@ function getSemesterRiskAnalysis() {
                 </a>
             </li>
             <li class="nav-item">
-                <a href="admin-students.php" class="nav-link ">
+                <a href="admin-students.php" class="nav-link">
                     <i class="fas fa-users"></i>
                     Manage Students
                 </a>
@@ -741,7 +910,7 @@ function getSemesterRiskAnalysis() {
         </ul>
 
         <div class="sidebar-footer">
-            <a href="logout.php" class="logout-btn">
+            <a href="#" class="logout-btn" id="logoutBtn">
                 <i class="fas fa-sign-out-alt"></i>
                 Logout
             </a>
@@ -757,23 +926,78 @@ function getSemesterRiskAnalysis() {
         <?php endif; ?>
         
         <div class="header">
-            <div class="welcome">Welcome, <?php echo htmlspecialchars(explode(' ', $admin['fullname'])[0]); ?>!</div>
+            <div class="welcome-section">
+                <div class="welcome-icon">
+                    <i class="fas fa-user-shield"></i>
+                </div>
+                <div class="welcome-text">
+                    <h1>Welcome back, <?php echo htmlspecialchars(explode(' ', $admin['fullname'])[0]); ?>!</h1>
+                    <p>Here's what's happening with your institution today</p>
+                </div>
+            </div>
+            <div class="date-display">
+                <i class="fas fa-calendar"></i>
+                <?php echo date('F j, Y'); ?>
+            </div>
         </div>
 
-        <!-- Admin Statistics -->
-        <div class="dashboard-grid">
-            <div class="metrics-grid">
-                <div class="metric-card">
-                    <div class="metric-value"><?php echo $total_students; ?></div>
-                    <div class="metric-label">Total Students</div>
+        <!-- Quick Actions -->
+        <div class="quick-actions">
+            <a href="admin-students.php" class="action-card">
+                <div class="action-icon">
+                    <i class="fas fa-user-plus"></i>
                 </div>
-                <div class="metric-card">
-                    <div class="metric-value"><?php echo $total_subjects; ?></div>
-                    <div class="metric-label">Total Subjects</div>
+                <div class="action-title">Add Student</div>
+                <div class="action-desc">Register new students</div>
+            </a>
+            <a href="admin-messages.php" class="action-card">
+                <div class="action-icon">
+                    <i class="fas fa-envelope"></i>
+                </div>
+                <div class="action-title">Messages</div>
+                <div class="action-desc">View student inquiries</div>
+            </a>
+            <a href="admin-system-logs.php" class="action-card">
+                <div class="action-icon">
+                    <i class="fas fa-chart-bar"></i>
+                </div>
+                <div class="action-title">Analytics</div>
+                <div class="action-desc">View system reports</div>
+            </a>
+        </div>
+
+        <!-- Statistics Cards -->
+        <div class="dashboard-grid">
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-user-graduate"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-value"><?php echo $total_students; ?></div>
+                    <div class="stat-label">Total Students</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-book"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-value"><?php echo $total_subjects; ?></div>
+                    <div class="stat-label">Total Subjects</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-chart-pie"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-value"><?php echo $semester_risk_data['overall_totals']['total_students']; ?></div>
+                    <div class="stat-label">Students Analyzed</div>
                 </div>
             </div>
         </div>
 
+        <!-- Three Column Layout -->
         <div class="three-column-grid">
             <!-- Recent Students -->
             <div class="card">
@@ -782,14 +1006,17 @@ function getSemesterRiskAnalysis() {
                         <i class="fas fa-user-graduate"></i>
                         Recent Students
                     </div>
-                    <a href="admin-students.php" style="color: var(--plp-green); text-decoration: none; font-size: 0.9rem;">
-                        View All
+                    <a href="admin-students.php" class="view-all">
+                        View All <i class="fas fa-arrow-right"></i>
                     </a>
                 </div>
                 <?php if (!empty($recent_students)): ?>
                     <ul class="student-list">
                         <?php foreach ($recent_students as $student): ?>
                             <li class="student-item">
+                                <div class="student-avatar">
+                                    <?php echo strtoupper(substr($student['fullname'], 0, 1)); ?>
+                                </div>
                                 <div class="student-info">
                                     <div class="student-name"><?php echo htmlspecialchars($student['fullname']); ?></div>
                                     <div class="student-details">
@@ -810,98 +1037,97 @@ function getSemesterRiskAnalysis() {
                 <?php endif; ?>
             </div>
 
-            <!-- Semester Risk Analysis -->
+            <!-- First Semester Risk Analysis -->
             <div class="card">
                 <div class="card-header">
                     <div class="card-title">
-                        <i class="fas fa-chart-bar"></i>
-                        Semester Risk Analysis
+                        <i class="fas fa-calendar-alt"></i>
+                        First Semester Analysis
                     </div>
                 </div>
                 <div class="risk-stats">
-                    <!-- First Semester -->
-                    <div style="margin-bottom: 1.5rem;">
-                        <h4 style="color: var(--plp-green); margin-bottom: 0.75rem; font-size: 0.9rem;">
-                            <i class="fas fa-calendar-alt"></i> First Semester
-                        </h4>
-                        <div class="risk-stat-item">
-                            <div class="risk-stat-label">
-                                <i class="fas fa-exclamation-triangle"></i>
-                                <span>High Risk</span>
-                            </div>
-                            <div class="risk-stat-value risk-high">
-                                <?php echo $semester_risk_data['first_semester']['high_risk']; ?>
-                            </div>
+                    <div class="risk-stat-item">
+                        <div class="risk-stat-label">
+                            <i class="fas fa-exclamation-triangle" style="color: var(--danger);"></i>
+                            <span>High Risk</span>
                         </div>
-                        <div class="risk-stat-item">
-                            <div class="risk-stat-label">
-                                <i class="fas fa-minus-circle"></i>
-                                <span>Moderate Risk</span>
-                            </div>
-                            <div class="risk-stat-value risk-moderate">
-                                <?php echo $semester_risk_data['first_semester']['moderate_risk']; ?>
-                            </div>
-                        </div>
-                        <div class="risk-stat-item">
-                            <div class="risk-stat-label">
-                                <i class="fas fa-check-circle"></i>
-                                <span>Low Risk</span>
-                            </div>
-                            <div class="risk-stat-value risk-low">
-                                <?php echo $semester_risk_data['first_semester']['low_risk']; ?>
-                            </div>
-                        </div>
-                        <div class="risk-stat-item">
-                            <div class="risk-stat-label">
-                                <i class="fas fa-question-circle"></i>
-                                <span>No Data</span>
-                            </div>
-                            <div class="risk-stat-value risk-no-data">
-                                <?php echo $semester_risk_data['first_semester']['no_data']; ?>
-                            </div>
+                        <div class="risk-stat-value risk-high">
+                            <?php echo $semester_risk_data['first_semester']['high_risk']; ?>
                         </div>
                     </div>
+                    <div class="risk-stat-item">
+                        <div class="risk-stat-label">
+                            <i class="fas fa-minus-circle" style="color: var(--warning);"></i>
+                            <span>Moderate Risk</span>
+                        </div>
+                        <div class="risk-stat-value risk-moderate">
+                            <?php echo $semester_risk_data['first_semester']['moderate_risk']; ?>
+                        </div>
+                    </div>
+                    <div class="risk-stat-item">
+                        <div class="risk-stat-label">
+                            <i class="fas fa-check-circle" style="color: var(--success);"></i>
+                            <span>Low Risk</span>
+                        </div>
+                        <div class="risk-stat-value risk-low">
+                            <?php echo $semester_risk_data['first_semester']['low_risk']; ?>
+                        </div>
+                    </div>
+                    <div class="risk-stat-item">
+                        <div class="risk-stat-label">
+                            <i class="fas fa-question-circle" style="color: var(--text-light);"></i>
+                            <span>No Data</span>
+                        </div>
+                        <div class="risk-stat-value risk-no-data">
+                            <?php echo $semester_risk_data['first_semester']['no_data']; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-                    <!-- Second Semester -->
-                    <div>
-                        <h4 style="color: var(--plp-green); margin-bottom: 0.75rem; font-size: 0.9rem;">
-                            <i class="fas fa-calendar-alt"></i> Second Semester
-                        </h4>
-                        <div class="risk-stat-item">
-                            <div class="risk-stat-label">
-                                <i class="fas fa-exclamation-triangle"></i>
-                                <span>High Risk</span>
-                            </div>
-                            <div class="risk-stat-value risk-high">
-                                <?php echo $semester_risk_data['second_semester']['high_risk']; ?>
-                            </div>
+            <!-- Second Semester Risk Analysis -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fas fa-calendar-alt"></i>
+                        Second Semester Analysis
+                    </div>
+                </div>
+                <div class="risk-stats">
+                    <div class="risk-stat-item">
+                        <div class="risk-stat-label">
+                            <i class="fas fa-exclamation-triangle" style="color: var(--danger);"></i>
+                            <span>High Risk</span>
                         </div>
-                        <div class="risk-stat-item">
-                            <div class="risk-stat-label">
-                                <i class="fas fa-minus-circle"></i>
-                                <span>Moderate Risk</span>
-                            </div>
-                            <div class="risk-stat-value risk-moderate">
-                                <?php echo $semester_risk_data['second_semester']['moderate_risk']; ?>
-                            </div>
+                        <div class="risk-stat-value risk-high">
+                            <?php echo $semester_risk_data['second_semester']['high_risk']; ?>
                         </div>
-                        <div class="risk-stat-item">
-                            <div class="risk-stat-label">
-                                <i class="fas fa-check-circle"></i>
-                                <span>Low Risk</span>
-                            </div>
-                            <div class="risk-stat-value risk-low">
-                                <?php echo $semester_risk_data['second_semester']['low_risk']; ?>
-                            </div>
+                    </div>
+                    <div class="risk-stat-item">
+                        <div class="risk-stat-label">
+                            <i class="fas fa-minus-circle" style="color: var(--warning);"></i>
+                            <span>Moderate Risk</span>
                         </div>
-                        <div class="risk-stat-item">
-                            <div class="risk-stat-label">
-                                <i class="fas fa-question-circle"></i>
-                                <span>No Data</span>
-                            </div>
-                            <div class="risk-stat-value risk-no-data">
-                                <?php echo $semester_risk_data['second_semester']['no_data']; ?>
-                            </div>
+                        <div class="risk-stat-value risk-moderate">
+                            <?php echo $semester_risk_data['second_semester']['moderate_risk']; ?>
+                        </div>
+                    </div>
+                    <div class="risk-stat-item">
+                        <div class="risk-stat-label">
+                            <i class="fas fa-check-circle" style="color: var(--success);"></i>
+                            <span>Low Risk</span>
+                        </div>
+                        <div class="risk-stat-value risk-low">
+                            <?php echo $semester_risk_data['second_semester']['low_risk']; ?>
+                        </div>
+                    </div>
+                    <div class="risk-stat-item">
+                        <div class="risk-stat-label">
+                            <i class="fas fa-question-circle" style="color: var(--text-light);"></i>
+                            <span>No Data</span>
+                        </div>
+                        <div class="risk-stat-value risk-no-data">
+                            <?php echo $semester_risk_data['second_semester']['no_data']; ?>
                         </div>
                     </div>
                 </div>
@@ -911,31 +1137,24 @@ function getSemesterRiskAnalysis() {
 
     <!-- Logout Modal -->
     <div class="modal" id="logoutModal">
-        <div class="modal-content" style="max-width: 450px; text-align: center;">
-            <h3 style="color: var(--plp-green); font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem;">
-                Confirm Logout
-            </h3>
-            <div style="color: var(--text-medium); margin-bottom: 2rem; line-height: 1.6;">
-                Are you sure you want to logout? You'll need<br>
-                to log in again to access your account.
+        <div class="modal-content">
+            <h3 class="modal-title">Confirm Logout</h3>
+            <div class="modal-body">
+                Are you sure you want to logout?<br>
+                You'll need to log in again to access your account.
             </div>
-            <div style="display: flex; justify-content: center; gap: 1rem;">
-                <button class="modal-btn modal-btn-cancel" id="cancelLogout" style="min-width: 120px;">
-                    Cancel
-                </button>
-                <button class="modal-btn modal-btn-confirm" id="confirmLogout" style="min-width: 120px;">
-                    Yes, Logout
-                </button>
+            <div class="modal-actions">
+                <button class="modal-btn modal-btn-cancel" id="cancelLogout">Cancel</button>
+                <a href="logout.php" class="modal-btn modal-btn-confirm">Yes, Logout</a>
             </div>
         </div>
     </div>
 
     <script>
         // Logout modal functionality
-        const logoutBtn = document.querySelector('.logout-btn');
+        const logoutBtn = document.getElementById('logoutBtn');
         const logoutModal = document.getElementById('logoutModal');
         const cancelLogout = document.getElementById('cancelLogout');
-        const confirmLogout = document.getElementById('confirmLogout');
 
         // Show modal when clicking logout button
         logoutBtn.addEventListener('click', (e) => {
@@ -948,16 +1167,27 @@ function getSemesterRiskAnalysis() {
             logoutModal.classList.remove('show');
         });
 
-        // Handle logout confirmation
-        confirmLogout.addEventListener('click', () => {
-            window.location.href = 'logout.php';
-        });
-
         // Hide modal when clicking outside the modal content
         logoutModal.addEventListener('click', (e) => {
             if (e.target === logoutModal) {
                 logoutModal.classList.remove('show');
             }
+        });
+
+        // Add some interactive animations
+        document.addEventListener('DOMContentLoaded', function() {
+            // Animate cards on load
+            const cards = document.querySelectorAll('.card, .stat-card');
+            cards.forEach((card, index) => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(20px)';
+                
+                setTimeout(() => {
+                    card.style.transition = 'all 0.5s ease';
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }, index * 100);
+            });
         });
     </script>
 </body>
