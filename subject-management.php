@@ -569,16 +569,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Helper functions - ONLY KEEP ESSENTIAL ONES
-function getRiskDescription($riskLevel) {
-    switch ($riskLevel) {
-        case 'low_risk': return 'Excellent/Good Performance';
-        case 'moderate_risk': return 'Needs Improvement';
-        case 'high_risk': return 'Need to Communicate with Professor';
-        default: return 'No Data Inputted';
-    }
-}
-
 function getGradeDescription($grade) {
     if ($grade >= 90) return 'Excellent';
     elseif ($grade >= 85) return 'Very Good';

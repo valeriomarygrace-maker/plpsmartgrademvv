@@ -360,7 +360,7 @@ function getSemesterRiskAnalysis() {
 
         .dashboard-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(250px, 2fr));
             gap: 1.5rem;
             margin-bottom: 2rem;
         }
@@ -906,6 +906,8 @@ function getSemesterRiskAnalysis() {
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
 
     <!-- Logout Modal -->
     <div class="modal" id="logoutModal">
