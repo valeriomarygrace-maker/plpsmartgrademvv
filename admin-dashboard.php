@@ -652,49 +652,6 @@ function getSemesterRiskAnalysis() {
             gap: 0.75rem;
         }
 
-        /* Quick Actions */
-        .quick-actions {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-            margin-bottom: 2rem;
-        }
-
-        .action-card {
-            background: white;
-            padding: 1.5rem;
-            border-radius: var(--border-radius);
-            box-shadow: var(--box-shadow);
-            text-align: center;
-            text-decoration: none;
-            color: var(--text-dark);
-            transition: var(--transition);
-            border: 2px solid transparent;
-        }
-
-        .action-card:hover {
-            transform: translateY(-3px);
-            box-shadow: var(--box-shadow-lg);
-            border-color: var(--plp-green);
-            color: var(--plp-green);
-        }
-
-        .action-icon {
-            font-size: 2rem;
-            margin-bottom: 1rem;
-            color: var(--plp-green);
-        }
-
-        .action-title {
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-        }
-
-        .action-desc {
-            font-size: 0.85rem;
-            color: var(--text-medium);
-        }
-
         /* Modal Styles */
         .modal {
             display: none;
@@ -927,43 +884,10 @@ function getSemesterRiskAnalysis() {
         
         <div class="header">
             <div class="welcome-section">
-                <div class="welcome-icon">
-                    <i class="fas fa-user-shield"></i>
-                </div>
                 <div class="welcome-text">
-                    <h1>Welcome back, <?php echo htmlspecialchars(explode(' ', $admin['fullname'])[0]); ?>!</h1>
-                    <p>Here's what's happening with your institution today</p>
+                    <h1>Welcome, <?php echo htmlspecialchars(explode(' ', $admin['fullname'])[0]); ?>!</h1>
                 </div>
             </div>
-            <div class="date-display">
-                <i class="fas fa-calendar"></i>
-                <?php echo date('F j, Y'); ?>
-            </div>
-        </div>
-
-        <!-- Quick Actions -->
-        <div class="quick-actions">
-            <a href="admin-students.php" class="action-card">
-                <div class="action-icon">
-                    <i class="fas fa-user-plus"></i>
-                </div>
-                <div class="action-title">Add Student</div>
-                <div class="action-desc">Register new students</div>
-            </a>
-            <a href="admin-messages.php" class="action-card">
-                <div class="action-icon">
-                    <i class="fas fa-envelope"></i>
-                </div>
-                <div class="action-title">Messages</div>
-                <div class="action-desc">View student inquiries</div>
-            </a>
-            <a href="admin-system-logs.php" class="action-card">
-                <div class="action-icon">
-                    <i class="fas fa-chart-bar"></i>
-                </div>
-                <div class="action-title">Analytics</div>
-                <div class="action-desc">View system reports</div>
-            </a>
         </div>
 
         <!-- Statistics Cards -->
@@ -999,7 +923,6 @@ function getSemesterRiskAnalysis() {
 
         <!-- Three Column Layout -->
         <div class="three-column-grid">
-            <!-- Recent Students -->
             <div class="card">
                 <div class="card-header">
                     <div class="card-title">
@@ -1014,9 +937,6 @@ function getSemesterRiskAnalysis() {
                     <ul class="student-list">
                         <?php foreach ($recent_students as $student): ?>
                             <li class="student-item">
-                                <div class="student-avatar">
-                                    <?php echo strtoupper(substr($student['fullname'], 0, 1)); ?>
-                                </div>
                                 <div class="student-info">
                                     <div class="student-name"><?php echo htmlspecialchars($student['fullname']); ?></div>
                                     <div class="student-details">
@@ -1048,7 +968,6 @@ function getSemesterRiskAnalysis() {
                 <div class="risk-stats">
                     <div class="risk-stat-item">
                         <div class="risk-stat-label">
-                            <i class="fas fa-exclamation-triangle" style="color: var(--danger);"></i>
                             <span>High Risk</span>
                         </div>
                         <div class="risk-stat-value risk-high">
@@ -1057,7 +976,6 @@ function getSemesterRiskAnalysis() {
                     </div>
                     <div class="risk-stat-item">
                         <div class="risk-stat-label">
-                            <i class="fas fa-minus-circle" style="color: var(--warning);"></i>
                             <span>Moderate Risk</span>
                         </div>
                         <div class="risk-stat-value risk-moderate">
@@ -1066,7 +984,6 @@ function getSemesterRiskAnalysis() {
                     </div>
                     <div class="risk-stat-item">
                         <div class="risk-stat-label">
-                            <i class="fas fa-check-circle" style="color: var(--success);"></i>
                             <span>Low Risk</span>
                         </div>
                         <div class="risk-stat-value risk-low">
@@ -1075,7 +992,6 @@ function getSemesterRiskAnalysis() {
                     </div>
                     <div class="risk-stat-item">
                         <div class="risk-stat-label">
-                            <i class="fas fa-question-circle" style="color: var(--text-light);"></i>
                             <span>No Data</span>
                         </div>
                         <div class="risk-stat-value risk-no-data">
@@ -1096,7 +1012,6 @@ function getSemesterRiskAnalysis() {
                 <div class="risk-stats">
                     <div class="risk-stat-item">
                         <div class="risk-stat-label">
-                            <i class="fas fa-exclamation-triangle" style="color: var(--danger);"></i>
                             <span>High Risk</span>
                         </div>
                         <div class="risk-stat-value risk-high">
@@ -1105,7 +1020,6 @@ function getSemesterRiskAnalysis() {
                     </div>
                     <div class="risk-stat-item">
                         <div class="risk-stat-label">
-                            <i class="fas fa-minus-circle" style="color: var(--warning);"></i>
                             <span>Moderate Risk</span>
                         </div>
                         <div class="risk-stat-value risk-moderate">
@@ -1114,7 +1028,6 @@ function getSemesterRiskAnalysis() {
                     </div>
                     <div class="risk-stat-item">
                         <div class="risk-stat-label">
-                            <i class="fas fa-check-circle" style="color: var(--success);"></i>
                             <span>Low Risk</span>
                         </div>
                         <div class="risk-stat-value risk-low">
@@ -1123,7 +1036,6 @@ function getSemesterRiskAnalysis() {
                     </div>
                     <div class="risk-stat-item">
                         <div class="risk-stat-label">
-                            <i class="fas fa-question-circle" style="color: var(--text-light);"></i>
                             <span>No Data</span>
                         </div>
                         <div class="risk-stat-value risk-no-data">

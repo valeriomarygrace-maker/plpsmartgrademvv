@@ -1683,16 +1683,6 @@ function getGradeDescription($grade) {
                     </div>
                     <?php if ($hasScores): ?>
                         <div class="performance-value"><?php echo number_format($termGrade, 1); ?>%</div>
-                        <div class="performance-label" style="margin-top: 0.5rem; font-size: 0.9rem; color: var(--text-medium);">
-                            <?php
-                            if ($termGrade >= 90) echo 'Excellent';
-                            elseif ($termGrade >= 85) echo 'Very Good';
-                            elseif ($termGrade >= 80) echo 'Good';
-                            elseif ($termGrade >= 75) echo 'Satisfactory';
-                            elseif ($termGrade >= 70) echo 'Passing';
-                            else echo 'Needs Improvement';
-                            ?>
-                        </div>
                     <?php else: ?>
                         <div class="performance-value" style="color: var(--text-light);">--</div>
                         <div class="performance-label">No scores added</div>

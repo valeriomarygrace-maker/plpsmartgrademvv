@@ -237,9 +237,9 @@ function getSubjectRiskDetailedDescription($grade, $ml_prediction = null) {
         return $ml_prediction['risk_description'];
     }
     
-    if ($grade >= 85) return 'Excellent/Good Performance';
-    elseif ($grade >= 80) return 'Needs Improvement';
-    else return 'Need to Communicate with Professor';
+    if ($grade >= 85) return 'Low Risk';
+    elseif ($grade >= 80) return 'Moderate Risk';
+    else return 'High Risk';
 }
 ?>
 
@@ -252,7 +252,6 @@ function getSubjectRiskDetailedDescription($grade, $ml_prediction = null) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* Your existing CSS styles remain the same */
         :root {
             --plp-green: #006341;
             --plp-green-light: #008856;

@@ -76,9 +76,9 @@ function calculateRiskLevelSimple($grade) {
  */
 function getRiskDescription($riskLevel) {
     switch ($riskLevel) {
-        case 'low_risk': return 'Low Risk';
-        case 'moderate_risk': return 'Moderate Risk';
-        case 'high_risk': return 'High Risk';
+        case 'low_risk': return 'Excellent/Good Performance';
+        case 'moderate_risk': return 'Needs Improvement';
+        case 'high_risk': return 'Need to Communicate with Professor';
         default: return 'No Data Inputted';
     }
 }
