@@ -831,7 +831,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
                 
                 <div class="login-container">
                     <form class="login-form" method="POST" id="loginForm">
-                    <h3><?php echo isset($_SESSION['user_type']) && $_SESSION['user_type'] === 'admin' ? 'Admin' : 'Student'; ?> Log In</h3>
+                    <h3>Log In</h3>
                         
                         <?php if ($error && !isset($_POST['signup'])): ?>
                             <div class="alert alert-error">
