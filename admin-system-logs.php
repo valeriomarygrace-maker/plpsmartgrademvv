@@ -533,25 +533,30 @@ $admin = getAdminByEmail($_SESSION['user_email']);
             <li class="nav-item">
                 <a href="admin-students.php" class="nav-link">
                     <i class="fas fa-users"></i>
-                    Students
+                    Manage Students
                 </a>
             </li>
             <li class="nav-item">
                 <a href="admin-messages.php" class="nav-link">
                     <i class="fas fa-comments"></i>
                     Messages
+                    <?php 
+                    $unread_count = getUnreadMessageCount($_SESSION['user_id'], 'admin');
+                    if ($unread_count > 0): ?>
+                        <span class="sidebar-badge"><?php echo $unread_count; ?></span>
+                    <?php endif; ?>
                 </a>
             </li>
             <li class="nav-item">
                 <a href="admin-system-logs.php" class="nav-link active">
-                    <i class="fas fa-clipboard-list"></i>
+                    <i class="fas fa-cog"></i>
                     System Logs
                 </a>
             </li>
         </ul>
 
         <div class="sidebar-footer">
-            <a href="logout.php" class="logout-btn">
+            <a href="#" class="logout-btn" id="logoutBtn">
                 <i class="fas fa-sign-out-alt"></i>
                 Logout
             </a>
