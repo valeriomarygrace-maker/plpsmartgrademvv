@@ -184,10 +184,6 @@ function getSemesterRiskAnalysis() {
             --box-shadow: 0 4px 12px rgba(0, 99, 65, 0.1);
             --box-shadow-lg: 0 8px 24px rgba(0, 99, 65, 0.15);
             --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-            --danger: #dc3545;
-            --warning: #ffc107;
-            --success: #28a745;
-            --info: #17a2b8;
         }
 
         * {
@@ -341,10 +337,10 @@ function getSemesterRiskAnalysis() {
 
         .header {
             background: white;
-            padding: 1.5rem 2rem;
+            padding: 0.6rem 1.25rem;
             border-radius: var(--border-radius);
             box-shadow: var(--box-shadow);
-            margin-bottom: 2rem;
+            margin-bottom: 1.5rem; 
             background: var(--plp-green-gradient);
             color: white;
             display: flex;
@@ -352,34 +348,10 @@ function getSemesterRiskAnalysis() {
             align-items: center;
         }
 
-        .welcome-section {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .welcome-icon {
-            font-size: 2.5rem;
-            opacity: 0.9;
-        }
-
-        .welcome-text h1 {
-            font-size: 1.8rem;
+        .welcome {
+            font-size: 1.5rem;
             font-weight: 700;
-            margin-bottom: 0.25rem;
-        }
-
-        .welcome-text p {
-            opacity: 0.9;
-            font-size: 1rem;
-        }
-
-        .date-display {
-            background: rgba(255, 255, 255, 0.2);
-            padding: 0.75rem 1.5rem;
-            border-radius: var(--border-radius);
-            font-weight: 600;
-            backdrop-filter: blur(10px);
+            letter-spacing: 0.5px;
         }
 
         /* Enhanced Dashboard Grid */
@@ -556,7 +528,7 @@ function getSemesterRiskAnalysis() {
         }
 
         .semester-section {
-            margin-bottom: 1.5rem;
+            margin-bottom: 1rem;
         }
 
         .semester-header {
@@ -568,7 +540,6 @@ function getSemesterRiskAnalysis() {
             align-items: center;
             gap: 0.5rem;
             padding-bottom: 0.5rem;
-            border-bottom: 1px solid var(--plp-green-lighter);
         }
 
         .risk-stat-item {
@@ -577,7 +548,6 @@ function getSemesterRiskAnalysis() {
             align-items: center;
             padding: 0.75rem;
             border-radius: var(--border-radius);
-            background: var(--plp-green-pale);
             transition: var(--transition);
         }
 
