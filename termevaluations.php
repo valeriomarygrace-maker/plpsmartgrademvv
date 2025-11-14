@@ -193,7 +193,7 @@ try {
         if ($subjectGrade > 100) $subjectGrade = 100;
     }
     
-    // 🚀 CALL PYTHON ML FOR SUBJECT GRADE PREDICTION ONLY
+    // CALL PYTHON ML FOR SUBJECT GRADE PREDICTION ONLY
     if ($subjectGrade > 0) {
         $ml_prediction = callPythonMLAPI([
             'subject_grade' => $subjectGrade,

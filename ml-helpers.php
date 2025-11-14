@@ -1,5 +1,87 @@
 <?php
-// Add these functions to ml-helpers.php
+/**
+ * ML Helpers for PLP SmartGrade
+ * Contains functions for Python ML integration and fallback logic
+ */
+
+/**
+ * Call Python ML API for risk prediction
+ */
+function callPythonMLAPI($student_data) {
+    $url = 'http://localhost:5000/predict';
+    
+    $payload = json_encode([
+        'class_standings' => $student_data['class_standings'] ?? [],
+        'exam_scores' => $student_data['exam_scores'] ?? [],
+        'attendance' => $student_data['attendance'] ?? [],
+        'subject' => $student_data['subject'] ?? 'General',
+        'term' => $student_data['term'] ?? 'midterm',
+        'subject_grade' => $student_data['subject_grade'] ?? 0
+    ]);
+    
+    $options = [
+        'http' => [
+            'header'  => "Content-type: application/json\r\n",
+            'method'  => 'POST',
+            'content' => $payload,
+            'timeout' => 5 // 5 second timeout
+        ]
+    ];
+    
+    $context = stream_context_create($options);
+    
+    try {
+        $result = @file_get_contents($url, false, $context);
+        
+        if ($result === FALSE) {
+            error_log("Python ML API call failed - service might be down");
+            return [
+                'success' => false,
+                'error' => 'ML service unavailable'
+            ];
+        }
+        
+        $decoded_result = json_decode($result, true);
+        
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            error_log("Python ML API returned invalid JSON");
+            return [
+                'success' => false,
+                'error' => 'Invalid response from ML service'
+            ];
+        }
+        
+        return $decoded_result;
+        
+    } catch (Exception $e) {
+        error_log("Python ML API exception: " . $e->getMessage());
+        return [
+            'success' => false,
+            'error' => $e->getMessage()
+        ];
+    }
+}
+
+/**
+ * Fallback function if ML service is down
+ */
+function calculateRiskLevelSimple($grade) {
+    if ($grade >= 85) return 'low_risk';
+    elseif ($grade >= 80) return 'moderate_risk';
+    else return 'high_risk';
+}
+
+/**
+ * Get risk description based on risk level
+ */
+function getRiskDescription($riskLevel) {
+    switch ($riskLevel) {
+        case 'low_risk': return 'Excellent/Good Performance';
+        case 'moderate_risk': return 'Needs Improvement';
+        case 'high_risk': return 'Need to Communicate with Professor';
+        default: return 'No Data Inputted';
+    }
+}
 
 /**
  * Generate behavioral insights based on student performance
@@ -231,5 +313,20 @@ function generateRecommendations($termGrade, $categoryTotals, $riskLevel, $term)
     }
     
     return array_slice($recommendations, 0, 3);
+}
+
+/**
+ * Get attendance data for ML analysis
+ */
+function getAttendanceData($categoryTotals) {
+    $attendance = [];
+    foreach ($categoryTotals as $category) {
+        if (strtolower($category['name']) === 'attendance' && !empty($category['scores'])) {
+            foreach ($category['scores'] as $score) {
+                $attendance[] = $score['score_name'] === 'Present' ? 1 : 0;
+            }
+        }
+    }
+    return $attendance;
 }
 ?>

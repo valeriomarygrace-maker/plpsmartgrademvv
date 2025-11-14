@@ -906,36 +906,6 @@ function getSemesterRiskAnalysis() {
                     </div>
                 </div>
             </div>
-
-            <!-- System Status -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title">
-                        <i class="fas fa-server"></i>
-                        System Status
-                    </div>
-                </div>
-                <div style="display: flex; flex-direction: column; gap: 1rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="color: var(--text-medium);">Database</span>
-                        <span style="color: var(--success); font-weight: 600;">
-                            <i class="fas fa-check-circle"></i> Online
-                        </span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="color: var(--text-medium);">ML Service</span>
-                        <span style="color: var(--success); font-weight: 600;">
-                            <i class="fas fa-check-circle"></i> Active
-                        </span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="color: var(--text-medium);">Last Backup</span>
-                        <span style="color: var(--text-medium); font-size: 0.85rem;">
-                            <?php echo date('M j, Y'); ?>
-                        </span>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 
