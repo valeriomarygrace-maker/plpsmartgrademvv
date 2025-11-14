@@ -291,14 +291,6 @@ if ($hasScores) {
     ]];
 }
 
-/**
- * Fallback function if ML service is down
- */
-function calculateRiskLevelSimple($grade) {
-    if ($grade >= 85) return 'low_risk';
-    elseif ($grade >= 80) return 'moderate_risk';
-    else return 'high_risk';
-}
 
 // FORM HANDLING - Only allow actions for current term
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {

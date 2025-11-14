@@ -906,8 +906,6 @@ function getSemesterRiskAnalysis() {
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
 
     <!-- Logout Modal -->
     <div class="modal" id="logoutModal">
