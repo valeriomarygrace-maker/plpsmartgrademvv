@@ -102,11 +102,6 @@ try {
     $allScores = supabaseFetch('student_subject_scores', ['student_subject_id' => $subject_id]);
     if (!$allScores) $allScores = [];
     
-    error_log("All Scores Count: " . count($allScores));
-    foreach ($allScores as $score) {
-        error_log("Score: " . $score['score_name'] . " - " . $score['score_value'] . "/" . $score['max_score']);
-    }
-    
     // Filter scores based on CURRENT TERM categories
     $filteredScores = [];
     foreach ($allScores as $score) {
@@ -157,11 +152,6 @@ $finalExam = array_filter($allScores, function($score) {
     return $score['score_type'] === 'final_exam';
 });
 
-error_log("Class Standings Count: " . count($classStandings));
-foreach ($classStandings as $standing) {
-    error_log("Class Standing: " . $standing['score_name'] . " - " . $standing['score_value'] . "/" . $standing['max_score']);
-}
-
 // Initialize variables
 $hasScores = !empty($classStandings) || ($term === 'midterm' && !empty($midtermExam)) || ($term === 'final' && !empty($finalExam));
 $totalClassStanding = 0;
@@ -171,7 +161,6 @@ $termGrade = 0;
 $subjectGrade = 0;
 $riskLevel = 'no-data';
 $riskDescription = 'No Data Inputted';
-$ml_confidence = 0;
 $behavioralInsights = [];
 $interventions = [];
 $recommendations = [];
@@ -266,37 +255,15 @@ if ($hasScores) {
         $termGrade = 100;
     }
 
-    // 🚀 NEW: CALL PYTHON ML FOR RISK PREDICTION
-    $ml_prediction = callPythonMLAPI([
-        'subject_grade' => $termGrade,
-        'class_standings' => array_column($categoryTotals, 'percentage_score'),
-        'exam_scores' => $term === 'midterm' ? [$midtermScore] : [$finalScore],
-        'attendance' => getAttendanceData($categoryTotals),
-        'subject' => $subject['subject_name'],
-        'term' => $term
-    ]);
-
-    if ($ml_prediction && $ml_prediction['success']) {
-        // Use ML prediction
-        $riskLevel = $ml_prediction['risk_level'];
-        $riskDescription = $ml_prediction['risk_description'];
-        $ml_confidence = $ml_prediction['confidence'] * 100; // Convert to percentage
-        $behavioralInsights = $ml_prediction['behavioral_insights'];
-        $recommendations = $ml_prediction['recommendations'];
-    } else {
-        // Fallback to simple rules if ML fails
-        $riskLevel = calculateRiskLevelSimple($termGrade);
-        $riskDescription = getRiskDescription($riskLevel);
-        $ml_confidence = 0;
-        $behavioralInsights = generateBehavioralInsights($termGrade, $categoryTotals, $term, $student['id'], $subject_id);
-        $recommendations = generateRecommendations($termGrade, $categoryTotals, $riskLevel, $term);
-    }
+    // 🚀 REMOVED: Python ML call for prediction
+    // Use PHP-based analysis only for behavioral insights, interventions, and recommendations
+    
+    $riskLevel = calculateRiskLevelSimple($termGrade);
+    $riskDescription = getRiskDescription($riskLevel);
+    $behavioralInsights = generateBehavioralInsights($termGrade, $categoryTotals, $term, $student['id'], $subject_id);
+    $recommendations = generateRecommendations($termGrade, $categoryTotals, $riskLevel, $term);
 
     $interventions = generateInterventions($riskLevel, $categoryTotals, $term);
-
-    error_log("ML Prediction: " . json_encode($ml_prediction));
-    error_log("Total Class Standing: " . $totalClassStanding);
-    error_log("Term Grade: " . $termGrade);
 
 } else {
     $termGrade = 0;
@@ -304,7 +271,6 @@ if ($hasScores) {
     $totalClassStanding = 0;
     $midtermScore = 0;
     $finalScore = 0;
-    $ml_confidence = 0;
     
     // Provide basic insights even without scores
     $behavioralInsights = [[
@@ -323,70 +289,6 @@ if ($hasScores) {
         'priority' => 'low',
         'source' => 'system'
     ]];
-}
-
-/**
- * NEW: Get attendance data for ML analysis
- */
-function getAttendanceData($categoryTotals) {
-    $attendance = [];
-    foreach ($categoryTotals as $category) {
-        if (strtolower($category['name']) === 'attendance' && !empty($category['scores'])) {
-            foreach ($category['scores'] as $score) {
-                $attendance[] = $score['score_name'] === 'Present' ? 1 : 0;
-            }
-        }
-    }
-    return $attendance;
-}
-
-/**
- * NEW: Call Python ML API
- */
-function callPythonMLAPI($student_data) {
-    $url = 'http://localhost:5000/predict';
-    
-    $payload = json_encode([
-        'class_standings' => $student_data['class_standings'] ?? [],
-        'exam_scores' => $student_data['exam_scores'] ?? [],
-        'attendance' => $student_data['attendance'] ?? [],
-        'subject' => $student_data['subject'] ?? 'General',
-        'term' => $student_data['term'] ?? 'midterm',
-        'subject_grade' => $student_data['subject_grade'] ?? 0
-    ]);
-    
-    $options = [
-        'http' => [
-            'header'  => "Content-type: application/json\r\n",
-            'method'  => 'POST',
-            'content' => $payload,
-            'timeout' => 5 // 5 second timeout
-        ]
-    ];
-    
-    $context = stream_context_create($options);
-    
-    try {
-        $result = @file_get_contents($url, false, $context);
-        
-        if ($result === FALSE) {
-            error_log("Python ML API call failed - service might be down");
-            return null;
-        }
-        
-        $decoded_result = json_decode($result, true);
-        
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            error_log("Python ML API returned invalid JSON");
-            return null;
-        }
-        
-        return $decoded_result;
-        
-    } catch (Exception $e) {
-        error_log("Python ML API exception: " . $e->getMessage());
-        return null;
-    }
 }
 
 /**
@@ -694,6 +596,7 @@ function getGradeDescription($grade) {
     else return 'Needs Improvement';
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -703,6 +606,7 @@ function getGradeDescription($grade) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        /* Your existing CSS styles remain exactly the same */
         :root {
             --plp-green: #006341;
             --plp-green-light: #008856;
@@ -1597,6 +1501,77 @@ function getGradeDescription($grade) {
             gap: 0.5rem;
             margin-left: 1rem;
         }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal.show {
+            display: flex;
+            opacity: 1;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 2.5rem;
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--box-shadow-lg);
+            max-width: 600px;
+            width: 90%;
+            transform: translateY(20px);
+            transition: transform 0.3s ease;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal.show .modal-content {
+            transform: translateY(0);
+        }
+
+        .modal-btn {
+            font-size: 1rem;
+            font-weight: 600;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: var(--transition);
+            font-family: 'Poppins', sans-serif;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .modal-btn-cancel {
+            background: #f1f5f9;
+            color: var(--text-medium);
+        }
+
+        .modal-btn-cancel:hover {
+            background: #e2e8f0;
+            transform: translateY(-2px);
+        }
+
+        .modal-btn-confirm {
+            background: var(--plp-green-gradient);
+            color: white;
+            box-shadow: 0 4px 12px rgba(0, 99, 65, 0.3);
+        }
+
+        .modal-btn-confirm:hover {
+            transform: translateY(-2px);
+        }
         .unread-badge {
             background: #ff4444;
             color: white;
@@ -1623,29 +1598,6 @@ function getGradeDescription($grade) {
             margin-left: auto;
             font-weight: 600;
             animation: pulse 2s infinite;
-        }
-        .ml-confidence {
-            display: inline-block;
-            background: #e3f2fd;
-            color: #1976d2;
-            padding: 0.3rem 0.8rem;
-            border-radius: 15px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            margin-left: 0.5rem;
-        }
-        
-        .ml-badge {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 0.3rem 0.8rem;
-            border-radius: 15px;
-            font-size: 0.7rem;
-            font-weight: 600;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.3rem;
-            margin-left: 0.5rem;
         }
     </style>
 </head>
@@ -1731,12 +1683,6 @@ function getGradeDescription($grade) {
         <div class="header">
             <div class="class-title">
                 <?php echo htmlspecialchars($subject['subject_code'] . ' - ' . $subject['subject_name']); ?>
-                <?php if ($hasScores && $ml_confidence > 0): ?>
-                    <span class="ml-badge">
-                        <i class="fas fa-robot"></i>
-                        ML Powered
-                    </span>
-                <?php endif; ?>
             </div>
             <div class="header-actions">
                 <a href="termevaluations.php?subject_id=<?php echo $subject_id; ?>" class="btn btn-secondary">
@@ -2257,7 +2203,7 @@ function getGradeDescription($grade) {
         </div>
     </div>
 
-    <!-- Add Exam Score Modal - CURRENT TERM EXAM ONLY -->
+    <!-- Add Exam Score Modal -->
     <div class="modal" id="examModal">
         <div class="modal-content">
             <span class="close" id="closeExamModal">&times;</span>
@@ -2286,7 +2232,6 @@ function getGradeDescription($grade) {
         </div>
     </div>
 
-    <!-- Logout Modal -->
     <div class="modal" id="logoutModal">
         <div class="modal-content" style="max-width: 450px; text-align: center;">
             <h3 style="color: var(--plp-green); font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem;">
@@ -2297,298 +2242,291 @@ function getGradeDescription($grade) {
                 to log in again to access your account.
             </div>
             <div style="display: flex; justify-content: center; gap: 1rem;">
-                <button class="modal-btn modal-btn-cancel" id="cancelLogout" style="min-width: 120px;">
+                <button class="modal-btn modal-btn-close" id="cancelLogout" style="min-width: 120px;">
                     Cancel
                 </button>
-                <button class="modal-btn modal-btn-confirm" id="confirmLogout" style="min-width: 120px;">
+                <button class="modal-btn btn-restore" id="confirmLogout" style="min-width: 120px;">
                     Yes, Logout
                 </button>
             </div>
         </div>
     </div>
 
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Clear any cached form data
-        if (window.history.replaceState) {
-            window.history.replaceState(null, null, window.location.href);
-        }
-        
-        // Force refresh if we have success messages
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.has('success')) {
-            // Remove the success parameter from URL without reloading
-            urlParams.delete('success');
-            urlParams.delete('t');
-            const newUrl = window.location.pathname + '?' + urlParams.toString();
-            window.history.replaceState({}, '', newUrl);
-        }
-        
-        // Add cache busting to all form submissions
-        const forms = document.querySelectorAll('form');
-        forms.forEach(form => {
-            form.addEventListener('submit', function() {
-                // Add timestamp to prevent caching
-                const timestamp = new Date().getTime();
-                const input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = 'cache_buster';
-                input.value = timestamp;
-                this.appendChild(input);
+    <script>
+        // Your existing JavaScript code remains exactly the same
+        document.addEventListener('DOMContentLoaded', function() {
+            // Clear any cached form data
+            if (window.history.replaceState) {
+                window.history.replaceState(null, null, window.location.href);
+            }
+            
+            // Force refresh if we have success messages
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.has('success')) {
+                // Remove the success parameter from URL without reloading
+                urlParams.delete('success');
+                urlParams.delete('t');
+                const newUrl = window.location.pathname + '?' + urlParams.toString();
+                window.history.replaceState({}, '', newUrl);
+            }
+            
+            // Add cache busting to all form submissions
+            const forms = document.querySelectorAll('form');
+            forms.forEach(form => {
+                form.addEventListener('submit', function() {
+                    // Add timestamp to prevent caching
+                    const timestamp = new Date().getTime();
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = 'cache_buster';
+                    input.value = timestamp;
+                    this.appendChild(input);
+                });
             });
         });
-    });
 
-    // Prevent browser back button from showing cached form data
-    window.onpageshow = function(event) {
-        if (event.persisted) {
-            window.location.reload();
+        // Prevent browser back button from showing cached form data
+        window.onpageshow = function(event) {
+            if (event.persisted) {
+                window.location.reload();
+            }
+        };
+
+        // Set today's date as default for score date and disable future dates
+        document.addEventListener('DOMContentLoaded', function() {
+            const today = new Date().toISOString().split('T')[0];
+            
+            // Set today as default value and max date
+            const dateInputs = ['score_date', 'attendance_date'];
+            dateInputs.forEach(inputId => {
+                const input = document.getElementById(inputId);
+                if (input) {
+                    input.value = today;
+                    input.max = today;
+                }
+            });
+
+            // Tab functionality
+            const tabs = document.querySelectorAll('.insight-tab');
+            const contents = document.querySelectorAll('.insight-content');
+
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    // Remove active class from all tabs and contents
+                    tabs.forEach(t => t.classList.remove('active'));
+                    contents.forEach(c => c.classList.remove('active'));
+
+                    // Add active class to clicked tab
+                    tab.classList.add('active');
+
+                    // Show corresponding content
+                    const tabId = tab.getAttribute('data-tab');
+                    document.getElementById(`${tabId}-tab`).classList.add('active');
+                });
+            });
+
+            // Set exam type based on current term
+            document.getElementById('examType').value = '<?php echo $term === 'midterm' ? 'midterm_exam' : 'final_exam'; ?>';
+        });
+
+        function openAddCategoryModal() {
+            document.getElementById('addCategoryModal').classList.add('show');
         }
-    };
-    // Set today's date as default for score date and disable future dates
-    document.addEventListener('DOMContentLoaded', function() {
-        const today = new Date().toISOString().split('T')[0];
-        
-        // Set today as default value and max date
-        const dateInputs = ['score_date', 'attendance_date'];
-        dateInputs.forEach(inputId => {
-            const input = document.getElementById(inputId);
-            if (input) {
-                input.value = today;
-                input.max = today;
+
+        function closeAddCategoryModal() {
+            document.getElementById('addCategoryModal').classList.remove('show');
+        }
+
+        function openAddScoreModal(categoryId, categoryName) {
+            document.getElementById('scoreCategoryId').value = categoryId;
+            document.getElementById('addScoreModalTitle').textContent = 'Add Score to ' + categoryName;
+            
+            // Reset form and set today's date
+            document.getElementById('scoreForm').reset();
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('score_date').value = today;
+            document.getElementById('score_date').max = today;
+            
+            document.getElementById('addScoreModal').classList.add('show');
+        }
+
+        function closeAddScoreModal() {
+            document.getElementById('addScoreModal').classList.remove('show');
+        }
+
+        function openAddAttendanceModal(categoryId, categoryName) {
+            document.getElementById('attendanceCategoryId').value = categoryId;
+            document.getElementById('addAttendanceModalTitle').textContent = 'Add Attendance to ' + categoryName;
+            
+            // Reset form and set today's date
+            document.getElementById('attendanceForm').reset();
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('attendance_date').value = today;
+            document.getElementById('attendance_date').max = today;
+            
+            // Set default to present
+            document.querySelector('input[name="attendance_status"][value="present"]').checked = true;
+            
+            document.getElementById('addAttendanceModal').classList.add('show');
+        }
+
+        function closeAddAttendanceModal() {
+            document.getElementById('addAttendanceModal').classList.remove('show');
+        }
+
+        function openEditModal(scoreId, scoreName, scoreValue, maxScore) {
+            document.getElementById('editScoreId').value = scoreId;
+            document.getElementById('deleteScoreId').value = scoreId;
+            document.getElementById('edit_score_name').value = scoreName;
+            document.getElementById('edit_score_value').value = scoreValue;
+            document.getElementById('edit_score_value').max = maxScore;
+            
+            document.getElementById('editScoreModal').classList.add('show');
+        }
+
+        function closeEditModal() {
+            document.getElementById('editScoreModal').classList.remove('show');
+        }
+
+        function openExamModal(examType) {
+            // Only allow current term exam
+            const currentTerm = '<?php echo $term; ?>';
+            const allowedExamType = currentTerm === 'midterm' ? 'midterm_exam' : 'final_exam';
+            
+            if (examType !== allowedExamType) {
+                alert('You can only add ' + currentTerm + ' exam in ' + currentTerm + ' term view.');
+                return;
+            }
+            
+            document.getElementById('examType').value = examType;
+            document.getElementById('examModalTitle').textContent = 
+                examType === 'midterm_exam' ? 'Add Midterm Exam Score' : 'Add Final Exam Score';
+            
+            // Reset form
+            document.getElementById('examForm').reset();
+            document.getElementById('exam_score').value = '';
+            document.getElementById('max_score').value = '';
+            
+            document.getElementById('examModal').classList.add('show');
+        }
+
+        function closeExamModal() {
+            document.getElementById('examModal').classList.remove('show');
+        }
+
+        // Close modals when clicking outside
+        window.addEventListener('click', (e) => {
+            <?php if ($canAddCategory): ?>
+            if (e.target === document.getElementById('addCategoryModal')) {
+                closeAddCategoryModal();
+            }
+            <?php endif; ?>
+            if (e.target === document.getElementById('addScoreModal')) {
+                closeAddScoreModal();
+            }
+            if (e.target === document.getElementById('addAttendanceModal')) {
+                closeAddAttendanceModal();
+            }
+            if (e.target === document.getElementById('editScoreModal')) {
+                closeEditModal();
+            }
+            if (e.target === document.getElementById('examModal')) {
+                closeExamModal();
             }
         });
 
-        // Tab functionality
-        const tabs = document.querySelectorAll('.insight-tab');
-        const contents = document.querySelectorAll('.insight-content');
+        // Close modal event listeners
+        document.getElementById('closeEditModal').addEventListener('click', closeEditModal);
+        document.getElementById('cancelEdit').addEventListener('click', closeEditModal);
+        document.getElementById('closeExamModal').addEventListener('click', closeExamModal);
+        document.getElementById('cancelExam').addEventListener('click', closeExamModal);
 
-        tabs.forEach(tab => {
-            tab.addEventListener('click', () => {
-                // Remove active class from all tabs and contents
-                tabs.forEach(t => t.classList.remove('active'));
-                contents.forEach(c => c.classList.remove('active'));
-
-                // Add active class to clicked tab
-                tab.classList.add('active');
-
-                // Show corresponding content
-                const tabId = tab.getAttribute('data-tab');
-                document.getElementById(`${tabId}-tab`).classList.add('active');
-            });
+        // Form validation
+        document.getElementById('scoreForm').addEventListener('submit', function(e) {
+            const scoreValue = parseFloat(document.getElementById('score_value').value);
+            const maxScore = parseFloat(document.getElementById('max_score').value);
+            
+            if (scoreValue > maxScore) {
+                e.preventDefault();
+                alert('Score value cannot exceed maximum score.');
+                return;
+            }
         });
 
-        // Set exam type based on current term
-        document.getElementById('examType').value = '<?php echo $term === 'midterm' ? 'midterm_exam' : 'final_exam'; ?>';
-    });
-
-    function openAddCategoryModal() {
-        document.getElementById('addCategoryModal').classList.add('show');
-    }
-
-    function closeAddCategoryModal() {
-        document.getElementById('addCategoryModal').classList.remove('show');
-    }
-
-    function openAddScoreModal(categoryId, categoryName) {
-        document.getElementById('scoreCategoryId').value = categoryId;
-        document.getElementById('addScoreModalTitle').textContent = 'Add Score to ' + categoryName;
-        
-        // Reset form and set today's date
-        document.getElementById('scoreForm').reset();
-        const today = new Date().toISOString().split('T')[0];
-        document.getElementById('score_date').value = today;
-        document.getElementById('score_date').max = today;
-        
-        document.getElementById('addScoreModal').classList.add('show');
-    }
-
-    function closeAddScoreModal() {
-        document.getElementById('addScoreModal').classList.remove('show');
-    }
-
-    function openAddAttendanceModal(categoryId, categoryName) {
-        document.getElementById('attendanceCategoryId').value = categoryId;
-        document.getElementById('addAttendanceModalTitle').textContent = 'Add Attendance to ' + categoryName;
-        
-        // Reset form and set today's date
-        document.getElementById('attendanceForm').reset();
-        const today = new Date().toISOString().split('T')[0];
-        document.getElementById('attendance_date').value = today;
-        document.getElementById('attendance_date').max = today;
-        
-        // Set default to present
-        document.querySelector('input[name="attendance_status"][value="present"]').checked = true;
-        
-        document.getElementById('addAttendanceModal').classList.add('show');
-    }
-
-    function closeAddAttendanceModal() {
-        document.getElementById('addAttendanceModal').classList.remove('show');
-    }
-
-    function openEditModal(scoreId, scoreName, scoreValue, maxScore) {
-        document.getElementById('editScoreId').value = scoreId;
-        document.getElementById('deleteScoreId').value = scoreId;
-        document.getElementById('edit_score_name').value = scoreName;
-        document.getElementById('edit_score_value').value = scoreValue;
-        document.getElementById('edit_score_value').max = maxScore;
-        
-        document.getElementById('editScoreModal').classList.add('show');
-    }
-
-    function closeEditModal() {
-        document.getElementById('editScoreModal').classList.remove('show');
-    }
-
-    function openExamModal(examType) {
-        // Only allow current term exam
-        const currentTerm = '<?php echo $term; ?>';
-        const allowedExamType = currentTerm === 'midterm' ? 'midterm_exam' : 'final_exam';
-        
-        if (examType !== allowedExamType) {
-            alert('You can only add ' + currentTerm + ' exam in ' + currentTerm + ' term view.');
-            return;
-        }
-        
-        document.getElementById('examType').value = examType;
-        document.getElementById('examModalTitle').textContent = 
-            examType === 'midterm_exam' ? 'Add Midterm Exam Score' : 'Add Final Exam Score';
-        
-        // Reset form
-        document.getElementById('examForm').reset();
-        document.getElementById('exam_score').value = '';
-        document.getElementById('max_score').value = '';
-        
-        document.getElementById('examModal').classList.add('show');
-    }
-
-    function closeExamModal() {
-        document.getElementById('examModal').classList.remove('show');
-    }
-
-    // Close modals when clicking outside
-    window.addEventListener('click', (e) => {
-        <?php if ($canAddCategory): ?>
-        if (e.target === document.getElementById('addCategoryModal')) {
-            closeAddCategoryModal();
-        }
-        <?php endif; ?>
-        if (e.target === document.getElementById('addScoreModal')) {
-            closeAddScoreModal();
-        }
-        if (e.target === document.getElementById('addAttendanceModal')) {
-            closeAddAttendanceModal();
-        }
-        if (e.target === document.getElementById('editScoreModal')) {
-            closeEditModal();
-        }
-        if (e.target === document.getElementById('examModal')) {
-            closeExamModal();
-        }
-    });
-
-    // Close modal event listeners
-    document.getElementById('closeEditModal').addEventListener('click', closeEditModal);
-    document.getElementById('cancelEdit').addEventListener('click', closeEditModal);
-    document.getElementById('closeExamModal').addEventListener('click', closeExamModal);
-    document.getElementById('cancelExam').addEventListener('click', closeExamModal);
-
-    // Form validation
-    document.getElementById('scoreForm').addEventListener('submit', function(e) {
-        const scoreValue = parseFloat(document.getElementById('score_value').value);
-        const maxScore = parseFloat(document.getElementById('max_score').value);
-        
-        if (scoreValue > maxScore) {
-            e.preventDefault();
-            alert('Score value cannot exceed maximum score.');
-            return;
-        }
-    });
-
-    document.getElementById('editScoreForm').addEventListener('submit', function(e) {
-        const scoreValue = parseFloat(document.getElementById('edit_score_value').value);
-        const maxScore = parseFloat(document.getElementById('edit_score_value').max);
-        
-        if (scoreValue > maxScore) {
-            e.preventDefault();
-            alert('Score value cannot exceed maximum score of ' + maxScore);
-        }
-    });
-
-    document.getElementById('examForm').addEventListener('submit', function(e) {
-        const examScore = parseFloat(document.getElementById('exam_score').value);
-        const maxScore = parseFloat(document.getElementById('max_score').value);
-        
-        if (examScore < 0 || maxScore <= 0) {
-            e.preventDefault();
-            alert('Score value and maximum score must be positive numbers.');
-        } else if (examScore > maxScore) {
-            e.preventDefault();
-            alert('Score value cannot exceed maximum score.');
-        }
-    });
-
-    document.getElementById('categoryForm').addEventListener('submit', function(e) {
-        const percentage = parseFloat(document.getElementById('category_percentage').value);
-        const remaining = <?php echo $remainingAllocation; ?>;
-        
-        if (percentage > remaining) {
-            e.preventDefault();
-            alert('Cannot add category. Percentage exceeds remaining allocation of ' + remaining + '%.');
-        }
-    });
-
-    // Real-time validation for category percentage input
-    document.getElementById('category_percentage').addEventListener('input', function() {
-        const percentage = parseFloat(this.value) || 0;
-        const remaining = <?php echo $remainingAllocation; ?>;
-        
-        if (percentage > remaining) {
-            this.style.borderColor = 'var(--danger)';
-            this.style.boxShadow = '0 0 0 3px rgba(220, 53, 69, 0.1)';
-        } else {
-            this.style.borderColor = '';
-            this.style.boxShadow = '';
-        }
-    });
-
-    document.addEventListener('DOMContentLoaded', function() {
-            <?php if ($hasScores && $ml_confidence > 0): ?>
-                console.log("ML Prediction Active - Confidence: <?php echo $ml_confidence; ?>%");
-            <?php elseif ($hasScores): ?>
-                console.log("Using fallback risk calculation - ML service unavailable");
-            <?php endif; ?>
+        document.getElementById('editScoreForm').addEventListener('submit', function(e) {
+            const scoreValue = parseFloat(document.getElementById('edit_score_value').value);
+            const maxScore = parseFloat(document.getElementById('edit_score_value').max);
+            
+            if (scoreValue > maxScore) {
+                e.preventDefault();
+                alert('Score value cannot exceed maximum score of ' + maxScore);
+            }
         });
 
-    // Logout modal functionality
-    const logoutBtn = document.querySelector('.logout-btn');
-    const logoutModal = document.getElementById('logoutModal');
-    const cancelLogout = document.getElementById('cancelLogout');
-    const confirmLogout = document.getElementById('confirmLogout');
+        document.getElementById('examForm').addEventListener('submit', function(e) {
+            const examScore = parseFloat(document.getElementById('exam_score').value);
+            const maxScore = parseFloat(document.getElementById('max_score').value);
+            
+            if (examScore < 0 || maxScore <= 0) {
+                e.preventDefault();
+                alert('Score value and maximum score must be positive numbers.');
+            } else if (examScore > maxScore) {
+                e.preventDefault();
+                alert('Score value cannot exceed maximum score.');
+            }
+        });
 
-    // Show modal when clicking logout button
-    logoutBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        logoutModal.classList.add('show');
-    });
+        document.getElementById('categoryForm').addEventListener('submit', function(e) {
+            const percentage = parseFloat(document.getElementById('category_percentage').value);
+            const remaining = <?php echo $remainingAllocation; ?>;
+            
+            if (percentage > remaining) {
+                e.preventDefault();
+                alert('Cannot add category. Percentage exceeds remaining allocation of ' + remaining + '%.');
+            }
+        });
 
-    // Hide modal when clicking cancel
-    cancelLogout.addEventListener('click', () => {
-        logoutModal.classList.remove('show');
-    });
+        // Real-time validation for category percentage input
+        document.getElementById('category_percentage').addEventListener('input', function() {
+            const percentage = parseFloat(this.value) || 0;
+            const remaining = <?php echo $remainingAllocation; ?>;
+            
+            if (percentage > remaining) {
+                this.style.borderColor = 'var(--danger)';
+                this.style.boxShadow = '0 0 0 3px rgba(220, 53, 69, 0.1)';
+            } else {
+                this.style.borderColor = '';
+                this.style.boxShadow = '';
+            }
+        });
+        // Logout modal functionality
+        const logoutBtn = document.querySelector('.logout-btn');
+        const logoutModal = document.getElementById('logoutModal');
+        const cancelLogout = document.getElementById('cancelLogout');
+        const confirmLogout = document.getElementById('confirmLogout');
 
-    // Handle logout confirmation
-    confirmLogout.addEventListener('click', () => {
-        window.location.href = 'logout.php';
-    });
+        // Show modal when clicking logout button
+        logoutBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            logoutModal.classList.add('show');
+        });
 
-    // Hide modal when clicking outside the modal content
-    logoutModal.addEventListener('click', (e) => {
-        if (e.target === logoutModal) {
+        // Hide modal when clicking cancel
+        cancelLogout.addEventListener('click', () => {
             logoutModal.classList.remove('show');
-        }
-    });
-</script>
+        });
+
+        // Handle logout confirmation
+        confirmLogout.addEventListener('click', () => {
+            window.location.href = 'logout.php';
+        });
+
+        // Hide modal when clicking outside the modal content
+        logoutModal.addEventListener('click', (e) => {
+            if (e.target === logoutModal) {
+                logoutModal.classList.remove('show');
+            }
+        });
+    </script>
 </body>
 </html>

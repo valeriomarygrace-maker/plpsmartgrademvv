@@ -1,5 +1,6 @@
 <?php
 require_once 'config.php';
+require_once 'ml-helpers.php'; // Add this line
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -55,18 +56,13 @@ try {
 $midtermGrade = 0;
 $finalGrade = 0;
 $subjectGrade = 0;
+$ml_prediction = null;
 
 try {
     // Get all scores for this subject
     $allScores = supabaseFetch('student_subject_scores', ['student_subject_id' => $subject_id]);
     if (!$allScores) $allScores = [];
     
-    // DEBUG: Log all scores found
-    error_log("All scores count: " . count($allScores));
-    foreach ($allScores as $score) {
-        error_log("Score - Type: " . $score['score_type'] . ", Name: " . $score['score_name'] . ", Value: " . $score['score_value']);
-    }
-
     // Get midterm categories
     $midtermCategories = supabaseFetch('student_class_standing_categories', [
         'student_subject_id' => $subject_id,
@@ -79,12 +75,6 @@ try {
         'term_type' => 'final'
     ]);
 
-    // DEBUG: Log categories
-    error_log("Midterm categories: " . ($midtermCategories ? count($midtermCategories) : 0));
-    error_log("Final categories: " . ($finalCategories ? count($finalCategories) : 0));
-
-    // SIMPLIFIED GRADE CALCULATION - More reliable approach
-    
     // Calculate Midterm Grade
     if ($midtermCategories && count($midtermCategories) > 0) {
         $midtermClassStanding = 0;
@@ -203,15 +193,20 @@ try {
         if ($subjectGrade > 100) $subjectGrade = 100;
     }
     
-    // DEBUG: Log final calculated grades
-    error_log("FINAL CALCULATED GRADES:");
-    error_log("Subject Grade: " . $subjectGrade);
-    error_log("Midterm Grade: " . $midtermGrade);
-    error_log("Final Grade: " . $finalGrade);
+    // 🚀 CALL PYTHON ML FOR SUBJECT GRADE PREDICTION ONLY
+    if ($subjectGrade > 0) {
+        $ml_prediction = callPythonMLAPI([
+            'subject_grade' => $subjectGrade,
+            'class_standings' => [$midtermGrade, $finalGrade],
+            'exam_scores' => [$midtermGrade, $finalGrade],
+            'attendance' => [],
+            'subject' => $subject['subject_name'],
+            'term' => 'overall'
+        ]);
+    }
     
 } catch (Exception $e) {
     error_log("Error calculating grades: " . $e->getMessage());
-    // If there's an error calculating grades, they will remain 0
 }
 
 // Get grade description for MIDTERM and FINAL (traditional grading)
@@ -224,15 +219,24 @@ function getTermGradeDescription($grade) {
     else return 'Needs Improvement';
 }
 
-// Get risk level description for SUBJECT GRADE (risk-based)
-function getSubjectRiskDescription($grade) {
+// Get risk level description for SUBJECT GRADE (ML-based)
+function getSubjectRiskDescription($grade, $ml_prediction = null) {
+    if ($ml_prediction && $ml_prediction['success']) {
+        return $ml_prediction['risk_description'];
+    }
+    
+    // Fallback to simple rules if ML fails
     if ($grade >= 85) return 'Low Risk';
     elseif ($grade >= 80) return 'Moderate Risk';
     else return 'High Risk';
 }
 
 // Get detailed risk description for SUBJECT GRADE
-function getSubjectRiskDetailedDescription($grade) {
+function getSubjectRiskDetailedDescription($grade, $ml_prediction = null) {
+    if ($ml_prediction && $ml_prediction['success']) {
+        return $ml_prediction['risk_description'];
+    }
+    
     if ($grade >= 85) return 'Excellent/Good Performance';
     elseif ($grade >= 80) return 'Needs Improvement';
     else return 'Need to Communicate with Professor';
@@ -248,6 +252,7 @@ function getSubjectRiskDetailedDescription($grade) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        /* Your existing CSS styles remain the same */
         :root {
             --plp-green: #006341;
             --plp-green-light: #008856;
@@ -624,6 +629,30 @@ function getSubjectRiskDetailedDescription($grade) {
             font-style: italic;
         }
 
+        .ml-badge {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 0.3rem 0.8rem;
+            border-radius: 15px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            margin-left: 0.5rem;
+        }
+
+        .ml-confidence {
+            display: inline-block;
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 0.3rem 0.8rem;
+            border-radius: 15px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-left: 0.5rem;
+        }
+
         @media (max-width: 768px) {
             body {
                 flex-direction: column;
@@ -655,7 +684,6 @@ function getSubjectRiskDetailedDescription($grade) {
             }
         }
 
-        /* Add debugging styles */
         .debug-info {
             background: #f8f9fa;
             border: 1px solid #dee2e6;
@@ -688,84 +716,33 @@ function getSubjectRiskDetailedDescription($grade) {
 
         .modal-content {
             background: white;
-            padding: 1.5rem;
+            padding: 2.5rem;
             border-radius: var(--border-radius-lg);
             box-shadow: var(--box-shadow-lg);
-            max-width: 450px;
+            max-width: 600px;
             width: 90%;
             transform: translateY(20px);
             transition: transform 0.3s ease;
-            position: relative;
+            max-height: 90vh;
+            overflow-y: auto;
         }
 
         .modal.show .modal-content {
             transform: translateY(0);
         }
 
-        .close {
-            position: absolute;
-            top: 1rem;
-            right: 1.5rem;
-            font-size: 1.5rem;
-            cursor: pointer;
-            color: var(--text-light);
-        }
-
-        .close:hover {
-            color: var(--text-dark);
-        }
-
-        .modal-title {
-            color: var(--plp-green);
-            font-size: 1.1rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
-        }
-
-        .form-group {
-            margin-bottom: 1rem;
-        }
-
-        .form-label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-weight: 500;
-            color: var(--text-dark);
-            font-size: 0.9rem;
-        }
-
-        .form-input {
-            width: 100%;
-            padding: 0.75rem;
-            border: 1px solid var(--plp-green-lighter);
-            border-radius: var(--border-radius);
-            font-family: 'Poppins', sans-serif;
-            transition: var(--transition);
-            font-size: 0.9rem;
-        }
-
-        .form-input:focus {
-            outline: none;
-            border-color: var(--plp-green);
-            box-shadow: 0 0 0 3px rgba(0, 99, 65, 0.1);
-        }
-
-        .modal-actions {
-            display: flex;
-            justify-content: flex-end;
-            gap: 1rem;
-            margin-top: 1rem;
-        }
-
         .modal-btn {
-            padding: 0.6rem 1.2rem;
-            border: none;
-            border-radius: 50px;
+            font-size: 1rem;
             font-weight: 600;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 50px;
             cursor: pointer;
             transition: var(--transition);
             font-family: 'Poppins', sans-serif;
-            font-size: 0.9rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
         }
 
         .modal-btn-cancel {
@@ -775,11 +752,13 @@ function getSubjectRiskDetailedDescription($grade) {
 
         .modal-btn-cancel:hover {
             background: #e2e8f0;
+            transform: translateY(-2px);
         }
 
         .modal-btn-confirm {
             background: var(--plp-green-gradient);
             color: white;
+            box-shadow: 0 4px 12px rgba(0, 99, 65, 0.3);
         }
 
         .modal-btn-confirm:hover {
@@ -881,7 +860,14 @@ function getSubjectRiskDetailedDescription($grade) {
     <div class="main-content">
         <div class="header">
             <div class="header-content">
-                <div class="subject-name"><?php echo htmlspecialchars($subject['subject_code'] . ' - ' . $subject['subject_name']); ?></div>
+                <div class="subject-name"><?php echo htmlspecialchars($subject['subject_code'] . ' - ' . $subject['subject_name']); ?>
+                    <?php if ($subjectGrade > 0 && $ml_prediction && $ml_prediction['success']): ?>
+                        <span class="ml-badge">
+                            <i class="fas fa-robot"></i>
+                            ML Powered
+                        </span>
+                    <?php endif; ?>
+                </div>
                 <div style="width: 100px;"></div> 
                 <a href="student-subjects.php" class="back-btn">
                     <i class="fas fa-arrow-left"></i>
@@ -899,6 +885,7 @@ function getSubjectRiskDetailedDescription($grade) {
             Midterm Grade: <?php echo $midtermGrade; ?><br>
             Final Grade: <?php echo $finalGrade; ?><br>
             Subject Grade: <?php echo $subjectGrade; ?><br>
+            ML Prediction: <?php echo $ml_prediction ? 'Success' : 'Failed'; ?><br>
         </div>
         <?php endif; ?>
 
@@ -914,11 +901,17 @@ function getSubjectRiskDetailedDescription($grade) {
                         <div class="overview-description">
                             <?php if ($subjectGrade > 0): ?>
                                 <?php 
-                                $riskLevel = getSubjectRiskDescription($subjectGrade);
+                                $riskLevel = getSubjectRiskDescription($subjectGrade, $ml_prediction);
+                                $riskDescription = getSubjectRiskDetailedDescription($subjectGrade, $ml_prediction);
                                 ?>
                                 <span class="risk-badge <?php echo strtolower(str_replace(' ', '-', $riskLevel)); ?>">
-                                    <?php echo $riskLevel; ?>
+                                    <?php echo $riskDescription; ?>
                                 </span>
+                                <?php if ($ml_prediction && $ml_prediction['success']): ?>
+                                    <div class="ml-confidence">
+                                        Confidence: <?php echo number_format($ml_prediction['confidence'] * 100, 1); ?>%
+                                    </div>
+                                <?php endif; ?>
                             <?php else: ?>
                                 No grades calculated
                             <?php endif; ?>
@@ -990,7 +983,6 @@ function getSubjectRiskDetailedDescription($grade) {
         </div>
     </div>
 
-            <!-- Logout Modal -->
     <div class="modal" id="logoutModal">
         <div class="modal-content" style="max-width: 450px; text-align: center;">
             <h3 style="color: var(--plp-green); font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem;">
@@ -1020,33 +1012,33 @@ function getSubjectRiskDetailedDescription($grade) {
             });
         });
         // Logout modal functionality
-    const logoutBtn = document.querySelector('.logout-btn');
-    const logoutModal = document.getElementById('logoutModal');
-    const cancelLogout = document.getElementById('cancelLogout');
-    const confirmLogout = document.getElementById('confirmLogout');
+        const logoutBtn = document.querySelector('.logout-btn');
+        const logoutModal = document.getElementById('logoutModal');
+        const cancelLogout = document.getElementById('cancelLogout');
+        const confirmLogout = document.getElementById('confirmLogout');
 
-    // Show modal when clicking logout button
-    logoutBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        logoutModal.classList.add('show');
-    });
+        // Show modal when clicking logout button
+        logoutBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            logoutModal.classList.add('show');
+        });
 
-    // Hide modal when clicking cancel
-    cancelLogout.addEventListener('click', () => {
-        logoutModal.classList.remove('show');
-    });
-
-    // Handle logout confirmation
-    confirmLogout.addEventListener('click', () => {
-        window.location.href = 'logout.php';
-    });
-
-    // Hide modal when clicking outside the modal content
-    logoutModal.addEventListener('click', (e) => {
-        if (e.target === logoutModal) {
+        // Hide modal when clicking cancel
+        cancelLogout.addEventListener('click', () => {
             logoutModal.classList.remove('show');
-        }
-    });
+        });
+
+        // Handle logout confirmation
+        confirmLogout.addEventListener('click', () => {
+            window.location.href = 'logout.php';
+        });
+
+        // Hide modal when clicking outside the modal content
+        logoutModal.addEventListener('click', (e) => {
+            if (e.target === logoutModal) {
+                logoutModal.classList.remove('show');
+            }
+        });
     </script>
 </body>
 </html>
