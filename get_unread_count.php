@@ -9,6 +9,7 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type'])) {
 $user_id = $_SESSION['user_id'];
 $user_type = $_SESSION['user_type'];
 
+// Always get fresh count
 $count = getUnreadMessageCount($user_id, $user_type);
 
 echo json_encode(['count' => $count]);

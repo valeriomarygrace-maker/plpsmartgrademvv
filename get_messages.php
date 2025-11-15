@@ -26,9 +26,13 @@ foreach ($messages as $msg) {
 
 if (!empty($unread_ids)) {
     markMessagesAsRead($unread_ids);
-    // Clear the session cache to force refresh
-    unset($_SESSION['unread_message_count']);
-    unset($_SESSION['unread_message_count_time']);
+    // Clear any session cache
+    if (isset($_SESSION['unread_message_count'])) {
+        unset($_SESSION['unread_message_count']);
+    }
+    if (isset($_SESSION['unread_message_count_time'])) {
+        unset($_SESSION['unread_message_count_time']);
+    }
 }
 
 echo json_encode($messages);

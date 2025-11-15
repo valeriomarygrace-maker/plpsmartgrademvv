@@ -1407,26 +1407,6 @@ function calculateSubjectGradeFromScores($student_subject_id) {
                                     <div class="subject-code"><?php echo htmlspecialchars($subject['subject_code']); ?></div>
                                     <div class="subject-name"><?php echo htmlspecialchars($subject['subject_name']); ?></div>
                                 </div>
-                                <div class="subject-grade">
-                                    <?php if ($subject['has_scores']): ?>
-                                        <div class="grade-value 
-                                            <?php 
-                                            if ($subject['overall_grade'] >= 90) echo 'grade-excellent';
-                                            elseif ($subject['overall_grade'] >= 80) echo 'grade-good';
-                                            elseif ($subject['overall_grade'] >= 75) echo 'grade-average';
-                                            else echo 'grade-poor';
-                                            ?>
-                                        ">
-                                            <?php echo number_format($subject['overall_grade'], 1); ?>%
-                                        </div>
-                                        <div class="risk-badge <?php echo $subject['risk_level']; ?>">
-                                            <?php echo ucfirst($subject['risk_level']); ?> Risk
-                                        </div>
-                                    <?php else: ?>
-                                        <div class="grade-value grade-no-data">No Data</div>
-                                        <div class="risk-badge no-data">No Data</div>
-                                    <?php endif; ?>
-                                </div>
                             </li>
                         <?php endforeach; ?>
                     </ul>

@@ -168,12 +168,6 @@ function getUnreadMessageCount($userId, $userType) {
     return $count;
 }
 
-function refreshUnreadMessageCount($userId, $userType) {
-    unset($_SESSION['unread_message_count']);
-    unset($_SESSION['unread_message_count_time']);
-    return getUnreadMessageCount($userId, $userType);
-}
-
 function getMessagesBetweenUsers($user1_id, $user1_type, $user2_id, $user2_type) {
     global $supabase_url, $supabase_key;
     
