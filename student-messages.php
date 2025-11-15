@@ -767,190 +767,190 @@ $partners = getConversationPartners($student_id, 'student');
         </div>
     </div>
 
-    <script>
-        let currentStudentId = null;
-        let currentStudentName = null;
-        let refreshInterval = null;
+<script>
+    let currentAdminId = null;
+    let currentAdminName = null;
+    let refreshInterval = null;
 
-        // Student selection
-        document.querySelectorAll('.student-item').forEach(item => {
-            item.addEventListener('click', function() {
-                document.querySelectorAll('.student-item').forEach(i => i.classList.remove('active'));
-                this.classList.add('active');
-                
-                currentStudentId = this.dataset.studentId;
-                currentStudentName = this.dataset.studentName;
-                
-                // Update chat header
-                document.getElementById('chat-header').style.display = 'flex';
-                document.getElementById('header-name').textContent = currentStudentName;
-                document.getElementById('header-avatar').textContent = currentStudentName.charAt(0).toUpperCase();
-                document.getElementById('message-input').style.display = 'block';
-                
-                loadMessages();
-                startAutoRefresh();
-                
-                // Update unread badge for this student
-                updateStudentUnreadBadge(currentStudentId);
-            });
-        });
-
-        // Load messages for selected student
-        function loadMessages() {
-            if (!currentStudentId) return;
+    // Admin selection
+    document.querySelectorAll('.admin-item').forEach(item => {
+        item.addEventListener('click', function() {
+            document.querySelectorAll('.admin-item').forEach(i => i.classList.remove('active'));
+            this.classList.add('active');
             
-            fetch('get_messages.php?partner_id=' + currentStudentId + '&user_type=admin')
-                .then(response => response.json())
-                .then(messages => {
-                    const messagesArea = document.getElementById('messages-area');
-                    messagesArea.innerHTML = '';
+            currentAdminId = this.dataset.adminId;
+            currentAdminName = this.dataset.adminName;
+            
+            // Update chat header
+            document.getElementById('chat-header').style.display = 'flex';
+            document.getElementById('header-name').textContent = currentAdminName;
+            document.getElementById('header-avatar').textContent = currentAdminName.charAt(0).toUpperCase();
+            document.getElementById('message-input').style.display = 'block';
+            
+            loadMessages();
+            startAutoRefresh();
+            
+            // Update unread badge for this admin
+            updateAdminUnreadBadge(currentAdminId);
+        });
+    });
+
+    // Load messages for selected admin
+    function loadMessages() {
+        if (!currentAdminId) return;
+        
+        fetch('get_messages.php?partner_id=' + currentAdminId + '&user_type=student')
+            .then(response => response.json())
+            .then(messages => {
+                const messagesArea = document.getElementById('messages-area');
+                messagesArea.innerHTML = '';
+                
+                if (messages.length === 0) {
+                    messagesArea.innerHTML = `
+                        <div class="no-chat-selected">
+                            <i class="fas fa-comment-slash"></i>
+                            <h3>No Messages Yet</h3>
+                            <p>Start the conversation by sending a message</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                messages.forEach(msg => {
+                    const messageDiv = document.createElement('div');
+                    const isSent = msg.sender_type === 'student';
+                    messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
                     
-                    if (messages.length === 0) {
-                        messagesArea.innerHTML = `
-                            <div class="no-chat-selected">
-                                <i class="fas fa-comment-slash"></i>
-                                <h3>No Messages Yet</h3>
-                                <p>Start the conversation by sending a message</p>
-                            </div>
-                        `;
-                        return;
-                    }
-                    
-                    messages.forEach(msg => {
-                        const messageDiv = document.createElement('div');
-                        const isSent = msg.sender_type === 'admin';
-                        messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
-                        
-                        const time = new Date(msg.created_at).toLocaleTimeString([], { 
-                            hour: '2-digit', minute: '2-digit' 
-                        });
-                        
-                        messageDiv.innerHTML = `
-                            <div class="message-content">${msg.message}</div>
-                            <div class="message-time">${time}</div>
-                        `;
-                        
-                        messagesArea.appendChild(messageDiv);
+                    const time = new Date(msg.created_at).toLocaleTimeString([], { 
+                        hour: '2-digit', minute: '2-digit' 
                     });
                     
-                    messagesArea.scrollTop = messagesArea.scrollHeight;
-                })
-                .catch(error => {
-                    console.error('Error loading messages:', error);
+                    messageDiv.innerHTML = `
+                        <div class="message-content">${msg.message}</div>
+                        <div class="message-time">${time}</div>
+                    `;
+                    
+                    messagesArea.appendChild(messageDiv);
                 });
-        }
-
-        // Send message
-        function sendMessage() {
-            const messageText = document.getElementById('message-text').value.trim();
-            if (!messageText || !currentStudentId) return;
-            
-            const formData = new FormData();
-            formData.append('receiver_id', currentStudentId);
-            formData.append('message', messageText);
-            
-            fetch('send_message.php', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(result => {
-                if (result.success) {
-                    document.getElementById('message-text').value = '';
-                    loadMessages();
-                    // Refresh the page to update unread counts in sidebar
-                    setTimeout(() => {
-                        refreshUnreadCounts();
-                    }, 500);
-                } else {
-                    alert('Failed to send message. Please try again.');
-                }
+                
+                messagesArea.scrollTop = messagesArea.scrollHeight;
             })
             .catch(error => {
-                console.error('Error sending message:', error);
-                alert('Error sending message. Please try again.');
+                console.error('Error loading messages:', error);
             });
-        }
+    }
 
-        // Update unread badge for a specific student
-        function updateStudentUnreadBadge(studentId) {
-            const studentItem = document.querySelector(`.student-item[data-student-id="${studentId}"]`);
-            if (studentItem) {
-                const unreadBadge = studentItem.querySelector('.unread-badge');
-                if (unreadBadge) {
-                    unreadBadge.remove();
-                }
-            }
-        }
-
-        // Refresh all unread counts
-        function refreshUnreadCounts() {
-            // This will refresh the sidebar badge
-            location.reload();
-        }
-
-        // Auto-refresh messages
-        function startAutoRefresh() {
-            if (refreshInterval) {
-                clearInterval(refreshInterval);
-            }
-            refreshInterval = setInterval(loadMessages, 3000);
-        }
-
-        // Enter key to send message
-        document.getElementById('message-text')?.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-            }
-        });
-
-        // Auto-resize textarea
-        document.getElementById('message-text')?.addEventListener('input', function() {
-            this.style.height = 'auto';
-            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
-        });
-
-        // Stop auto-refresh when leaving page
-        window.addEventListener('beforeunload', function() {
-            if (refreshInterval) {
-                clearInterval(refreshInterval);
-            }
-        });
-
-        // Auto-refresh page every 30 seconds to update message count
-        setTimeout(() => {
-            location.reload();
-        }, 30000);
+    // Send message
+    function sendMessage() {
+        const messageText = document.getElementById('message-text').value.trim();
+        if (!messageText || !currentAdminId) return;
         
-        // Logout modal functionality
-        const logoutBtn = document.querySelector('.logout-btn');
-        const logoutModal = document.getElementById('logoutModal');
-        const cancelLogout = document.getElementById('cancelLogout');
-        const confirmLogout = document.getElementById('confirmLogout');
-
-        // Show modal when clicking logout button
-        logoutBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            logoutModal.classList.add('show');
-        });
-
-        // Hide modal when clicking cancel
-        cancelLogout.addEventListener('click', () => {
-            logoutModal.classList.remove('show');
-        });
-
-        // Handle logout confirmation
-        confirmLogout.addEventListener('click', () => {
-            window.location.href = 'logout.php';
-        });
-
-        // Hide modal when clicking outside the modal content
-        logoutModal.addEventListener('click', (e) => {
-            if (e.target === logoutModal) {
-                logoutModal.classList.remove('show');
+        const formData = new FormData();
+        formData.append('receiver_id', currentAdminId);
+        formData.append('message', messageText);
+        
+        fetch('send_message.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                document.getElementById('message-text').value = '';
+                loadMessages();
+                // Refresh the page to update unread counts in sidebar
+                setTimeout(() => {
+                    refreshUnreadCounts();
+                }, 500);
+            } else {
+                alert('Failed to send message. Please try again.');
             }
+        })
+        .catch(error => {
+            console.error('Error sending message:', error);
+            alert('Error sending message. Please try again.');
         });
-    </script>
+    }
+
+    // Update unread badge for a specific admin
+    function updateAdminUnreadBadge(adminId) {
+        const adminItem = document.querySelector(`.admin-item[data-admin-id="${adminId}"]`);
+        if (adminItem) {
+            const unreadBadge = adminItem.querySelector('.unread-badge');
+            if (unreadBadge) {
+                unreadBadge.remove();
+            }
+        }
+    }
+
+    // Refresh all unread counts
+    function refreshUnreadCounts() {
+        // This will refresh the sidebar badge
+        location.reload();
+    }
+
+    // Auto-refresh messages
+    function startAutoRefresh() {
+        if (refreshInterval) {
+            clearInterval(refreshInterval);
+        }
+        refreshInterval = setInterval(loadMessages, 3000);
+    }
+
+    // Enter key to send message
+    document.getElementById('message-text')?.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    });
+
+    // Auto-resize textarea
+    document.getElementById('message-text')?.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+    });
+
+    // Stop auto-refresh when leaving page
+    window.addEventListener('beforeunload', function() {
+        if (refreshInterval) {
+            clearInterval(refreshInterval);
+        }
+    });
+
+    // Auto-refresh page every 30 seconds to update message count
+    setTimeout(() => {
+        location.reload();
+    }, 30000);
+    
+    // Logout modal functionality
+    const logoutBtn = document.querySelector('.logout-btn');
+    const logoutModal = document.getElementById('logoutModal');
+    const cancelLogout = document.getElementById('cancelLogout');
+    const confirmLogout = document.getElementById('confirmLogout');
+
+    // Show modal when clicking logout button
+    logoutBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        logoutModal.classList.add('show');
+    });
+
+    // Hide modal when clicking cancel
+    cancelLogout.addEventListener('click', () => {
+        logoutModal.classList.remove('show');
+    });
+
+    // Handle logout confirmation
+    confirmLogout.addEventListener('click', () => {
+        window.location.href = 'logout.php';
+    });
+
+    // Hide modal when clicking outside the modal content
+    logoutModal.addEventListener('click', (e) => {
+        if (e.target === logoutModal) {
+            logoutModal.classList.remove('show');
+        }
+    });
+</script>
 </body>
 </html>

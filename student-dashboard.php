@@ -11,13 +11,11 @@ if (!$student) {
     header('Location: login.php');
     exit;
 }
-
 // Initialize variables
 $active_subjects = [];
 $recent_scores = [];
 $performance_metrics = [];
 $semester_risk_data = [];
-$archived_risk_data = [];
 $error_message = '';
 
 try {
@@ -65,9 +63,6 @@ try {
         
         // Get semester risk data for the graph
         $semester_risk_data = getSemesterRiskData($student['id']);
-        
-        // Get archived subjects risk overview specifically for the pie chart
-        $archived_risk_data = getArchivedSubjectsRiskOverview($student['id']);
         
     }
 } catch (Exception $e) {
@@ -215,7 +210,7 @@ function getUniqueProfessors($student_id) {
         }
         
         // Get archived subjects
-        $archived_subjects = supabaseFetch('student_subjects', ['student_id' => $student_id, 'archived' => 'true']);
+        $archived_subjects = supabaseFetch('archived_subjects', ['student_id' => $student_id]);
         if ($archived_subjects && is_array($archived_subjects)) {
             foreach ($archived_subjects as $subject) {
                 if (!empty($subject['professor_name'])) {
@@ -229,6 +224,306 @@ function getUniqueProfessors($student_id) {
     }
     
     return array_keys($professors);
+}
+
+/**
+ * Calculate GWA from grade (Philippine system)
+ */
+function calculateGWA($grade) {
+    if ($grade >= 90) return 1.00;
+    elseif ($grade >= 85) return 1.25;
+    elseif ($grade >= 80) return 1.50;
+    elseif ($grade >= 75) return 1.75;
+    elseif ($grade >= 70) return 2.00;
+    elseif ($grade >= 65) return 2.25;
+    elseif ($grade >= 60) return 2.50;
+    elseif ($grade >= 55) return 2.75;
+    elseif ($grade >= 50) return 3.00;
+    else return 5.00;
+}
+
+/**
+ * Get semester risk data for bar chart - CORRECTED VERSION
+ */
+function getSemesterRiskData($student_id) {
+    $data = [
+        'first_semester' => [
+            'high_risk_count' => 0,
+            'low_risk_count' => 0,
+            'total_subjects' => 0,
+            'subjects' => []
+        ],
+        'second_semester' => [
+            'high_risk_count' => 0,
+            'low_risk_count' => 0,
+            'total_subjects' => 0,
+            'subjects' => []
+        ],
+        'total_archived_subjects' => 0,
+        'total_high_risk' => 0,
+        'total_low_risk' => 0,
+        'total_active_subjects' => 0,
+        'active_high_risk' => 0,
+        'active_low_risk' => 0,
+        'debug_info' => []
+    ];
+    
+    try {
+        // Get ALL subjects (both active and archived)
+        $all_subjects = supabaseFetch('student_subjects', [
+            'student_id' => $student_id
+        ]);
+        
+        $data['debug_info']['total_subjects_found'] = $all_subjects ? count($all_subjects) : 0;
+        
+        if ($all_subjects && is_array($all_subjects)) {
+            foreach ($all_subjects as $subject_record) {
+                // Skip soft-deleted subjects
+                if (!empty($subject_record['deleted_at'])) {
+                    continue;
+                }
+                
+                // Get subject info
+                $subject_data = supabaseFetch('subjects', ['id' => $subject_record['subject_id']]);
+                
+                if ($subject_data && count($subject_data) > 0) {
+                    $subject_info = $subject_data[0];
+                    
+                    // Check if subject is archived - use proper boolean comparison
+                    $is_archived = false;
+                    if (isset($subject_record['archived'])) {
+                        if ($subject_record['archived'] === true || 
+                            $subject_record['archived'] === 'true' || 
+                            $subject_record['archived'] === 't') {
+                            $is_archived = true;
+                        }
+                    }
+                    
+                    // Get performance data
+                    $performance_data = supabaseFetch('subject_performance', ['student_subject_id' => $subject_record['id']]);
+                    
+                    $is_high_risk = false;
+                    $is_low_risk = false;
+                    $final_grade = 0;
+                    $risk_level = 'no-data';
+                    
+                    if ($performance_data && count($performance_data) > 0) {
+                        $performance = $performance_data[0];
+                        $final_grade = $performance['overall_grade'] ?? 0;
+                        $risk_level = $performance['risk_level'] ?? 'no-data';
+                        
+                        // Determine risk level based on grade
+                        if ($final_grade > 0) {
+                            if ($final_grade >= 80) {
+                                $is_low_risk = true;
+                                $risk_level = 'low';
+                            } else {
+                                $is_high_risk = true;
+                                $risk_level = 'high';
+                            }
+                        }
+                    } else {
+                        // If no performance data, try to calculate from scores
+                        $calculated_grade = calculateSubjectGradeFromScores($subject_record['id']);
+                        if ($calculated_grade > 0) {
+                            $final_grade = $calculated_grade;
+                            if ($calculated_grade >= 80) {
+                                $is_low_risk = true;
+                                $risk_level = 'low';
+                            } else {
+                                $is_high_risk = true;
+                                $risk_level = 'high';
+                            }
+                        }
+                    }
+                    
+                    // Add to counts based on archived status
+                    if ($is_archived) {
+                        $data['total_archived_subjects']++;
+                        if ($is_high_risk) {
+                            $data['total_high_risk']++;
+                        }
+                        if ($is_low_risk) {
+                            $data['total_low_risk']++;
+                        }
+                        
+                        // Categorize by semester for archived subjects only
+                        $semester = strtolower($subject_info['semester']);
+                        
+                        if (strpos($semester, 'first') !== false || strpos($semester, '1') !== false) {
+                            $data['first_semester']['total_subjects']++;
+                            if ($is_high_risk) {
+                                $data['first_semester']['high_risk_count']++;
+                            }
+                            if ($is_low_risk) {
+                                $data['first_semester']['low_risk_count']++;
+                            }
+                        } elseif (strpos($semester, 'second') !== false || strpos($semester, '2') !== false) {
+                            $data['second_semester']['total_subjects']++;
+                            if ($is_high_risk) {
+                                $data['second_semester']['high_risk_count']++;
+                            }
+                            if ($is_low_risk) {
+                                $data['second_semester']['low_risk_count']++;
+                            }
+                        }
+                    } else {
+                        // Active subjects
+                        $data['total_active_subjects']++;
+                        if ($is_high_risk) {
+                            $data['active_high_risk']++;
+                        }
+                        if ($is_low_risk) {
+                            $data['active_low_risk']++;
+                        }
+                    }
+                    
+                    // Add debug info for this subject
+                    $data['debug_info']['subjects'][] = [
+                        'subject_code' => $subject_info['subject_code'],
+                        'archived' => $is_archived,
+                        'grade' => $final_grade,
+                        'risk_level' => $risk_level,
+                        'has_performance_data' => !empty($performance_data),
+                        'semester' => $subject_info['semester']
+                    ];
+                }
+            }
+        }
+        
+    } catch (Exception $e) {
+        $data['debug_info']['error'] = $e->getMessage();
+        error_log("Error getting semester risk data: " . $e->getMessage());
+    }
+    
+    return $data;
+}
+
+/**
+ * Calculate subject grade from scores if performance data is missing
+ */
+function calculateSubjectGradeFromScores($student_subject_id) {
+    try {
+        $allScores = supabaseFetch('student_subject_scores', ['student_subject_id' => $student_subject_id]);
+        if (!$allScores || empty($allScores)) {
+            return 0;
+        }
+        
+        $midtermGrade = 0;
+        $finalGrade = 0;
+        
+        // Get midterm categories
+        $midtermCategories = supabaseFetch('student_class_standing_categories', [
+            'student_subject_id' => $student_subject_id,
+            'term_type' => 'midterm'
+        ]);
+        
+        // Get final categories
+        $finalCategories = supabaseFetch('student_class_standing_categories', [
+            'student_subject_id' => $student_subject_id,
+            'term_type' => 'final'
+        ]);
+        
+        // Calculate Midterm Grade
+        if ($midtermCategories && count($midtermCategories) > 0) {
+            $midtermClassStanding = 0;
+            $midtermExamScore = 0;
+            
+            foreach ($midtermCategories as $category) {
+                $categoryScores = array_filter($allScores, function($score) use ($category) {
+                    return $score['category_id'] == $category['id'] && $score['score_type'] === 'class_standing';
+                });
+                
+                $categoryTotal = 0;
+                $categoryMax = 0;
+                
+                foreach ($categoryScores as $score) {
+                    $categoryTotal += floatval($score['score_value']);
+                    $categoryMax += floatval($score['max_score']);
+                }
+                
+                if ($categoryMax > 0) {
+                    $categoryPercentage = ($categoryTotal / $categoryMax) * 100;
+                    $weightedScore = ($categoryPercentage * floatval($category['category_percentage'])) / 100;
+                    $midtermClassStanding += $weightedScore;
+                }
+            }
+            
+            if ($midtermClassStanding > 60) $midtermClassStanding = 60;
+            
+            $midtermExams = array_filter($allScores, function($score) {
+                return $score['score_type'] === 'midterm_exam';
+            });
+            
+            if (!empty($midtermExams)) {
+                $midtermExam = reset($midtermExams);
+                if (floatval($midtermExam['max_score']) > 0) {
+                    $midtermExamPercentage = (floatval($midtermExam['score_value']) / floatval($midtermExam['max_score'])) * 100;
+                    $midtermExamScore = ($midtermExamPercentage * 40) / 100;
+                }
+            }
+            
+            $midtermGrade = $midtermClassStanding + $midtermExamScore;
+        }
+        
+        // Calculate Final Grade
+        if ($finalCategories && count($finalCategories) > 0) {
+            $finalClassStanding = 0;
+            $finalExamScore = 0;
+            
+            foreach ($finalCategories as $category) {
+                $categoryScores = array_filter($allScores, function($score) use ($category) {
+                    return $score['category_id'] == $category['id'] && $score['score_type'] === 'class_standing';
+                });
+                
+                $categoryTotal = 0;
+                $categoryMax = 0;
+                
+                foreach ($categoryScores as $score) {
+                    $categoryTotal += floatval($score['score_value']);
+                    $categoryMax += floatval($score['max_score']);
+                }
+                
+                if ($categoryMax > 0) {
+                    $categoryPercentage = ($categoryTotal / $categoryMax) * 100;
+                    $weightedScore = ($categoryPercentage * floatval($category['category_percentage'])) / 100;
+                    $finalClassStanding += $weightedScore;
+                }
+            }
+            
+            if ($finalClassStanding > 60) $finalClassStanding = 60;
+            
+            $finalExams = array_filter($allScores, function($score) {
+                return $score['score_type'] === 'final_exam';
+            });
+            
+            if (!empty($finalExams)) {
+                $finalExam = reset($finalExams);
+                if (floatval($finalExam['max_score']) > 0) {
+                    $finalExamPercentage = (floatval($finalExam['score_value']) / floatval($finalExam['max_score'])) * 100;
+                    $finalExamScore = ($finalExamPercentage * 40) / 100;
+                }
+            }
+            
+            $finalGrade = $finalClassStanding + $finalExamScore;
+        }
+        
+        // Calculate Subject Grade
+        $grades = array_filter([$midtermGrade, $finalGrade], function($grade) {
+            return $grade > 0;
+        });
+        
+        if (!empty($grades)) {
+            $subjectGrade = array_sum($grades) / count($grades);
+            return min($subjectGrade, 100);
+        }
+        
+        return 0;
+        
+    } catch (Exception $e) {
+        error_log("Error calculating grade from scores: " . $e->getMessage());
+        return 0;
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -1094,15 +1389,11 @@ function getUniqueProfessors($student_id) {
             <div class="metrics-grid">
                 <div class="metric-card">
                     <div class="metric-value"><?php echo $performance_metrics['total_subjects']; ?></div>
-                    <div class="metric-label">Active Subjects</div>
+                    <div class="metric-label">Subjects</div>
                 </div>
                 <div class="metric-card">
                     <div class="metric-value"><?php echo count(getUniqueProfessors($student['id'])); ?></div>
                     <div class="metric-label">Professors</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-value"><?php echo $archived_risk_data['total_subjects']; ?></div>
-                    <div class="metric-label">Archived Subjects</div>
                 </div>
             </div>
         </div>
@@ -1146,7 +1437,6 @@ function getUniqueProfessors($student_id) {
                                             </span>
                                         </div>
                                     <?php else: ?>
-                                        <div class="grade-value grade-no-data">No Data</div>
                                     <?php endif; ?>
                                 </div>
                             </li>
@@ -1200,16 +1490,13 @@ function getUniqueProfessors($student_id) {
                 <?php endif; ?>
             </div>
 
-            <!-- Risk Overview (Now shows archived subjects risk) -->
+            <!-- Risk Overview -->
             <div class="card">
                 <div class="card-header">
                     <div class="card-title">
                         <i class="fas fa-chart-pie"></i>
-                        Archived Subjects Risk Overview
+                        Risk Overview
                     </div>
-                    <a href="student-archived-subject.php" style="color: var(--plp-green); text-decoration: none; font-size: 0.9rem;">
-                        View All
-                    </a>
                 </div>
                 <div style="text-align: center; padding: 1rem;">
                     <div class="bar-chart-wrapper" style="height: 200px; position: relative;">
@@ -1218,27 +1505,31 @@ function getUniqueProfessors($student_id) {
                     <div style="display: flex; justify-content: space-around; margin-top: 1rem;">
                         <div style="text-align: center;">
                             <div style="font-size: 1.5rem; font-weight: 700; color: #dc3545;">
-                                <?php echo $archived_risk_data['high_risk']; ?>
+                                <?php 
+                                $totalHighRisk = ($semester_risk_data['total_high_risk'] ?? 0) + ($semester_risk_data['active_high_risk'] ?? 0);
+                                echo $totalHighRisk; 
+                                ?>
                             </div>
                             <div style="font-size: 0.8rem; color: var(--text-medium);">High Risk</div>
                         </div>
                         <div style="text-align: center;">
                             <div style="font-size: 1.5rem; font-weight: 700; color: #28a745;">
-                                <?php echo $archived_risk_data['low_risk']; ?>
+                                <?php 
+                                $totalLowRisk = ($semester_risk_data['total_low_risk'] ?? 0) + ($semester_risk_data['active_low_risk'] ?? 0);
+                                echo $totalLowRisk; 
+                                ?>
                             </div>
                             <div style="font-size: 0.8rem; color: var(--text-medium);">Low Risk</div>
                         </div>
                         <div style="text-align: center;">
                             <div style="font-size: 1.5rem; font-weight: 700; color: #e2e8f0;">
-                                <?php echo $archived_risk_data['no_data']; ?>
+                                <?php 
+                                $totalSubjects = ($semester_risk_data['total_archived_subjects'] ?? 0) + ($semester_risk_data['total_active_subjects'] ?? 0);
+                                $totalWithRisk = $totalHighRisk + $totalLowRisk;
+                                echo max(0, $totalSubjects - $totalWithRisk); 
+                                ?>
                             </div>
                             <div style="font-size: 0.8rem; color: var(--text-medium);">No Data</div>
-                        </div>
-                    </div>
-                    <div style="margin-top: 1rem; padding: 0.75rem; background: var(--plp-green-pale); border-radius: var(--border-radius);">
-                        <div style="font-size: 0.85rem; color: var(--text-medium);">
-                            <i class="fas fa-info-circle" style="color: var(--plp-green);"></i>
-                            Based on <?php echo $archived_risk_data['total_subjects']; ?> archived subjects
                         </div>
                     </div>
                 </div>
@@ -1246,7 +1537,7 @@ function getUniqueProfessors($student_id) {
         </div>
     </div>
 
-    <!-- Logout Modal -->
+        <!-- Logout Modal -->
     <div class="modal" id="logoutModal">
         <div class="modal-content" style="max-width: 450px; text-align: center;">
             <h3 style="color: var(--plp-green); font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem;">
@@ -1268,11 +1559,10 @@ function getUniqueProfessors($student_id) {
     </div>
 
     <script>
-        // Initialize Charts with archived subjects data
         function initializeCharts() {
             try {
-                const archivedRiskData = <?php echo json_encode($archived_risk_data); ?>;
-                console.log('Archived Risk Data:', archivedRiskData);
+                const semesterRiskData = <?php echo json_encode($semester_risk_data); ?>;
+                console.log('Risk Data:', semesterRiskData);
                 
                 const riskOverviewCtx = document.getElementById('riskOverviewChart');
                 
@@ -1281,27 +1571,37 @@ function getUniqueProfessors($student_id) {
                     return;
                 }
                 
-                // Use archived subjects data for the pie chart
-                const highRiskCount = archivedRiskData.high_risk || 0;
-                const lowRiskCount = archivedRiskData.low_risk || 0;
-                const noDataCount = archivedRiskData.no_data || 0;
-                const totalSubjects = archivedRiskData.total_subjects || 0;
+                // Calculate data for the chart - CORRECTED CALCULATION
+                const archivedHighRisk = semesterRiskData.total_high_risk || 0;
+                const archivedLowRisk = semesterRiskData.total_low_risk || 0;
+                const activeHighRisk = semesterRiskData.active_high_risk || 0;
+                const activeLowRisk = semesterRiskData.active_low_risk || 0;
+                
+                const totalHighRisk = archivedHighRisk + activeHighRisk;
+                const totalLowRisk = archivedLowRisk + activeLowRisk;
+                const totalArchived = semesterRiskData.total_archived_subjects || 0;
+                const totalActive = semesterRiskData.total_active_subjects || 0;
+                const totalSubjects = totalArchived + totalActive;
+                
+                // Calculate no data count correctly
+                const totalWithRisk = totalHighRisk + totalLowRisk;
+                const noDataCount = Math.max(0, totalSubjects - totalWithRisk);
                 
                 console.log('Chart Data:', { 
-                    highRisk: highRiskCount, 
-                    lowRisk: lowRiskCount, 
+                    highRisk: totalHighRisk, 
+                    lowRisk: totalLowRisk, 
                     noData: noDataCount,
-                    total: totalSubjects
+                    totalSubjects: totalSubjects
                 });
                 
                 // Only show chart if there's data
-                if (totalSubjects > 0 && (highRiskCount > 0 || lowRiskCount > 0 || noDataCount > 0)) {
+                if (totalSubjects > 0 && (totalHighRisk > 0 || totalLowRisk > 0 || noDataCount > 0)) {
                     new Chart(riskOverviewCtx, {
                         type: 'doughnut',
                         data: {
                             labels: ['High Risk', 'Low Risk', 'No Data'],
                             datasets: [{
-                                data: [highRiskCount, lowRiskCount, noDataCount],
+                                data: [totalHighRisk, totalLowRisk, noDataCount],
                                 backgroundColor: ['#dc3545', '#28a745', '#e2e8f0'],
                                 borderWidth: 2,
                                 borderColor: '#fff'
@@ -1342,7 +1642,7 @@ function getUniqueProfessors($student_id) {
                     riskOverviewCtx.style.display = 'none';
                     const wrapper = riskOverviewCtx.closest('.bar-chart-wrapper');
                     if (wrapper) {
-                        wrapper.innerHTML = '<div style="color: var(--text-light); text-align: center; padding: 2rem; display: flex; align-items: center; justify-content: center; height: 100%;"><div><i class="fas fa-chart-pie" style="font-size: 2rem; margin-bottom: 1rem;"></i><p>No archived subjects data</p><small>Archive some subjects to see risk overview</small></div></div>';
+                        wrapper.innerHTML = '<div style="color: var(--text-light); text-align: center; padding: 2rem; display: flex; align-items: center; justify-content: center; height: 100%;"><div><i class="fas fa-chart-pie" style="font-size: 2rem; margin-bottom: 1rem;"></i><p>No risk data available</p></div></div>';
                     }
                 }
             } catch (error) {
@@ -1383,6 +1683,6 @@ function getUniqueProfessors($student_id) {
                 }
             });
         }
-    </script>
+</script>
 </body>
 </html>
