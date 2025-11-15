@@ -800,7 +800,6 @@ $partners = getConversationPartners($admin_id, 'admin');
         });
     });
 
-    // Load messages for selected student
     function loadMessages() {
         if (!currentStudentId) return;
         
@@ -839,6 +838,9 @@ $partners = getConversationPartners($admin_id, 'admin');
                 });
                 
                 messagesArea.scrollTop = messagesArea.scrollHeight;
+                
+                // Update sidebar badge after loading messages
+                updateSidebarBadge(); // ADD THIS LINE
             })
             .catch(error => {
                 console.error('Error loading messages:', error);
@@ -923,10 +925,33 @@ $partners = getConversationPartners($admin_id, 'admin');
         }
     });
 
-    // Auto-refresh page every 30 seconds to update message count
-    setTimeout(() => {
-        location.reload();
-    }, 30000);
+    function updateSidebarBadge() {
+        fetch('get_unread_count.php')
+            .then(response => response.json())
+            .then(data => {
+                const sidebarBadge = document.querySelector('.nav-link.active .sidebar-badge');
+                if (data.count > 0) {
+                    if (sidebarBadge) {
+                        sidebarBadge.textContent = data.count;
+                    } else {
+                        // Create badge if it doesn't exist
+                        const badge = document.createElement('span');
+                        badge.className = 'sidebar-badge';
+                        badge.textContent = data.count;
+                        document.querySelector('.nav-link.active').appendChild(badge);
+                    }
+                } else {
+                    // Remove badge if no unread messages
+                    if (sidebarBadge) {
+                        sidebarBadge.remove(); // FIXED: was badge.remove()
+                    }
+                }
+            })
+            .catch(error => console.error('Error updating sidebar badge:', error));
+    }
+
+    // Update sidebar badge every 5 seconds
+    setInterval(updateSidebarBadge, 5000);
     
     // Logout modal functionality
     const logoutBtn = document.querySelector('.logout-btn');

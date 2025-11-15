@@ -26,8 +26,9 @@ foreach ($messages as $msg) {
 
 if (!empty($unread_ids)) {
     markMessagesAsRead($unread_ids);
-    // Refresh unread count after marking messages as read
-    refreshUnreadMessageCount($user_id, $user_type);
+    // Clear the session cache to force refresh
+    unset($_SESSION['unread_message_count']);
+    unset($_SESSION['unread_message_count_time']);
 }
 
 echo json_encode($messages);

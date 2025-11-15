@@ -795,7 +795,36 @@ $partners = getConversationPartners($student_id, 'student');
         });
     });
 
-    // Load messages for selected admin
+    // Function to update sidebar badge without page reload
+    function updateSidebarBadge() {
+        fetch('get_unread_count.php')
+            .then(response => response.json())
+            .then(data => {
+                const sidebarBadge = document.querySelector('.nav-link.active .sidebar-badge');
+                if (data.count > 0) {
+                    if (sidebarBadge) {
+                        sidebarBadge.textContent = data.count;
+                    } else {
+                        // Create badge if it doesn't exist
+                        const badge = document.createElement('span');
+                        badge.className = 'sidebar-badge';
+                        badge.textContent = data.count;
+                        document.querySelector('.nav-link.active').appendChild(badge);
+                    }
+                } else {
+                    // Remove badge if no unread messages
+                    if (sidebarBadge) {
+                        sidebarBadge.remove();
+                    }
+                }
+            })
+            .catch(error => console.error('Error updating sidebar badge:', error));
+    }
+
+    // Update sidebar badge every 5 seconds
+    setInterval(updateSidebarBadge, 5000);
+
+    // Also update when messages are loaded or sent
     function loadMessages() {
         if (!currentAdminId) return;
         
@@ -834,6 +863,9 @@ $partners = getConversationPartners($student_id, 'student');
                 });
                 
                 messagesArea.scrollTop = messagesArea.scrollHeight;
+                
+                // Update sidebar badge after loading messages
+                updateSidebarBadge();
             })
             .catch(error => {
                 console.error('Error loading messages:', error);
@@ -858,10 +890,8 @@ $partners = getConversationPartners($student_id, 'student');
             if (result.success) {
                 document.getElementById('message-text').value = '';
                 loadMessages();
-                // Refresh the page to update unread counts in sidebar
-                setTimeout(() => {
-                    refreshUnreadCounts();
-                }, 500);
+                // Update sidebar badge after sending message
+                updateSidebarBadge();
             } else {
                 alert('Failed to send message. Please try again.');
             }
@@ -917,11 +947,6 @@ $partners = getConversationPartners($student_id, 'student');
             clearInterval(refreshInterval);
         }
     });
-
-    // Auto-refresh page every 30 seconds to update message count
-    setTimeout(() => {
-        location.reload();
-    }, 30000);
     
     // Logout modal functionality
     const logoutBtn = document.querySelector('.logout-btn');
