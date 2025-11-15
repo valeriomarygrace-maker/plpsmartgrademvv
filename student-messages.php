@@ -644,11 +644,6 @@ $partners = getConversationPartners($student_id, 'student');
                 <a href="student-messages.php" class="nav-link active">
                     <i class="fas fa-comments"></i>
                     Messages
-                    <?php 
-                    $unread_count = getUnreadMessageCount($_SESSION['user_id'], 'student');
-                    if ($unread_count > 0): ?>
-                        <span class="sidebar-badge"><?php echo $unread_count; ?></span>
-                    <?php endif; ?>
                 </a>
             </li>
             <li class="nav-item">
@@ -801,33 +796,30 @@ $partners = getConversationPartners($student_id, 'student');
             .then(response => response.json())
             .then(data => {
                 const sidebarBadge = document.querySelector('.nav-link.active .sidebar-badge');
-                const navLink = document.querySelector('.nav-link[href="student-messages.php"]');
-                const existingBadge = navLink.querySelector('.sidebar-badge');
-                
                 if (data.count > 0) {
-                    if (existingBadge) {
-                        existingBadge.textContent = data.count;
+                    if (sidebarBadge) {
+                        sidebarBadge.textContent = data.count;
                     } else {
                         // Create badge if it doesn't exist
                         const badge = document.createElement('span');
                         badge.className = 'sidebar-badge';
                         badge.textContent = data.count;
-                        navLink.appendChild(badge);
+                        document.querySelector('.nav-link.active').appendChild(badge);
                     }
                 } else {
                     // Remove badge if no unread messages
-                    if (existingBadge) {
-                        existingBadge.remove();
+                    if (sidebarBadge) {
+                        sidebarBadge.remove();
                     }
                 }
             })
             .catch(error => console.error('Error updating sidebar badge:', error));
     }
 
-    // Update sidebar badge every 3 seconds
-    setInterval(updateSidebarBadge, 3000);
+    // Update sidebar badge every 5 seconds
+    setInterval(updateSidebarBadge, 5000);
 
-    // Load messages for selected admin
+    // Also update when messages are loaded or sent
     function loadMessages() {
         if (!currentAdminId) return;
         
@@ -894,7 +886,7 @@ $partners = getConversationPartners($student_id, 'student');
                 document.getElementById('message-text').value = '';
                 loadMessages();
                 // Update sidebar badge after sending message
-                setTimeout(updateSidebarBadge, 1000);
+                updateSidebarBadge();
             } else {
                 alert('Failed to send message. Please try again.');
             }
@@ -914,6 +906,12 @@ $partners = getConversationPartners($student_id, 'student');
                 unreadBadge.remove();
             }
         }
+    }
+
+    // Refresh all unread counts
+    function refreshUnreadCounts() {
+        // This will refresh the sidebar badge
+        location.reload();
     }
 
     // Auto-refresh messages
@@ -944,11 +942,6 @@ $partners = getConversationPartners($student_id, 'student');
             clearInterval(refreshInterval);
         }
     });
-
-    // Remove the auto page reload since we're using AJAX
-    // setTimeout(() => {
-    //     location.reload();
-    // }, 30000);
     
     // Logout modal functionality
     const logoutBtn = document.querySelector('.logout-btn');
@@ -978,9 +971,6 @@ $partners = getConversationPartners($student_id, 'student');
             logoutModal.classList.remove('show');
         }
     });
-
-    // Initial badge update
-    updateSidebarBadge();
 </script>
 </body>
 </html>

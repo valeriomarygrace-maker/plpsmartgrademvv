@@ -568,11 +568,6 @@ $admin = getAdminByEmail($_SESSION['user_email']);
                 <a href="admin-messages.php" class="nav-link">
                     <i class="fas fa-comments"></i>
                     Messages
-                    <?php 
-                    $unread_count = getUnreadMessageCount($_SESSION['user_id'], 'admin');
-                    if ($unread_count > 0): ?>
-                        <span class="sidebar-badge"><?php echo $unread_count; ?></span>
-                    <?php endif; ?>
                 </a>
             </li>
             <li class="nav-item">
