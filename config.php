@@ -173,15 +173,11 @@ function getUnreadMessageCount($userId, $userType) {
     return $count;
 }
 
-/**
- * Force refresh unread count (call this after sending/reading messages)
- */
 function refreshUnreadMessageCount($userId, $userType) {
     unset($_SESSION['unread_message_count']);
     unset($_SESSION['unread_message_count_time']);
     return getUnreadMessageCount($userId, $userType);
 }
-
 
 function getMessagesBetweenUsers($user1_id, $user1_type, $user2_id, $user2_type) {
     global $supabase_url, $supabase_key;
@@ -229,19 +225,22 @@ function markMessagesAsRead($message_ids) {
 
 function getConversationPartners($userId, $userType) {
     if ($userType === 'student') {
-        // For students, get all admins (show all admins even if no messages yet)
+        // For students, get all admins they have conversations with
         $admins = supabaseFetchAll('admins');
         $partners = [];
         
         foreach ($admins as $admin) {
-            $messages = getMessagesBetweenUsers($userId, 'student', $admin['id'], 'admin');
-            $unread_count = 0;
+            // Get unread count for this specific admin
+            $unread_filters = [
+                'sender_id' => $admin['id'],
+                'sender_type' => 'admin',
+                'receiver_id' => $userId,
+                'receiver_type' => 'student',
+                'is_read' => 'false'
+            ];
             
-            if (!empty($messages)) {
-                $unread_count = count(array_filter($messages, function($msg) use ($userId) {
-                    return $msg['sender_type'] === 'admin' && !$msg['is_read'];
-                }));
-            }
+            $unread_messages = supabaseFetch('messages', $unread_filters);
+            $unread_count = $unread_messages ? count($unread_messages) : 0;
             
             $partners[] = [
                 'id' => $admin['id'],
@@ -252,19 +251,22 @@ function getConversationPartners($userId, $userType) {
         }
         return $partners;
     } else {
-        // For admins, get all students (show all students even if no messages yet)
+        // For admins, get all students they have conversations with
         $students = supabaseFetchAll('students');
         $partners = [];
         
         foreach ($students as $student) {
-            $messages = getMessagesBetweenUsers($userId, 'admin', $student['id'], 'student');
-            $unread_count = 0;
+            // Get unread count for this specific student
+            $unread_filters = [
+                'sender_id' => $student['id'],
+                'sender_type' => 'student',
+                'receiver_id' => $userId,
+                'receiver_type' => 'admin',
+                'is_read' => 'false'
+            ];
             
-            if (!empty($messages)) {
-                $unread_count = count(array_filter($messages, function($msg) use ($userId) {
-                    return $msg['sender_type'] === 'student' && !$msg['is_read'];
-                }));
-            }
+            $unread_messages = supabaseFetch('messages', $unread_filters);
+            $unread_count = $unread_messages ? count($unread_messages) : 0;
             
             $partners[] = [
                 'id' => $student['id'],
@@ -404,5 +406,279 @@ function countSystemLogs($filters = []) {
     }
     
     return 0;
+}
+function getSemesterRiskData($student_id) {
+    $data = [
+        'first_semester' => [
+            'high_risk_count' => 0,
+            'low_risk_count' => 0,
+            'total_subjects' => 0,
+            'subjects' => []
+        ],
+        'second_semester' => [
+            'high_risk_count' => 0,
+            'low_risk_count' => 0,
+            'total_subjects' => 0,
+            'subjects' => []
+        ],
+        'total_archived_subjects' => 0,
+        'total_high_risk' => 0,
+        'total_low_risk' => 0,
+        'total_active_subjects' => 0,
+        'active_high_risk' => 0,
+        'active_low_risk' => 0,
+        'debug_info' => []
+    ];
+    
+    try {
+        // Get ALL archived subjects
+        $archived_subjects = supabaseFetch('student_subjects', [
+            'student_id' => $student_id,
+            'archived' => 'true'
+        ]);
+        
+        // Get ALL active subjects
+        $active_subjects = supabaseFetch('student_subjects', [
+            'student_id' => $student_id,
+            'archived' => 'false',
+            'deleted_at' => null
+        ]);
+        
+        $data['debug_info']['total_archived_found'] = $archived_subjects ? count($archived_subjects) : 0;
+        $data['debug_info']['total_active_found'] = $active_subjects ? count($active_subjects) : 0;
+        
+        // Process archived subjects (for pie chart)
+        if ($archived_subjects && is_array($archived_subjects)) {
+            foreach ($archived_subjects as $subject_record) {
+                $subject_data = supabaseFetch('subjects', ['id' => $subject_record['subject_id']]);
+                
+                if ($subject_data && count($subject_data) > 0) {
+                    $subject_info = $subject_data[0];
+                    
+                    // Get performance data
+                    $performance_data = supabaseFetch('subject_performance', ['student_subject_id' => $subject_record['id']]);
+                    
+                    $is_high_risk = false;
+                    $is_low_risk = false;
+                    $final_grade = 0;
+                    $risk_level = 'no-data';
+                    
+                    if ($performance_data && count($performance_data) > 0) {
+                        $performance = $performance_data[0];
+                        $final_grade = $performance['overall_grade'] ?? 0;
+                        $risk_level = $performance['risk_level'] ?? 'no-data';
+                        
+                        // Determine risk level based on grade
+                        if ($final_grade > 0) {
+                            if ($final_grade >= 80) {
+                                $is_low_risk = true;
+                            } else {
+                                $is_high_risk = true;
+                            }
+                        }
+                    } else {
+                        // If no performance data, try to calculate from scores
+                        $calculated_grade = calculateSubjectGradeFromScores($subject_record['id']);
+                        if ($calculated_grade > 0) {
+                            $final_grade = $calculated_grade;
+                            if ($calculated_grade >= 80) {
+                                $is_low_risk = true;
+                                $risk_level = 'low';
+                            } else {
+                                $is_high_risk = true;
+                                $risk_level = 'high';
+                            }
+                        }
+                    }
+                    
+                    // Add to archived counts
+                    $data['total_archived_subjects']++;
+                    if ($is_high_risk) {
+                        $data['total_high_risk']++;
+                    }
+                    if ($is_low_risk) {
+                        $data['total_low_risk']++;
+                    }
+                    
+                    // Categorize by semester for archived subjects
+                    $semester = strtolower($subject_info['semester']);
+                    
+                    if (strpos($semester, 'first') !== false || strpos($semester, '1') !== false) {
+                        $data['first_semester']['total_subjects']++;
+                        if ($is_high_risk) {
+                            $data['first_semester']['high_risk_count']++;
+                        }
+                        if ($is_low_risk) {
+                            $data['first_semester']['low_risk_count']++;
+                        }
+                    } elseif (strpos($semester, 'second') !== false || strpos($semester, '2') !== false) {
+                        $data['second_semester']['total_subjects']++;
+                        if ($is_high_risk) {
+                            $data['second_semester']['high_risk_count']++;
+                        }
+                        if ($is_low_risk) {
+                            $data['second_semester']['low_risk_count']++;
+                        }
+                    }
+                    
+                    // Add debug info for this subject
+                    $data['debug_info']['archived_subjects'][] = [
+                        'subject_code' => $subject_info['subject_code'],
+                        'grade' => $final_grade,
+                        'risk_level' => $risk_level,
+                        'semester' => $subject_info['semester']
+                    ];
+                }
+            }
+        }
+        
+        // Process active subjects (for comparison)
+        if ($active_subjects && is_array($active_subjects)) {
+            foreach ($active_subjects as $subject_record) {
+                $subject_data = supabaseFetch('subjects', ['id' => $subject_record['subject_id']]);
+                
+                if ($subject_data && count($subject_data) > 0) {
+                    $subject_info = $subject_data[0];
+                    
+                    // Get performance data
+                    $performance_data = supabaseFetch('subject_performance', ['student_subject_id' => $subject_record['id']]);
+                    
+                    $is_high_risk = false;
+                    $is_low_risk = false;
+                    
+                    if ($performance_data && count($performance_data) > 0) {
+                        $performance = $performance_data[0];
+                        $final_grade = $performance['overall_grade'] ?? 0;
+                        
+                        // Determine risk level
+                        if ($final_grade > 0) {
+                            if ($final_grade >= 80) {
+                                $is_low_risk = true;
+                            } else {
+                                $is_high_risk = true;
+                            }
+                        }
+                    } else {
+                        // If no performance data, try to calculate from scores
+                        $calculated_grade = calculateSubjectGradeFromScores($subject_record['id']);
+                        if ($calculated_grade > 0) {
+                            if ($calculated_grade >= 80) {
+                                $is_low_risk = true;
+                            } else {
+                                $is_high_risk = true;
+                            }
+                        }
+                    }
+                    
+                    // Add to active counts
+                    $data['total_active_subjects']++;
+                    if ($is_high_risk) {
+                        $data['active_high_risk']++;
+                    }
+                    if ($is_low_risk) {
+                        $data['active_low_risk']++;
+                    }
+                    
+                    // Add debug info for this subject
+                    $data['debug_info']['active_subjects'][] = [
+                        'subject_code' => $subject_info['subject_code'],
+                        'grade' => $final_grade,
+                        'risk_level' => $is_high_risk ? 'high' : ($is_low_risk ? 'low' : 'no-data')
+                    ];
+                }
+            }
+        }
+        
+    } catch (Exception $e) {
+        $data['debug_info']['error'] = $e->getMessage();
+        error_log("Error getting semester risk data: " . $e->getMessage());
+    }
+    
+    return $data;
+}
+
+/**
+ * Get risk overview data specifically for archived subjects
+ */
+function getArchivedSubjectsRiskOverview($student_id) {
+    $data = [
+        'high_risk' => 0,
+        'low_risk' => 0,
+        'no_data' => 0,
+        'total_subjects' => 0,
+        'subjects' => []
+    ];
+    
+    try {
+        // Get all archived subjects
+        $archived_subjects = supabaseFetch('student_subjects', [
+            'student_id' => $student_id,
+            'archived' => 'true'
+        ]);
+        
+        if ($archived_subjects && is_array($archived_subjects)) {
+            $data['total_subjects'] = count($archived_subjects);
+            
+            foreach ($archived_subjects as $subject_record) {
+                $subject_data = supabaseFetch('subjects', ['id' => $subject_record['subject_id']]);
+                
+                if ($subject_data && count($subject_data) > 0) {
+                    $subject_info = $subject_data[0];
+                    
+                    // Get performance data
+                    $performance_data = supabaseFetch('subject_performance', ['student_subject_id' => $subject_record['id']]);
+                    
+                    $final_grade = 0;
+                    $risk_level = 'no-data';
+                    
+                    if ($performance_data && count($performance_data) > 0) {
+                        $performance = $performance_data[0];
+                        $final_grade = $performance['overall_grade'] ?? 0;
+                        
+                        // Determine risk level
+                        if ($final_grade > 0) {
+                            if ($final_grade >= 80) {
+                                $risk_level = 'low';
+                                $data['low_risk']++;
+                            } else {
+                                $risk_level = 'high';
+                                $data['high_risk']++;
+                            }
+                        } else {
+                            $data['no_data']++;
+                        }
+                    } else {
+                        // If no performance data, try to calculate from scores
+                        $calculated_grade = calculateSubjectGradeFromScores($subject_record['id']);
+                        if ($calculated_grade > 0) {
+                            if ($calculated_grade >= 80) {
+                                $risk_level = 'low';
+                                $data['low_risk']++;
+                            } else {
+                                $risk_level = 'high';
+                                $data['high_risk']++;
+                            }
+                        } else {
+                            $data['no_data']++;
+                        }
+                    }
+                    
+                    // Store subject details
+                    $data['subjects'][] = [
+                        'subject_code' => $subject_info['subject_code'],
+                        'subject_name' => $subject_info['subject_name'],
+                        'grade' => $final_grade,
+                        'risk_level' => $risk_level,
+                        'semester' => $subject_info['semester']
+                    ];
+                }
+            }
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error getting archived subjects risk overview: " . $e->getMessage());
+    }
+    
+    return $data;
 }
 ?>

@@ -22,7 +22,7 @@ try {
     $error_message = 'Database error: ' . $e->getMessage();
 }
 
-// After line 4 (after session_start())
+// Get unread message count
 $unread_count = 0;
 try {
     $unread_count = getUnreadMessageCount($_SESSION['user_id'], 'student');
@@ -48,12 +48,27 @@ try {
                     'student_subject_id' => $subject_record['id']
                 ]);
                 
+                $performance = $performance_data ? $performance_data[0] : null;
+                $overall_grade = $performance['overall_grade'] ?? 0;
+                $risk_level = $performance['risk_level'] ?? 'no-data';
+                
+                // If no performance data, try to calculate risk level from scores
+                if ($overall_grade === 0) {
+                    $calculated_grade = calculateSubjectGradeFromScores($subject_record['id']);
+                    if ($calculated_grade > 0) {
+                        $overall_grade = $calculated_grade;
+                        $risk_level = $calculated_grade >= 80 ? 'low' : 'high';
+                    }
+                }
+                
                 $archived_subjects[] = array_merge($subject_record, [
                     'subject_code' => $subject_info['subject_code'],
                     'subject_name' => $subject_info['subject_name'],
                     'credits' => $subject_info['credits'],
                     'semester' => $subject_info['semester'],
-                    'performance' => $performance_data ? $performance_data[0] : null
+                    'overall_grade' => $overall_grade,
+                    'risk_level' => $risk_level,
+                    'has_scores' => ($overall_grade > 0)
                 ]);
             }
         }
@@ -119,7 +134,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['get_subject_details']))
                 
                 if (!$allScores) $allScores = [];
                 
-                // Calculate grades (same logic as termevaluations.php)
+                // Calculate grades
                 $midtermGrade = 0;
                 $finalGrade = 0;
                 $subjectGrade = 0;
@@ -248,6 +263,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['get_subject_details']))
                     if ($subjectGrade > 100) $subjectGrade = 100;
                 }
                 
+                // Determine risk level
+                $risk_level = 'no-data';
+                if ($subjectGrade > 0) {
+                    $risk_level = $subjectGrade >= 80 ? 'low' : 'high';
+                }
+                
                 // Prepare response
                 $response = [
                     'success' => true,
@@ -255,7 +276,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['get_subject_details']))
                     'grades' => [
                         'subject_grade' => $subjectGrade,
                         'midterm_grade' => $midtermGrade,
-                        'final_grade' => $finalGrade
+                        'final_grade' => $finalGrade,
+                        'risk_level' => $risk_level
                     ],
                     'performance' => $performance_data ? $performance_data[0] : null,
                     'has_data' => !empty($allScores)
@@ -279,7 +301,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['get_subject_details']))
     }
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -971,9 +992,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['get_subject_details']))
                 <a href="student-messages.php" class="nav-link">
                     <i class="fas fa-comments"></i>
                     Messages
-                    <?php 
-                    $unread_count = getUnreadMessageCount($_SESSION['user_id'], 'student');
-                    if ($unread_count > 0): ?>
+                    <?php if ($unread_count > 0): ?>
                         <span class="sidebar-badge"><?php echo $unread_count; ?></span>
                     <?php endif; ?>
                 </a>
@@ -1065,6 +1084,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['get_subject_details']))
                                     <span><strong>Semester:</strong> <?php echo htmlspecialchars($subject['semester']); ?></span>
                                 </div>
                                 <div class="info-item">
+                                    <i class="fas fa-chart-line"></i>
+                                    <span><strong>Risk Level:</strong> 
+                                        <span class="risk-badge <?php echo $subject['risk_level']; ?>">
+                                            <?php echo ucfirst($subject['risk_level']); ?>
+                                        </span>
+                                    </span>
+                                </div>
+                                <?php if ($subject['has_scores']): ?>
+                                <div class="info-item">
+                                    <i class="fas fa-percentage"></i>
+                                    <span><strong>Final Grade:</strong> 
+                                        <span style="font-weight: 600; color: <?php echo $subject['overall_grade'] >= 80 ? '#28a745' : '#dc3545'; ?>">
+                                            <?php echo number_format($subject['overall_grade'], 1); ?>%
+                                        </span>
+                                    </span>
+                                </div>
+                                <?php endif; ?>
+                                <div class="info-item">
                                     <i class="fas fa-clock"></i>
                                     <span><strong>Archived:</strong> 
                                         <?php echo $subject['archived_at'] ? date('M j, Y', strtotime($subject['archived_at'])) : 'Unknown'; ?>
@@ -1145,7 +1182,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['get_subject_details']))
 
         // Open details modal
         function openDetailsModal(subjectId) {
-            console.log('Opening details modal for subject ID:', subjectId); // Debug log
+            console.log('Opening details modal for subject ID:', subjectId);
             
             // Show loading state
             modalContent.innerHTML = `
@@ -1166,7 +1203,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['get_subject_details']))
                     return response.json();
                 })
                 .then(data => {
-                    console.log('Received data:', data); // Debug log
+                    console.log('Received data:', data);
                     if (data.success) {
                         displaySubjectDetails(data);
                     } else {
@@ -1217,14 +1254,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['get_subject_details']))
                         <i class="fas fa-graduation-cap"></i>
                         <span><strong>Credits:</strong> ${subject.credits}</span>
                     </div>
+                    <div class="info-item">
+                        <i class="fas fa-chart-line"></i>
+                        <span><strong>Risk Level:</strong> 
+                            <span class="risk-badge ${grades.risk_level}">
+                                ${grades.risk_level.charAt(0).toUpperCase() + grades.risk_level.slice(1)}
+                            </span>
+                        </span>
+                    </div>
                 </div>
             `;
             
-            if (hasData) {
+            if (hasData && grades.subject_grade > 0) {
                 content += `
                     <div class="grades-overview">
                         <div class="grade-card">
-                            <div class="grade-value">${grades.subject_grade > 0 ? grades.subject_grade.toFixed(1) + '%' : '--'}</div>
+                            <div class="grade-value">${grades.subject_grade.toFixed(1)}%</div>
                             <div class="grade-label">Subject Grade</div>
                         </div>
                         <div class="grade-card">
@@ -1295,23 +1340,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['get_subject_details']))
                 }, 300);
             });
         }, 5000);
-
-        // Debug: Check if buttons are working
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('Page loaded - checking View Details buttons');
-            
-            const viewDetailsButtons = document.querySelectorAll('.btn-details');
-            console.log('Found', viewDetailsButtons.length, 'View Details buttons');
-            
-            viewDetailsButtons.forEach(button => {
-                button.addEventListener('click', function(e) {
-                    console.log('View Details button clicked');
-                    const subjectId = this.getAttribute('onclick').match(/openDetailsModal\((\d+)\)/)[1];
-                    console.log('Subject ID:', subjectId);
-                    openDetailsModal(subjectId);
-                });
-            });
-        });
-</script>
+    </script>
 </body>
 </html>

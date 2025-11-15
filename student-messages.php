@@ -682,7 +682,7 @@ $partners = getConversationPartners($student_id, 'student');
             <div class="admins-list">
                 <div class="list-header">
                     <i class="fas fa-user-shield"></i>
-                    Administrators
+                    Administrator
                 </div>
                 <div class="admins-container">
                     <?php if (!empty($partners)): ?>
@@ -768,35 +768,38 @@ $partners = getConversationPartners($student_id, 'student');
     </div>
 
     <script>
-        let currentAdminId = null;
-        let currentAdminName = null;
+        let currentStudentId = null;
+        let currentStudentName = null;
         let refreshInterval = null;
 
-        // Admin selection
-        document.querySelectorAll('.admin-item').forEach(item => {
+        // Student selection
+        document.querySelectorAll('.student-item').forEach(item => {
             item.addEventListener('click', function() {
-                document.querySelectorAll('.admin-item').forEach(i => i.classList.remove('active'));
+                document.querySelectorAll('.student-item').forEach(i => i.classList.remove('active'));
                 this.classList.add('active');
                 
-                currentAdminId = this.dataset.adminId;
-                currentAdminName = this.dataset.adminName;
+                currentStudentId = this.dataset.studentId;
+                currentStudentName = this.dataset.studentName;
                 
                 // Update chat header
                 document.getElementById('chat-header').style.display = 'flex';
-                document.getElementById('header-name').textContent = currentAdminName;
-                document.getElementById('header-avatar').textContent = currentAdminName.charAt(0).toUpperCase();
+                document.getElementById('header-name').textContent = currentStudentName;
+                document.getElementById('header-avatar').textContent = currentStudentName.charAt(0).toUpperCase();
                 document.getElementById('message-input').style.display = 'block';
                 
                 loadMessages();
                 startAutoRefresh();
+                
+                // Update unread badge for this student
+                updateStudentUnreadBadge(currentStudentId);
             });
         });
 
-        // Load messages for selected admin
+        // Load messages for selected student
         function loadMessages() {
-            if (!currentAdminId) return;
+            if (!currentStudentId) return;
             
-            fetch('get_messages.php?partner_id=' + currentAdminId + '&user_type=student')
+            fetch('get_messages.php?partner_id=' + currentStudentId + '&user_type=admin')
                 .then(response => response.json())
                 .then(messages => {
                     const messagesArea = document.getElementById('messages-area');
@@ -815,7 +818,7 @@ $partners = getConversationPartners($student_id, 'student');
                     
                     messages.forEach(msg => {
                         const messageDiv = document.createElement('div');
-                        const isSent = msg.sender_type === 'student';
+                        const isSent = msg.sender_type === 'admin';
                         messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
                         
                         const time = new Date(msg.created_at).toLocaleTimeString([], { 
@@ -840,10 +843,10 @@ $partners = getConversationPartners($student_id, 'student');
         // Send message
         function sendMessage() {
             const messageText = document.getElementById('message-text').value.trim();
-            if (!messageText || !currentAdminId) return;
+            if (!messageText || !currentStudentId) return;
             
             const formData = new FormData();
-            formData.append('receiver_id', currentAdminId);
+            formData.append('receiver_id', currentStudentId);
             formData.append('message', messageText);
             
             fetch('send_message.php', {
@@ -855,6 +858,10 @@ $partners = getConversationPartners($student_id, 'student');
                 if (result.success) {
                     document.getElementById('message-text').value = '';
                     loadMessages();
+                    // Refresh the page to update unread counts in sidebar
+                    setTimeout(() => {
+                        refreshUnreadCounts();
+                    }, 500);
                 } else {
                     alert('Failed to send message. Please try again.');
                 }
@@ -863,6 +870,23 @@ $partners = getConversationPartners($student_id, 'student');
                 console.error('Error sending message:', error);
                 alert('Error sending message. Please try again.');
             });
+        }
+
+        // Update unread badge for a specific student
+        function updateStudentUnreadBadge(studentId) {
+            const studentItem = document.querySelector(`.student-item[data-student-id="${studentId}"]`);
+            if (studentItem) {
+                const unreadBadge = studentItem.querySelector('.unread-badge');
+                if (unreadBadge) {
+                    unreadBadge.remove();
+                }
+            }
+        }
+
+        // Refresh all unread counts
+        function refreshUnreadCounts() {
+            // This will refresh the sidebar badge
+            location.reload();
         }
 
         // Auto-refresh messages
@@ -894,10 +918,39 @@ $partners = getConversationPartners($student_id, 'student');
             }
         });
 
-        // Auto-refresh page every 60 seconds to update message count
+        // Auto-refresh page every 30 seconds to update message count
         setTimeout(() => {
             location.reload();
-        }, 60000);
+        }, 30000);
+        
+        // Logout modal functionality
+        const logoutBtn = document.querySelector('.logout-btn');
+        const logoutModal = document.getElementById('logoutModal');
+        const cancelLogout = document.getElementById('cancelLogout');
+        const confirmLogout = document.getElementById('confirmLogout');
+
+        // Show modal when clicking logout button
+        logoutBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            logoutModal.classList.add('show');
+        });
+
+        // Hide modal when clicking cancel
+        cancelLogout.addEventListener('click', () => {
+            logoutModal.classList.remove('show');
+        });
+
+        // Handle logout confirmation
+        confirmLogout.addEventListener('click', () => {
+            window.location.href = 'logout.php';
+        });
+
+        // Hide modal when clicking outside the modal content
+        logoutModal.addEventListener('click', (e) => {
+            if (e.target === logoutModal) {
+                logoutModal.classList.remove('show');
+            }
+        });
     </script>
 </body>
 </html>

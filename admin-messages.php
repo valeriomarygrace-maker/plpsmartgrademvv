@@ -794,6 +794,9 @@ $partners = getConversationPartners($admin_id, 'admin');
                 
                 loadMessages();
                 startAutoRefresh();
+                
+                // Update unread badge for this student
+                updateStudentUnreadBadge(currentStudentId);
             });
         });
 
@@ -860,6 +863,10 @@ $partners = getConversationPartners($admin_id, 'admin');
                 if (result.success) {
                     document.getElementById('message-text').value = '';
                     loadMessages();
+                    // Refresh the page to update unread counts in sidebar
+                    setTimeout(() => {
+                        refreshUnreadCounts();
+                    }, 500);
                 } else {
                     alert('Failed to send message. Please try again.');
                 }
@@ -868,6 +875,23 @@ $partners = getConversationPartners($admin_id, 'admin');
                 console.error('Error sending message:', error);
                 alert('Error sending message. Please try again.');
             });
+        }
+
+        // Update unread badge for a specific student
+        function updateStudentUnreadBadge(studentId) {
+            const studentItem = document.querySelector(`.student-item[data-student-id="${studentId}"]`);
+            if (studentItem) {
+                const unreadBadge = studentItem.querySelector('.unread-badge');
+                if (unreadBadge) {
+                    unreadBadge.remove();
+                }
+            }
+        }
+
+        // Refresh all unread counts
+        function refreshUnreadCounts() {
+            // This will refresh the sidebar badge
+            location.reload();
         }
 
         // Auto-refresh messages
@@ -899,10 +923,10 @@ $partners = getConversationPartners($admin_id, 'admin');
             }
         });
 
-        // Auto-refresh page every 60 seconds to update message count
+        // Auto-refresh page every 30 seconds to update message count
         setTimeout(() => {
-            location.reload();
-        }, 60000);
+                location.reload();
+            }, 30000);
         
         // Logout modal functionality
         const logoutBtn = document.querySelector('.logout-btn');
@@ -910,7 +934,7 @@ $partners = getConversationPartners($admin_id, 'admin');
         const cancelLogout = document.getElementById('cancelLogout');
         const confirmLogout = document.getElementById('confirmLogout');
 
-// Show modal when clicking logout button
+        // Show modal when clicking logout button
         logoutBtn.addEventListener('click', (e) => {
             e.preventDefault();
             logoutModal.classList.add('show');
@@ -926,15 +950,12 @@ $partners = getConversationPartners($admin_id, 'admin');
             window.location.href = 'logout.php';
         });
 
-// Hide modal when clicking outside the modal content
-        const modals = [addSubjectModal, editSubjectModal, archiveSubjectModal, logoutModal];
-        modals.forEach(modal => {
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    modal.classList.remove('show');
-                }
-            });
+        // Hide modal when clicking outside the modal content
+        logoutModal.addEventListener('click', (e) => {
+            if (e.target === logoutModal) {
+                logoutModal.classList.remove('show');
+            }
         });
-    </script>
+</script>
 </body>
 </html>

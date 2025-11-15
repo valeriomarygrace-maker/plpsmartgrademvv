@@ -18,7 +18,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $filters['date_from'] = sanitizeInput($_POST['date_from']) . ' 00:00:00';
     }
     if (isset($_POST['date_to']) && !empty($_POST['date_to'])) {
-        $filters['date_to'] = sanitizeInput($_POST['date_to']) . ' 23:59:59';
+        $filters['date_to'] = sanitizeInput($_POST['date_to']) . ' 12:00:00';
     }
 } elseif ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['clear_filters'])) {
     // Clear filters
@@ -508,6 +508,34 @@ $admin = getAdminByEmail($_SESSION['user_email']);
             .filter-group {
                 min-width: auto;
             }
+        }
+        /* Badges */
+        .unread-badge {
+            background: #ff4444;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 0.75rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: auto;
+        }
+
+        .sidebar-badge {
+            background: #ff4444;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 0.75rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: auto;
+            font-weight: 600;
+            animation: pulse 2s infinite;
         }
     </style>
 </head>
