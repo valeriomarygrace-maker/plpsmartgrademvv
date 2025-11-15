@@ -47,7 +47,6 @@ try {
                         'credits' => $subject_info['credits'],
                         'semester' => $subject_info['semester'],
                         'overall_grade' => $performance['overall_grade'] ?? 0,
-                        'gwa' => $performance['gwa'] ?? 0,
                         'risk_level' => $performance['risk_level'] ?? 'no-data',
                         'has_scores' => ($performance && $performance['overall_grade'] > 0)
                     ]);
@@ -128,15 +127,12 @@ function getRecentScoresForStudent($student_id, $limit = 3) {
     return $recent_scores;
 }
 
-/**
- * Calculate overall performance metrics
- */
+
 function calculatePerformanceMetrics($student_id) {
     $metrics = [
         'total_subjects' => 0,
         'subjects_with_scores' => 0,
         'average_grade' => 0,
-        'average_gwa' => 0,
         'low_risk_count' => 0,
         'medium_risk_count' => 0,
         'high_risk_count' => 0
@@ -149,7 +145,6 @@ function calculatePerformanceMetrics($student_id) {
         if ($student_subjects && is_array($student_subjects)) {
             $metrics['total_subjects'] = count($student_subjects);
             $total_grade = 0;
-            $total_gwa = 0;
             $subjects_with_data = 0;
             
             foreach ($student_subjects as $subject_record) {
@@ -160,20 +155,16 @@ function calculatePerformanceMetrics($student_id) {
                     if ($performance['overall_grade'] > 0) {
                         $metrics['subjects_with_scores']++;
                         $total_grade += $performance['overall_grade'];
-                        $total_gwa += $performance['gwa'];
                         $subjects_with_data++;
                         
-                        // Count risk levels
-                        switch ($performance['risk_level']) {
-                            case 'low':
-                                $metrics['low_risk_count']++;
-                                break;
-                            case 'medium':
-                                $metrics['medium_risk_count']++;
-                                break;
-                            case 'high':
-                                $metrics['high_risk_count']++;
-                                break;
+                        // Count risk levels based on subject grade
+                        $subject_grade = $performance['overall_grade'];
+                        if ($subject_grade >= 80) {
+                            $metrics['low_risk_count']++;
+                        } elseif ($subject_grade >= 75) {
+                            $metrics['medium_risk_count']++;
+                        } else {
+                            $metrics['high_risk_count']++;
                         }
                     }
                 }
@@ -181,7 +172,6 @@ function calculatePerformanceMetrics($student_id) {
             
             if ($subjects_with_data > 0) {
                 $metrics['average_grade'] = round($total_grade / $subjects_with_data, 1);
-                $metrics['average_gwa'] = round($total_gwa / $subjects_with_data, 2);
             }
         }
         
@@ -243,7 +233,7 @@ function calculateGWA($grade) {
 }
 
 /**
- * Get semester risk data for bar chart - CORRECTED VERSION
+ * Get semester risk data for bar chart - USING SUBJECT GRADES
  */
 function getSemesterRiskData($student_id) {
     $data = [
@@ -289,7 +279,7 @@ function getSemesterRiskData($student_id) {
                 if ($subject_data && count($subject_data) > 0) {
                     $subject_info = $subject_data[0];
                     
-                    // Check if subject is archived - use proper boolean comparison
+                    // Check if subject is archived
                     $is_archived = false;
                     if (isset($subject_record['archived'])) {
                         if ($subject_record['archived'] === true || 
@@ -299,22 +289,22 @@ function getSemesterRiskData($student_id) {
                         }
                     }
                     
-                    // Get performance data
+                    // Get performance data for subject grade
                     $performance_data = supabaseFetch('subject_performance', ['student_subject_id' => $subject_record['id']]);
                     
                     $is_high_risk = false;
                     $is_low_risk = false;
-                    $final_grade = 0;
+                    $subject_grade = 0;
                     $risk_level = 'no-data';
                     
+                    // Use subject grade from performance data
                     if ($performance_data && count($performance_data) > 0) {
                         $performance = $performance_data[0];
-                        $final_grade = $performance['overall_grade'] ?? 0;
-                        $risk_level = $performance['risk_level'] ?? 'no-data';
+                        $subject_grade = $performance['overall_grade'] ?? 0;
                         
-                        // Determine risk level based on grade
-                        if ($final_grade > 0) {
-                            if ($final_grade >= 80) {
+                        // Determine risk level based on SUBJECT GRADE only
+                        if ($subject_grade > 0) {
+                            if ($subject_grade >= 80) {
                                 $is_low_risk = true;
                                 $risk_level = 'low';
                             } else {
@@ -323,10 +313,10 @@ function getSemesterRiskData($student_id) {
                             }
                         }
                     } else {
-                        // If no performance data, try to calculate from scores
+                        // If no performance data, try to calculate subject grade from scores
                         $calculated_grade = calculateSubjectGradeFromScores($subject_record['id']);
                         if ($calculated_grade > 0) {
-                            $final_grade = $calculated_grade;
+                            $subject_grade = $calculated_grade;
                             if ($calculated_grade >= 80) {
                                 $is_low_risk = true;
                                 $risk_level = 'low';
@@ -382,7 +372,7 @@ function getSemesterRiskData($student_id) {
                     $data['debug_info']['subjects'][] = [
                         'subject_code' => $subject_info['subject_code'],
                         'archived' => $is_archived,
-                        'grade' => $final_grade,
+                        'subject_grade' => $subject_grade,
                         'risk_level' => $risk_level,
                         'has_performance_data' => !empty($performance_data),
                         'semester' => $subject_info['semester']
@@ -398,7 +388,6 @@ function getSemesterRiskData($student_id) {
     
     return $data;
 }
-
 /**
  * Calculate subject grade from scores if performance data is missing
  */
@@ -1430,13 +1419,12 @@ function calculateSubjectGradeFromScores($student_subject_id) {
                                         ">
                                             <?php echo number_format($subject['overall_grade'], 1); ?>%
                                         </div>
-                                        <div class="gwa-value">
-                                            GWA: <?php echo number_format($subject['gwa'], 2); ?>
-                                            <span class="risk-badge <?php echo $subject['risk_level']; ?>">
-                                                <?php echo ucfirst($subject['risk_level']); ?>
-                                            </span>
+                                        <div class="risk-badge <?php echo $subject['risk_level']; ?>">
+                                            <?php echo ucfirst($subject['risk_level']); ?> Risk
                                         </div>
                                     <?php else: ?>
+                                        <div class="grade-value grade-no-data">No Data</div>
+                                        <div class="risk-badge no-data">No Data</div>
                                     <?php endif; ?>
                                 </div>
                             </li>
