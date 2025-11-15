@@ -790,35 +790,6 @@ $partners = getConversationPartners($student_id, 'student');
         });
     });
 
-    // Function to update sidebar badge without page reload
-    function updateSidebarBadge() {
-        fetch('get_unread_count.php')
-            .then(response => response.json())
-            .then(data => {
-                const sidebarBadge = document.querySelector('.nav-link.active .sidebar-badge');
-                if (data.count > 0) {
-                    if (sidebarBadge) {
-                        sidebarBadge.textContent = data.count;
-                    } else {
-                        // Create badge if it doesn't exist
-                        const badge = document.createElement('span');
-                        badge.className = 'sidebar-badge';
-                        badge.textContent = data.count;
-                        document.querySelector('.nav-link.active').appendChild(badge);
-                    }
-                } else {
-                    // Remove badge if no unread messages
-                    if (sidebarBadge) {
-                        sidebarBadge.remove();
-                    }
-                }
-            })
-            .catch(error => console.error('Error updating sidebar badge:', error));
-    }
-
-    // Update sidebar badge every 5 seconds
-    setInterval(updateSidebarBadge, 5000);
-
     // Also update when messages are loaded or sent
     function loadMessages() {
         if (!currentAdminId) return;
