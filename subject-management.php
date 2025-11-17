@@ -291,6 +291,47 @@ if ($hasScores) {
     ]];
 }
 
+// Add missing functions at the TOP of the file
+function supabaseDelete($table, $conditions) {
+    try {
+        $supabase = getSupabaseClient();
+        
+        // Build the delete query
+        $query = $supabase->from($table)->delete();
+        
+        // Add conditions
+        foreach ($conditions as $column => $value) {
+            $query = $query->eq($column, $value);
+        }
+        
+        $response = $query->execute();
+        $data = $response->getData();
+        
+        return true;
+        
+    } catch (Exception $e) {
+        error_log("Supabase delete error: " . $e->getMessage());
+        return false;
+    }
+}
+
+function getSupabaseClient() {
+    global $supabase;
+    if (!$supabase) {
+        $supabase = createClient(
+            $_ENV['SUPABASE_URL'],
+            $_ENV['SUPABASE_KEY']
+        );
+    }
+    return $supabase;
+}
+
+if (!isset($_SESSION['logged_in']) || $_SESSION['user_type'] !== 'student') {
+    header('Location: login.php');
+    exit;
+}
+
+
 
 // FORM HANDLING - Only allow actions for current term
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
