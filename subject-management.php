@@ -11,6 +11,53 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['user_type'] !== 'student') {
     exit;
 }
 
+// Add missing supabaseDelete function using cURL
+function supabaseDelete($table, $conditions) {
+    try {
+        global $supabase_url, $supabase_key;
+        
+        $url = $supabase_url . "/rest/v1/$table";
+        
+        $queryParams = [];
+        foreach ($conditions as $key => $value) {
+            if ($value !== null) {
+                $queryParams[] = "$key=eq.$value";
+            }
+        }
+        
+        if (!empty($queryParams)) {
+            $url .= "?" . implode('&', $queryParams);
+        }
+        
+        $ch = curl_init();
+        $headers = [
+            'apikey: ' . $supabase_key,
+            'Authorization: Bearer ' . $supabase_key,
+            'Content-Type: application/json',
+            'Prefer: return=representation'
+        ];
+        
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER => $headers,
+            CURLOPT_CUSTOMREQUEST => 'DELETE',
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_TIMEOUT => 30,
+        ]);
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        return ($httpCode >= 200 && $httpCode < 300);
+        
+    } catch (Exception $e) {
+        error_log("Supabase delete error: " . $e->getMessage());
+        return false;
+    }
+}
+
 // After line 4 (after session_start())
 $unread_count = 0;
 try {
@@ -290,48 +337,6 @@ if ($hasScores) {
         'source' => 'system'
     ]];
 }
-
-// Add missing functions at the TOP of the file
-function supabaseDelete($table, $conditions) {
-    try {
-        $supabase = getSupabaseClient();
-        
-        // Build the delete query
-        $query = $supabase->from($table)->delete();
-        
-        // Add conditions
-        foreach ($conditions as $column => $value) {
-            $query = $query->eq($column, $value);
-        }
-        
-        $response = $query->execute();
-        $data = $response->getData();
-        
-        return true;
-        
-    } catch (Exception $e) {
-        error_log("Supabase delete error: " . $e->getMessage());
-        return false;
-    }
-}
-
-function getSupabaseClient() {
-    global $supabase;
-    if (!$supabase) {
-        $supabase = createClient(
-            $_ENV['SUPABASE_URL'],
-            $_ENV['SUPABASE_KEY']
-        );
-    }
-    return $supabase;
-}
-
-if (!isset($_SESSION['logged_in']) || $_SESSION['user_type'] !== 'student') {
-    header('Location: login.php');
-    exit;
-}
-
-
 
 // FORM HANDLING - Only allow actions for current term
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -629,7 +634,6 @@ function getGradeDescription($grade) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* Your existing CSS styles remain exactly the same */
         :root {
             --plp-green: #006341;
             --plp-green-light: #008856;
