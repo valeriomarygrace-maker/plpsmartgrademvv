@@ -1,6 +1,6 @@
 <?php
 require_once 'config.php';
-require_once 'ml-helpers.php'; // Add this line
+require_once 'ml-helpers.php'; 
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -11,7 +11,6 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['user_type'] !== 'student') {
     exit;
 }
 
-// Get subject ID from URL
 $subject_id = isset($_GET['subject_id']) ? intval($_GET['subject_id']) : 0;
 
 if (!$subject_id) {
@@ -19,14 +18,12 @@ if (!$subject_id) {
     exit;
 }
 
-// Get student and subject information
 $student = null;
 $subject = null;
 
 try {
     $student = getStudentByEmail($_SESSION['user_email']);
     
-    // Verify the subject belongs to the student
     $subject_record = supabaseFetch('student_subjects', [
         'id' => $subject_id, 
         'student_id' => $student['id']
@@ -52,35 +49,29 @@ try {
     exit;
 }
 
-// Calculate grades for both terms
 $midtermGrade = 0;
 $finalGrade = 0;
 $subjectGrade = 0;
 $ml_prediction = null;
 
 try {
-    // Get all scores for this subject
     $allScores = supabaseFetch('student_subject_scores', ['student_subject_id' => $subject_id]);
     if (!$allScores) $allScores = [];
     
-    // Get midterm categories
     $midtermCategories = supabaseFetch('student_class_standing_categories', [
         'student_subject_id' => $subject_id,
         'term_type' => 'midterm'
     ]);
     
-    // Get final categories
     $finalCategories = supabaseFetch('student_class_standing_categories', [
         'student_subject_id' => $subject_id,
         'term_type' => 'final'
     ]);
 
-    // Calculate Midterm Grade
     if ($midtermCategories && count($midtermCategories) > 0) {
         $midtermClassStanding = 0;
         $midtermExamScore = 0;
         
-        // Calculate class standing for midterm
         foreach ($midtermCategories as $category) {
             $categoryScores = array_filter($allScores, function($score) use ($category) {
                 return $score['category_id'] == $category['id'] && $score['score_type'] === 'class_standing';
@@ -107,12 +98,10 @@ try {
             }
         }
         
-        // Cap class standing at 60%
         if ($midtermClassStanding > 60) {
             $midtermClassStanding = 60;
         }
         
-        // Get midterm exam
         $midtermExams = array_filter($allScores, function($score) {
             return $score['score_type'] === 'midterm_exam';
         });
@@ -129,12 +118,10 @@ try {
         if ($midtermGrade > 100) $midtermGrade = 100;
     }
     
-    // Calculate Final Grade
     if ($finalCategories && count($finalCategories) > 0) {
         $finalClassStanding = 0;
         $finalExamScore = 0;
         
-        // Calculate class standing for final
         foreach ($finalCategories as $category) {
             $categoryScores = array_filter($allScores, function($score) use ($category) {
                 return $score['category_id'] == $category['id'] && $score['score_type'] === 'class_standing';
@@ -161,12 +148,10 @@ try {
             }
         }
         
-        // Cap class standing at 60%
         if ($finalClassStanding > 60) {
             $finalClassStanding = 60;
         }
         
-        // Get final exam
         $finalExams = array_filter($allScores, function($score) {
             return $score['score_type'] === 'final_exam';
         });
@@ -183,7 +168,6 @@ try {
         if ($finalGrade > 100) $finalGrade = 100;
     }
     
-    // Calculate Subject Grade (average of midterm and final)
     $grades = array_filter([$midtermGrade, $finalGrade], function($grade) {
         return $grade > 0;
     });
@@ -193,7 +177,6 @@ try {
         if ($subjectGrade > 100) $subjectGrade = 100;
     }
     
-    // CALL PYTHON ML FOR SUBJECT GRADE PREDICTION ONLY
     if ($subjectGrade > 0) {
         $ml_prediction = callPythonMLAPI([
             'subject_grade' => $subjectGrade,
@@ -209,7 +192,6 @@ try {
     error_log("Error calculating grades: " . $e->getMessage());
 }
 
-// Get grade description for MIDTERM and FINAL (traditional grading)
 function getTermGradeDescription($grade) {
     if ($grade >= 90) return 'Excellent';
     elseif ($grade >= 85) return 'Very Good';
@@ -219,19 +201,16 @@ function getTermGradeDescription($grade) {
     else return 'Needs Improvement';
 }
 
-// Get risk level description for SUBJECT GRADE (ML-based)
 function getSubjectRiskDescription($grade, $ml_prediction = null) {
     if ($ml_prediction && $ml_prediction['success']) {
         return $ml_prediction['risk_description'];
     }
     
-    // Fallback to simple rules if ML fails
     if ($grade >= 85) return 'Low Risk';
     elseif ($grade >= 80) return 'Moderate Risk';
     else return 'High Risk';
 }
 
-// Get detailed risk description for SUBJECT GRADE
 function getSubjectRiskDetailedDescription($grade, $ml_prediction = null) {
     if ($ml_prediction && $ml_prediction['success']) {
         return $ml_prediction['risk_description'];
@@ -870,7 +849,6 @@ function getSubjectRiskDetailedDescription($grade, $ml_prediction = null) {
             </div>
         </div>
 
-        <!-- Optional: Debug Information (remove in production) -->
         <?php if (isset($_GET['debug'])): ?>
         <div class="debug-info">
             <strong>Debug Information:</strong><br>
@@ -884,7 +862,6 @@ function getSubjectRiskDetailedDescription($grade, $ml_prediction = null) {
         <?php endif; ?>
 
         <div class="card">
-            <!-- Overview Section -->
             <div class="overview-section">
                 <div class="overview-grid">
                     <div class="overview-card subject-grade-card">
@@ -942,9 +919,7 @@ function getSubjectRiskDetailedDescription($grade, $ml_prediction = null) {
                 </div>
             </div>
 
-            <!-- Terms Section -->
             <div class="terms-container">
-                <!-- Midterm Card -->
                 <div class="term-card midterm" onclick="window.location.href='subject-management.php?subject_id=<?php echo $subject_id; ?>&term=midterm'">
                     <div class="term-title">MIDTERM</div>
                     <div class="term-stats">
@@ -959,7 +934,6 @@ function getSubjectRiskDetailedDescription($grade, $ml_prediction = null) {
                     </div>
                 </div>
 
-                <!-- Final Card -->
                 <div class="term-card final" onclick="window.location.href='subject-management.php?subject_id=<?php echo $subject_id; ?>&term=final'">
                     <div class="term-title">FINAL</div>
                     <div class="term-stats">
@@ -998,36 +972,30 @@ function getSubjectRiskDetailedDescription($grade, $ml_prediction = null) {
     </div>
 
     <script>
-        // Add click handlers for the term cards
         document.querySelectorAll('.term-card').forEach(card => {
             card.addEventListener('click', function() {
                 const url = this.getAttribute('onclick').match(/'([^']+)'/)[1];
                 window.location.href = url;
             });
         });
-        // Logout modal functionality
         const logoutBtn = document.querySelector('.logout-btn');
         const logoutModal = document.getElementById('logoutModal');
         const cancelLogout = document.getElementById('cancelLogout');
         const confirmLogout = document.getElementById('confirmLogout');
 
-        // Show modal when clicking logout button
         logoutBtn.addEventListener('click', (e) => {
             e.preventDefault();
             logoutModal.classList.add('show');
         });
 
-        // Hide modal when clicking cancel
         cancelLogout.addEventListener('click', () => {
             logoutModal.classList.remove('show');
         });
 
-        // Handle logout confirmation
         confirmLogout.addEventListener('click', () => {
             window.location.href = 'logout.php';
         });
 
-        // Hide modal when clicking outside the modal content
         logoutModal.addEventListener('click', (e) => {
             if (e.target === logoutModal) {
                 logoutModal.classList.remove('show');

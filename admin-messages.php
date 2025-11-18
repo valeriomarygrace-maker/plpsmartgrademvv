@@ -5,7 +5,6 @@ requireAdminRole();
 $admin_id = $_SESSION['user_id'];
 $admin = getAdminByEmail($_SESSION['user_email']);
 
-// Get conversation partners (students who have messaged with this admin)
 $partners = getConversationPartners($admin_id, 'admin');
 ?>
 <!DOCTYPE html>
@@ -746,7 +745,6 @@ $partners = getConversationPartners($admin_id, 'admin');
         </div>
     </div>
 
-                <!--  Logout Modal -->
     <div class="modal" id="logoutModal">
         <div class="modal-content" style="max-width: 450px; text-align: center;">
             <h3 style="color: var(--plp-green); font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem;">
@@ -772,7 +770,6 @@ $partners = getConversationPartners($admin_id, 'admin');
     let currentStudentName = null;
     let refreshInterval = null;
 
-    // Student selection
     document.querySelectorAll('.student-item').forEach(item => {
         item.addEventListener('click', function() {
             document.querySelectorAll('.student-item').forEach(i => i.classList.remove('active'));
@@ -781,7 +778,6 @@ $partners = getConversationPartners($admin_id, 'admin');
             currentStudentId = this.dataset.studentId;
             currentStudentName = this.dataset.studentName;
             
-            // Update chat header
             document.getElementById('chat-header').style.display = 'flex';
             document.getElementById('header-name').textContent = currentStudentName;
             document.getElementById('header-avatar').textContent = currentStudentName.charAt(0).toUpperCase();
@@ -790,7 +786,6 @@ $partners = getConversationPartners($admin_id, 'admin');
             loadMessages();
             startAutoRefresh();
             
-            // Update unread badge for this student
             updateStudentUnreadBadge(currentStudentId);
         });
     });
@@ -842,7 +837,6 @@ $partners = getConversationPartners($admin_id, 'admin');
             });
     }
 
-    // Send message
     function sendMessage() {
         const messageText = document.getElementById('message-text').value.trim();
         if (!messageText || !currentStudentId) return;
@@ -860,7 +854,6 @@ $partners = getConversationPartners($admin_id, 'admin');
             if (result.success) {
                 document.getElementById('message-text').value = '';
                 loadMessages();
-                // Refresh the page to update unread counts in sidebar
                 setTimeout(() => {
                     refreshUnreadCounts();
                 }, 500);
@@ -874,7 +867,6 @@ $partners = getConversationPartners($admin_id, 'admin');
         });
     }
 
-    // Update unread badge for a specific student
     function updateStudentUnreadBadge(studentId) {
         const studentItem = document.querySelector(`.student-item[data-student-id="${studentId}"]`);
         if (studentItem) {
@@ -885,13 +877,10 @@ $partners = getConversationPartners($admin_id, 'admin');
         }
     }
 
-    // Refresh all unread counts
     function refreshUnreadCounts() {
-        // This will refresh the sidebar badge
         location.reload();
     }
 
-    // Auto-refresh messages
     function startAutoRefresh() {
         if (refreshInterval) {
             clearInterval(refreshInterval);
@@ -899,7 +888,6 @@ $partners = getConversationPartners($admin_id, 'admin');
         refreshInterval = setInterval(loadMessages, 3000);
     }
 
-    // Enter key to send message
     document.getElementById('message-text')?.addEventListener('keypress', function(e) {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
@@ -907,13 +895,11 @@ $partners = getConversationPartners($admin_id, 'admin');
         }
     });
 
-    // Auto-resize textarea
     document.getElementById('message-text')?.addEventListener('input', function() {
         this.style.height = 'auto';
         this.style.height = Math.min(this.scrollHeight, 120) + 'px';
     });
 
-    // Stop auto-refresh when leaving page
     window.addEventListener('beforeunload', function() {
         if (refreshInterval) {
             clearInterval(refreshInterval);

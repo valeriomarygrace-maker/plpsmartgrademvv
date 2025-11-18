@@ -1,16 +1,11 @@
 <?php
-// Environment Configuration
 $supabase_url = getenv('SUPABASE_URL') ?: 'https://xwvrgpxcceivakzrwwji.supabase.co';
 $supabase_key = getenv('SUPABASE_KEY') ?: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh3dnJncHhjY2VpdmFrenJ3d2ppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE3MjQ0NzQsImV4cCI6MjA3NzMwMDQ3NH0.ovd8v3lqsYtJU78D4iM6CyAyvi6jK4FUbYUjydFi4FM';
 
-// Start session
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-/**
- * Simple Supabase API Helper Function
- */
 function supabaseFetch($table, $filters = [], $method = 'GET', $data = null) {
     global $supabase_url, $supabase_key;
     
@@ -70,9 +65,6 @@ function supabaseFetch($table, $filters = [], $method = 'GET', $data = null) {
     return $result;
 }
 
-/**
- * Password Hashing and Verification
- */
 function hashPassword($password) {
     return password_hash($password, PASSWORD_DEFAULT);
 }
@@ -81,9 +73,6 @@ function verifyPassword($password, $hashedPassword) {
     return password_verify($password, $hashedPassword);
 }
 
-/**
- * Student Functions
- */
 function getStudentByEmail($email) {
     $students = supabaseFetch('students', ['email' => $email]);
     return $students && count($students) > 0 ? $students[0] : null;
@@ -102,9 +91,7 @@ function isValidPLPEmail($email) {
     return strtolower($domain) === 'plpasig.edu.ph';
 }
 
-/**
- * Admin Functions
- */
+
 function getAdminByEmail($email) {
     $admins = supabaseFetch('admins', ['email' => $email]);
     return $admins && count($admins) > 0 ? $admins[0] : null;
@@ -128,9 +115,6 @@ function sanitizeInput($data) {
     return htmlspecialchars(trim($data), ENT_QUOTES, 'UTF-8');
 }
 
-/**
- * Additional Supabase Helper Functions
- */
 function supabaseUpdate($table, $data, $filters = []) {
     return supabaseFetch($table, $filters, 'PATCH', $data);
 }
@@ -160,18 +144,13 @@ function getUnreadMessageCount($userId, $userType) {
     
     $messages = supabaseFetch('messages', $filters);
     $count = $messages ? count($messages) : 0;
-    
-    // Store in session for 30 seconds
-    //$_SESSION['unread_message_count'] = $count;
-    //$_SESSION['unread_message_count_time'] = time();
-    
+        
     return $count;
 }
 
 function getMessagesBetweenUsers($user1_id, $user1_type, $user2_id, $user2_type) {
     global $supabase_url, $supabase_key;
     
-    // Get messages between two specific users
     $url = $supabase_url . "/rest/v1/messages?" . http_build_query([
         'or' => "(and(sender_id.eq.{$user1_id},sender_type.eq.{$user1_type},receiver_id.eq.{$user2_id},receiver_type.eq.{$user2_type}),and(sender_id.eq.{$user2_id},sender_type.eq.{$user2_type},receiver_id.eq.{$user1_id},receiver_type.eq.{$user1_type}))",
         'order' => 'created_at.asc'
@@ -214,12 +193,10 @@ function markMessagesAsRead($message_ids) {
 
 function getConversationPartners($userId, $userType) {
     if ($userType === 'student') {
-        // For students, get all admins they have conversations with
         $admins = supabaseFetchAll('admins');
         $partners = [];
         
         foreach ($admins as $admin) {
-            // Get unread count for this specific admin
             $unread_filters = [
                 'sender_id' => $admin['id'],
                 'sender_type' => 'admin',
@@ -240,12 +217,10 @@ function getConversationPartners($userId, $userType) {
         }
         return $partners;
     } else {
-        // For admins, get all students they have conversations with
         $students = supabaseFetchAll('students');
         $partners = [];
         
         foreach ($students as $student) {
-            // Get unread count for this specific student
             $unread_filters = [
                 'sender_id' => $student['id'],
                 'sender_type' => 'student',
@@ -268,9 +243,6 @@ function getConversationPartners($userId, $userType) {
     }
 }
 
-/**
- * Log system activities
- */
 function logSystemActivity($user_email, $user_type, $action, $description = '') {
     $log_data = [
         'user_email' => $user_email,
@@ -284,9 +256,6 @@ function logSystemActivity($user_email, $user_type, $action, $description = '') 
     return supabaseInsert('system_logs', $log_data);
 }
 
-/**
- * Get system logs with filters
- */
 function getSystemLogs($filters = [], $limit = 50, $offset = 0) {
     global $supabase_url, $supabase_key;
     
@@ -296,7 +265,6 @@ function getSystemLogs($filters = [], $limit = 50, $offset = 0) {
         'offset' => $offset
     ];
     
-    // Add filters if provided
     if (!empty($filters['user_type'])) {
         $query_params['user_type'] = 'eq.' . $filters['user_type'];
     }
@@ -341,9 +309,6 @@ function getSystemLogs($filters = [], $limit = 50, $offset = 0) {
     return [];
 }
 
-/**
- * Count system logs for pagination
- */
 function countSystemLogs($filters = []) {
     global $supabase_url, $supabase_key;
     
@@ -351,7 +316,6 @@ function countSystemLogs($filters = []) {
         'select' => 'count'
     ];
     
-    // Add filters if provided
     if (!empty($filters['user_type'])) {
         $query_params['user_type'] = 'eq.' . $filters['user_type'];
     }

@@ -116,7 +116,6 @@ try {
     $error_message = 'Database error: ' . $e->getMessage();
 }
 
-// Get categories for the specific term ONLY
 $categories = [];
 $classStandings = [];
 $midtermExam = [];
@@ -124,7 +123,6 @@ $finalExam = [];
 $allScores = [];
 
 try {
-    // Get categories for current term only
     $categories = supabaseFetch('student_class_standing_categories', [
         'student_subject_id' => $subject_id,
         'term_type' => $term
@@ -141,22 +139,18 @@ foreach ($categories as $category) {
 $remainingAllocation = 60 - $totalClassStandingPercentage;
 $canAddCategory = ($remainingAllocation > 0);
 
-// FORCE REFRESH - Clear any cached data
 clearstatcache();
 
 try {
-    // Get ALL scores first
     $allScores = supabaseFetch('student_subject_scores', ['student_subject_id' => $subject_id]);
     if (!$allScores) $allScores = [];
     
-    // Filter scores based on CURRENT TERM categories
     $filteredScores = [];
     foreach ($allScores as $score) {
         if ($score['category_id']) {
             $category_data = supabaseFetch('student_class_standing_categories', ['id' => $score['category_id']]);
             if ($category_data && count($category_data) > 0) {
                 $category_term = $category_data[0]['term_type'];
-                // Only include scores that belong to current term categories
                 if ($category_term === $term) {
                     $score['category_name'] = $category_data[0]['category_name'];
                     $score['category_term'] = $category_term;
@@ -164,7 +158,6 @@ try {
                 }
             }
         } else {
-            // For exam scores without category_id, include them
             $filteredScores[] = $score;
         }
     }
@@ -176,11 +169,9 @@ try {
     $allScores = [];
 }
 
-// Filter scores based on CURRENT TERM ONLY
 $classStandings = array_filter($allScores, function($score) use ($term) {
     if ($score['score_type'] !== 'class_standing') return false;
     
-    // For class standing scores, check if they belong to current term categories
     if ($score['category_id']) {
         $category_data = supabaseFetch('student_class_standing_categories', ['id' => $score['category_id']]);
         if ($category_data && count($category_data) > 0) {
@@ -190,7 +181,6 @@ $classStandings = array_filter($allScores, function($score) use ($term) {
     return false;
 });
 
-// Get exam scores - only show current term exam
 $midtermExam = array_filter($allScores, function($score) {
     return $score['score_type'] === 'midterm_exam';
 });
@@ -199,7 +189,6 @@ $finalExam = array_filter($allScores, function($score) {
     return $score['score_type'] === 'final_exam';
 });
 
-// Initialize variables
 $hasScores = !empty($classStandings) || ($term === 'midterm' && !empty($midtermExam)) || ($term === 'final' && !empty($finalExam));
 $totalClassStanding = 0;
 $midtermScore = 0;
@@ -212,7 +201,6 @@ $behavioralInsights = [];
 $interventions = [];
 $recommendations = [];
 
-// Calculate grades for CURRENT TERM ONLY
 if ($hasScores) {
     $categoryTotals = [];
     foreach ($categories as $category) {
@@ -242,7 +230,6 @@ if ($hasScores) {
                     $categoryTotals[$categoryId]['total_score'] += $standing['score_value'];
                     $categoryTotals[$categoryId]['max_possible'] += $standing['max_score'];
                     
-                    // Track low scores for behavioral insights
                     $scorePercentage = ($standing['score_value'] / $standing['max_score']) * 100;
                     if ($scorePercentage < 75) {
                         $categoryTotals[$categoryId]['low_scores'][] = [
@@ -271,7 +258,6 @@ if ($hasScores) {
         $totalClassStanding = 60;
     }
 
-    // MAJOR EXAM CALCULATION (40%) FOR CURRENT TERM ONLY
     $midtermScore = 0;
     $finalScore = 0;
 
@@ -291,7 +277,6 @@ if ($hasScores) {
         }
     }
 
-    // CALCULATE TERM GRADE FOR CURRENT TERM ONLY
     if ($term === 'midterm') {
         $termGrade = $totalClassStanding + $midtermScore;
     } else {
@@ -302,9 +287,6 @@ if ($hasScores) {
         $termGrade = 100;
     }
 
-    // 🚀 REMOVED: Python ML call for prediction
-    // Use PHP-based analysis only for behavioral insights, interventions, and recommendations
-    
     $riskLevel = calculateRiskLevelSimple($termGrade);
     $riskDescription = getRiskDescription($riskLevel);
     $behavioralInsights = generateBehavioralInsights($termGrade, $categoryTotals, $term, $student['id'], $subject_id);
@@ -319,7 +301,6 @@ if ($hasScores) {
     $midtermScore = 0;
     $finalScore = 0;
     
-    // Provide basic insights even without scores
     $behavioralInsights = [[
         'message' => "Welcome to {$term} term! Start adding your scores to get personalized insights.",
         'priority' => 'low',
@@ -338,11 +319,9 @@ if ($hasScores) {
     ]];
 }
 
-// FORM HANDLING - Only allow actions for current term
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $scoreUpdated = false;
     
-    // ADD CLASS STANDING CATEGORY - Only for current term
     if (isset($_POST['add_category'])) {
         $category_name = trim($_POST['category_name']);
         $category_percentage = floatval($_POST['category_percentage']);
@@ -366,7 +345,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($result) {
                     $success_message = 'Category added successfully for ' . $term . ' term!';
                     
-                    // IMMEDIATE REDIRECT WITH FORCE REFRESH
                     header("Location: subject-management.php?subject_id=$subject_id&term=$term&success=category_added&t=" . time());
                     exit;
                 } else {
@@ -378,7 +356,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     
-    // ADD CLASS STANDING SCORE - Only for current term categories
     elseif (isset($_POST['add_standing'])) {
         $category_id = intval($_POST['category_id']);
         $score_name = trim($_POST['score_name']);
@@ -386,7 +363,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $max_score = floatval($_POST['max_score']);
         $score_date = $_POST['score_date'];
         
-        // Verify category exists and belongs to current term
         $category_data = supabaseFetch('student_class_standing_categories', ['id' => $category_id]);
         if (!$category_data || $category_data[0]['term_type'] !== $term) {
             $error_message = 'Invalid category for ' . $term . ' term.';
@@ -412,7 +388,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($result) {
                     $success_message = 'Score added successfully!';
                     
-                    // IMMEDIATE REDIRECT WITH FORCE REFRESH
                     header("Location: subject-management.php?subject_id=$subject_id&term=$term&success=score_added&t=" . time());
                     exit;
                 } else {
@@ -424,13 +399,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     
-    // ADD ATTENDANCE - Only for current term categories
     elseif (isset($_POST['add_attendance'])) {
         $category_id = intval($_POST['category_id']);
         $attendance_date = $_POST['attendance_date'];
         $attendance_status = $_POST['attendance_status'];
         
-        // Verify category exists and belongs to current term
         $category_data = supabaseFetch('student_class_standing_categories', ['id' => $category_id]);
         if (!$category_data || $category_data[0]['term_type'] !== $term) {
             $error_message = 'Invalid category for ' . $term . ' term.';
@@ -465,7 +438,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($result) {
                         $success_message = 'Attendance recorded successfully!';
                         
-                        // IMMEDIATE REDIRECT WITH FORCE REFRESH
                         header("Location: subject-management.php?subject_id=$subject_id&term=$term&success=attendance_added&t=" . time());
                         exit;
                     } else {
@@ -478,13 +450,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     
-    // ADD MAJOR EXAM - Only allow current term exam
     elseif (isset($_POST['add_exam'])) {
         $exam_type = $_POST['exam_type'];
         $score_value = floatval($_POST['score_value']);
         $max_score = floatval($_POST['max_score']);
         
-        // Verify exam type matches current term
         if (($term === 'midterm' && $exam_type !== 'midterm_exam') || ($term === 'final' && $exam_type !== 'final_exam')) {
             $error_message = 'Invalid exam type for current term.';
         } elseif ($score_value < 0 || $max_score <= 0) {
@@ -495,13 +465,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $exam_name = $exam_type === 'midterm_exam' ? 'Midterm Exam' : 'Final Exam';
             
             try {
-                // Delete any existing exam score for this term
                 supabaseDelete('student_subject_scores', [
                     'student_subject_id' => $subject_id,
                     'score_type' => $exam_type
                 ]);
                 
-                // Insert new exam score
                 $insert_data = [
                     'student_subject_id' => $subject_id,
                     'score_type' => $exam_type,
@@ -516,7 +484,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($result) {
                     $success_message = $exam_name . ' score added successfully!';
                     
-                    // IMMEDIATE REDIRECT WITH FORCE REFRESH
                     header("Location: subject-management.php?subject_id=$subject_id&term=$term&success=exam_added&t=" . time());
                     exit;
                 } else {
@@ -528,7 +495,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     
-    // UPDATE SCORE - Only for current term scores
     elseif (isset($_POST['update_score'])) {
         $score_id = intval($_POST['score_id']);
         $score_value = floatval($_POST['score_value']);
@@ -548,7 +514,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($result) {
                         $success_message = 'Score updated successfully!';
                         
-                        // IMMEDIATE REDIRECT WITH FORCE REFRESH
                         header("Location: subject-management.php?subject_id=$subject_id&term=$term&success=score_updated&t=" . time());
                         exit;
                     } else {
@@ -563,7 +528,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     
-    // DELETE SCORE - Only for current term scores
     elseif (isset($_POST['delete_score'])) {
         $score_id = intval($_POST['score_id']);
         
@@ -573,7 +537,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($result) {
                 $success_message = 'Score deleted successfully!';
                 
-                // IMMEDIATE REDIRECT WITH FORCE REFRESH
                 header("Location: subject-management.php?subject_id=$subject_id&term=$term&success=score_deleted&t=" . time());
                 exit;
             } else {
@@ -584,25 +547,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     
-    // DELETE CATEGORY - Only for current term categories
     elseif (isset($_POST['delete_category'])) {
         $category_id = intval($_POST['category_id']);
         
         try {
-            // Verify category exists
             $category_data = supabaseFetch('student_class_standing_categories', ['id' => $category_id]);
             if (!$category_data) {
                 $error_message = 'Category not found.';
             } else {
-                // Delete all scores in this category first
                 supabaseDelete('student_subject_scores', ['category_id' => $category_id]);
-                // Then delete the category
                 $result = supabaseDelete('student_class_standing_categories', ['id' => $category_id]);
                 
                 if ($result) {
                     $success_message = 'Category deleted successfully!';
                     
-                    // IMMEDIATE REDIRECT WITH FORCE REFRESH
                     header("Location: subject-management.php?subject_id=$subject_id&term=$term&success=category_deleted&t=" . time());
                     exit;
                 } else {

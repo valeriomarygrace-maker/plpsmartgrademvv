@@ -1,7 +1,6 @@
 <?php
 require_once 'config.php';
 
-// Start session if not already started
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -11,7 +10,6 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['user_type'] !== 'admin') {
     exit;
 }
 
-// Initialize variables
 $admin = null;
 $students = [];
 $error_message = '';
@@ -20,27 +18,21 @@ $search_query = '';
 $filter_semester = '';
 
 try {
-    // Get admin info
     $admin = getAdminByEmail($_SESSION['user_email']);
     
     if (!$admin) {
         $error_message = 'Admin record not found.';
     } else {
-        // Handle search and filters
         $search_query = $_GET['search'] ?? '';
         $filter_semester = $_GET['semester'] ?? '';
         
-        // Build query filters
         $filters = [];
         if (!empty($search_query)) {
-            // Search in multiple fields
             $students = searchStudents($search_query);
         } else {
-            // Get all students with optional semester filter
             $students = getAllStudents($filter_semester);
         }
         
-        // Handle student update
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_student'])) {
             $student_id = $_POST['student_id'];
             $fullname = sanitizeInput($_POST['fullname']);
@@ -49,11 +41,9 @@ try {
             $semester = sanitizeInput($_POST['semester']);
             $section = sanitizeInput($_POST['section']);
             
-            // Validate required fields
             if (empty($fullname) || empty($email) || empty($student_number) || empty($semester) || empty($section)) {
                 $error_message = 'All fields are required.';
             } else {
-                // Update student data (excluding course and year_level)
                 $update_data = [
                     'fullname' => $fullname,
                     'email' => $email,
@@ -66,7 +56,6 @@ try {
                 
                 if ($result !== false) {
                     $success_message = 'Student information updated successfully!';
-                    // Refresh student list
                     $students = getAllStudents($filter_semester);
                 } else {
                     $error_message = 'Failed to update student information.';
@@ -79,9 +68,6 @@ try {
     error_log("Error in admin-students.php: " . $e->getMessage());
 }
 
-/**
- * Get all students with optional semester filter
- */
 function getAllStudents($semester = '') {
     $all_students = supabaseFetchAll('students');
     
@@ -89,14 +75,12 @@ function getAllStudents($semester = '') {
         return [];
     }
     
-    // Filter by semester if specified
     if (!empty($semester)) {
         $all_students = array_filter($all_students, function($student) use ($semester) {
             return strpos(strtolower($student['semester']), strtolower($semester)) !== false;
         });
     }
     
-    // Sort by creation date (newest first)
     usort($all_students, function($a, $b) {
         $dateA = isset($a['created_at']) ? strtotime($a['created_at']) : 0;
         $dateB = isset($b['created_at']) ? strtotime($b['created_at']) : 0;
@@ -106,9 +90,6 @@ function getAllStudents($semester = '') {
     return $all_students;
 }
 
-/**
- * Search students by name, email, or student number
- */
 function searchStudents($query) {
     $all_students = supabaseFetchAll('students');
     
@@ -888,7 +869,6 @@ function searchStudents($query) {
             </div>
         </div>
 
-        <!-- Search and Filter Section -->
         <div class="search-section">
             <div class="search-group">
                 <form method="GET" action="admin-students.php" class="search-form">
@@ -925,7 +905,6 @@ function searchStudents($query) {
             </div>
         </div>
 
-        <!-- Students Table -->
         <div class="students-table-container">
             <?php if (!empty($students)): ?>
                 <table class="students-table">
@@ -995,7 +974,6 @@ function searchStudents($query) {
         </div>
     </div>
 
-    <!-- Update Student Modal -->
     <div class="modal" id="updateStudentModal">
         <div class="modal-content">
             <form method="POST" action="admin-students.php" id="updateStudentForm">
@@ -1078,18 +1056,15 @@ function searchStudents($query) {
     </div>
 
     <script>
-        // Update Modal Functions
         function openUpdateModal(student) {
             document.getElementById('update_student_id').value = student.id;
             document.getElementById('update_fullname').value = student.fullname;
             document.getElementById('update_email').value = student.email;
             document.getElementById('update_student_number').value = student.student_number;
             
-            // Set course (readonly)
             document.getElementById('update_course_display').value = student.course;
             document.getElementById('update_course').value = student.course;
             
-            // Set year level (readonly)
             const yearLevelText = getYearLevelText(student.year_level);
             document.getElementById('update_year_level_display').value = yearLevelText;
             document.getElementById('update_year_level').value = student.year_level;
@@ -1114,7 +1089,6 @@ function searchStudents($query) {
             document.getElementById('updateStudentModal').classList.remove('show');
         }
 
-        // Auto-hide alerts after 5 seconds
         setTimeout(function() {
             const alerts = document.querySelectorAll('.alert-success, .alert-error');
             alerts.forEach(alert => {

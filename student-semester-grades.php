@@ -6,7 +6,6 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['user_type'] !== 'student') {
     exit;
 }
 
-// Initialize variables
 $success_message = '';
 $error_message = '';
 $student = null;
@@ -23,7 +22,6 @@ try {
     $error_message = 'Database error: ' . $e->getMessage();
 }
 
-// After line 4 (after session_start())
 $unread_count = 0;
 try {
     $unread_count = getUnreadMessageCount($_SESSION['user_id'], 'student');
@@ -31,7 +29,6 @@ try {
     $unread_count = 0;
 }
 
-// Get all archived subjects for the student
 try {
     $archived_result = supabaseFetch('student_subjects', [
         'student_id' => $student['id'],
@@ -44,17 +41,14 @@ try {
             if ($subject_info) {
                 $subject_info = $subject_info[0];
                 
-                // Get subject performance data for final grade
                 $performance_data = supabaseFetch('subject_performance', [
                     'student_subject_id' => $subject_record['id']
                 ]);
                 
-                // Calculate subject grade
                 $subject_grade = 0;
                 if ($performance_data && isset($performance_data[0]['overall_grade'])) {
                     $subject_grade = $performance_data[0]['overall_grade'];
                 } else {
-                    // Fallback: Calculate grade from scores
                     $allScores = supabaseFetch('student_subject_scores', [
                         'student_subject_id' => $subject_record['id']
                     ]);
@@ -63,23 +57,19 @@ try {
                         $midtermGrade = 0;
                         $finalGrade = 0;
                         
-                        // Calculate Midterm Grade
                         $midtermCategories = supabaseFetch('student_class_standing_categories', [
                             'student_subject_id' => $subject_record['id'],
                             'term_type' => 'midterm'
                         ]);
                         
-                        // Calculate Final Grade
                         $finalCategories = supabaseFetch('student_class_standing_categories', [
                             'student_subject_id' => $subject_record['id'],
                             'term_type' => 'final'
                         ]);
                         
-                        // Initialize exam score variables
                         $midtermExamScore = 0;
                         $finalExamScore = 0;
                         
-                        // Simplified grade calculation
                         if ($midtermCategories && count($midtermCategories) > 0) {
                             $midtermClassStanding = 0;
                             foreach ($midtermCategories as $category) {
@@ -158,7 +148,6 @@ try {
                             $finalGrade = $finalClassStanding + $finalExamScore;
                         }
                         
-                        // Calculate Subject Grade
                         $grades = array_filter([$midtermGrade, $finalGrade], function($grade) {
                             return $grade > 0;
                         });
@@ -185,13 +174,11 @@ try {
     $error_message = 'Database error: ' . $e->getMessage();
 }
 
-// Get available semesters for filter
 if (!empty($history_records)) {
     $available_semesters = array_unique(array_column($history_records, 'semester'));
     sort($available_semesters);
 }
 
-// Handle semester filter
 $selected_semester = $_GET['semester'] ?? 'all';
 $filtered_records = $history_records;
 

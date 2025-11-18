@@ -62,18 +62,12 @@ function callPythonMLAPI($student_data) {
     }
 }
 
-/**
- * Fallback function if ML service is down
- */
 function calculateRiskLevelSimple($grade) {
     if ($grade >= 85) return 'low_risk';
     elseif ($grade >= 80) return 'moderate_risk';
     else return 'high_risk';
 }
 
-/**
- * Get risk description based on risk level
- */
 function getRiskDescription($riskLevel) {
     switch ($riskLevel) {
         case 'low_risk': return 'Excellent/Good Performance';
@@ -83,9 +77,6 @@ function getRiskDescription($riskLevel) {
     }
 }
 
-/**
- * Generate behavioral insights based on student performance
- */
 function generateBehavioralInsights($termGrade, $categoryTotals, $term, $studentId, $subjectId) {
     $insights = [];
     

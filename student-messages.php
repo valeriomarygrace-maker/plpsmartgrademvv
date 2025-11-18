@@ -5,7 +5,6 @@ requireStudentRole();
 $student_id = $_SESSION['user_id'];
 $student = getStudentById($student_id);
 
-// Get conversation partners (admins who have messaged with this student)
 $partners = getConversationPartners($student_id, 'student');
 ?>
 <!DOCTYPE html>
@@ -785,12 +784,10 @@ $partners = getConversationPartners($student_id, 'student');
             loadMessages();
             startAutoRefresh();
             
-            // Update unread badge for this admin
             updateAdminUnreadBadge(currentAdminId);
         });
     });
 
-    // Also update when messages are loaded or sent
     function loadMessages() {
         if (!currentAdminId) return;
         
@@ -868,7 +865,6 @@ $partners = getConversationPartners($student_id, 'student');
         });
     }
 
-    // Update unread badge for a specific admin
     function updateAdminUnreadBadge(adminId) {
         const adminItem = document.querySelector(`.admin-item[data-admin-id="${adminId}"]`);
         if (adminItem) {
@@ -881,7 +877,6 @@ $partners = getConversationPartners($student_id, 'student');
 
     // Refresh all unread counts
     function refreshUnreadCounts() {
-        // This will refresh the sidebar badge
         location.reload();
     }
 

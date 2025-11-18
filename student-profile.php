@@ -1,7 +1,6 @@
 <?php
 require_once 'config.php';
 
-// Start session if not already started
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -14,7 +13,6 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['user_type'] !== 'student') {
 $userEmail = $_SESSION['user_email'] ?? '';
 $userId = $_SESSION['user_id'] ?? null;
 
-// Get student data from Supabase - FIXED: Use getStudentByEmail instead of getStudentById
 $student = getStudentByEmail($userEmail);
 if (!$student) {
     $_SESSION['error_message'] = "Student account not found";
@@ -22,11 +20,9 @@ if (!$student) {
     exit;
 }
 
-// Initialize messages
 $success_message = '';
 $error_message = '';
 
-// Get student info
 try {
     $student = getStudentByEmail($_SESSION['user_email']);
     
@@ -37,7 +33,6 @@ try {
     $error_message = 'Database error: ' . $e->getMessage();
 }
 
-// After line 10 (after session_start())
 $unread_count = 0;
 try {
     $unread_count = getUnreadMessageCount($_SESSION['user_id'], 'student');
@@ -58,7 +53,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_semester'])) {
             
             if ($update_result !== false) {
                 $success_message = 'Semester updated successfully!';
-                // Refresh student data
                 $student = getStudentByEmail($_SESSION['user_email']);
             } else {
                 $error_message = 'Failed to update semester.';
@@ -90,7 +84,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['profile_picture'])) 
             }
             
             if (empty($error_message)) {
-                // Delete old picture if exists
                 if (!empty($student['profile_picture']) && file_exists($student['profile_picture'])) {
                     unlink($student['profile_picture']);
                 }
@@ -105,7 +98,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['profile_picture'])) 
                         
                         if ($update_result !== false) {
                             $success_message = 'Profile picture updated successfully!';
-                            // Refresh student data
                             $student = getStudentByEmail($_SESSION['user_email']);
                         } else {
                             $error_message = 'Failed to update profile picture in database.';
@@ -1229,21 +1221,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['profile_picture'])) 
             const picturePreview = document.getElementById('picturePreview');
             const currentPicture = document.getElementById('currentPicture');
             
-            // Semester Modal
             const editSemesterBtn = document.getElementById('editSemesterBtn');
             const semesterModal = document.getElementById('semesterModal');
             const cancelSemesterUpdate = document.getElementById('cancelSemesterUpdate');
             
-            // Profile Picture Modal Functions
             profileAvatar.addEventListener('click', function() {
                 profilePictureModal.classList.add('show');
             });
             
             cancelPictureUpdate.addEventListener('click', function() {
                 profilePictureModal.classList.remove('show');
-                // Reset file input
                 profilePictureInput.value = '';
-                // Reset preview
                 resetPicturePreview();
             });
             
@@ -1252,15 +1240,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['profile_picture'])) 
                 if (file) {
                     const reader = new FileReader();
                     reader.onload = function(e) {
-                        // Clear previous content
                         picturePreview.innerHTML = '';
                         
-                        // Create new image
                         const img = document.createElement('img');
                         img.src = e.target.result;
                         img.alt = 'Preview';
                         
-                        // Add image to preview
                         picturePreview.appendChild(img);
                     };
                     reader.readAsDataURL(file);
@@ -1283,7 +1268,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['profile_picture'])) 
                 }
             }
             
-            // Semester Modal Functions
             editSemesterBtn.addEventListener('click', function() {
                 semesterModal.classList.add('show');
             });
@@ -1292,7 +1276,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['profile_picture'])) 
                 semesterModal.classList.remove('show');
             });
             
-            // Close modals when clicking outside
             document.addEventListener('click', function(e) {
                 if (e.target === profilePictureModal) {
                     profilePictureModal.classList.remove('show');
@@ -1303,7 +1286,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['profile_picture'])) 
                 }
             });
             
-            // Auto-hide success/error messages after 5 seconds
             setTimeout(function() {
                 const alerts = document.querySelectorAll('.alert-success, .alert-error');
                 alerts.forEach(alert => {
@@ -1318,7 +1300,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['profile_picture'])) 
         const cancelLogout = document.getElementById('cancelLogout');
         const confirmLogout = document.getElementById('confirmLogout');
 
-// Show modal when clicking logout button
         logoutBtn.addEventListener('click', (e) => {
             e.preventDefault();
             logoutModal.classList.add('show');
@@ -1334,7 +1315,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['profile_picture'])) 
             window.location.href = 'logout.php';
         });
 
-// Hide modal when clicking outside the modal content
         const modals = [addSubjectModal, editSubjectModal, archiveSubjectModal, logoutModal];
         modals.forEach(modal => {
             modal.addEventListener('click', (e) => {

@@ -3,7 +3,6 @@ require_once 'config.php';
 
 requireStudentRole();
 
-// Get student info
 $student = getStudentByEmail($_SESSION['user_email']);
 
 if (!$student) {
@@ -11,7 +10,6 @@ if (!$student) {
     header('Location: login.php');
     exit;
 }
-// Initialize variables
 $active_subjects = [];
 $recent_scores = [];
 $performance_metrics = [];
@@ -19,13 +17,11 @@ $semester_risk_data = [];
 $error_message = '';
 
 try {
-    // Get student info using Supabase
     $student = getStudentByEmail($_SESSION['user_email']);
     
     if (!$student) {
         $error_message = 'Student record not found.';
     } else {
-        // Get active subjects
         $student_subjects_data = supabaseFetch('student_subjects', [
             'student_id' => $student['id'], 
             'deleted_at' => null
@@ -37,7 +33,6 @@ try {
                 if ($subject_data && count($subject_data) > 0) {
                     $subject_info = $subject_data[0];
                     
-                    // Get performance data for this subject
                     $performance_data = supabaseFetch('subject_performance', ['student_subject_id' => $subject_record['id']]);
                     $performance = $performance_data && count($performance_data) > 0 ? $performance_data[0] : null;
                     
@@ -54,13 +49,10 @@ try {
             }
         }
         
-        // Get recent scores (last 5 scores for current student)
         $recent_scores = getRecentScoresForStudent($student['id'], 3);
         
-        // Calculate overall performance metrics
         $performance_metrics = calculatePerformanceMetrics($student['id']);
         
-        // Get semester risk data for the graph
         $semester_risk_data = getSemesterRiskData($student['id']);
         
     }
@@ -69,14 +61,10 @@ try {
     error_log("Error in student-dashboard.php: " . $e->getMessage());
 }
 
-/**
- * Get recent scores for a student
- */
 function getRecentScoresForStudent($student_id, $limit = 3) {
     $recent_scores = [];
     
     try {
-        // Get all the student's subjects
         $student_subjects_data = supabaseFetch('student_subjects', [
             'student_id' => $student_id, 
             'deleted_at' => null
@@ -86,7 +74,6 @@ function getRecentScoresForStudent($student_id, $limit = 3) {
             $student_subject_ids = array_column($student_subjects_data, 'id');
             
             if (!empty($student_subject_ids)) {
-                // Get scores only for this student's subjects
                 $all_scores = [];
                 foreach ($student_subject_ids as $subject_id) {
                     $scores = supabaseFetch('student_subject_scores', ['student_subject_id' => $subject_id]);
@@ -96,17 +83,14 @@ function getRecentScoresForStudent($student_id, $limit = 3) {
                 }
                 
                 if (!empty($all_scores)) {
-                    // Sort by creation date descending
                     usort($all_scores, function($a, $b) {
                         $dateA = isset($a['created_at']) ? strtotime($a['created_at']) : 0;
                         $dateB = isset($b['created_at']) ? strtotime($b['created_at']) : 0;
                         return $dateB - $dateA;
                     });
                     
-                    // Take the specified limit
                     $recent_scores = array_slice($all_scores, 0, $limit);
                     
-                    // Get subject names for display
                     foreach ($recent_scores as &$score) {
                         $subject_data = supabaseFetch('student_subjects', ['id' => $score['student_subject_id']]);
                         if ($subject_data && count($subject_data) > 0) {
@@ -139,7 +123,6 @@ function calculatePerformanceMetrics($student_id) {
     ];
     
     try {
-        // Get all student subjects with performance data
         $student_subjects = supabaseFetch('student_subjects', ['student_id' => $student_id, 'deleted_at' => null]);
         
         if ($student_subjects && is_array($student_subjects)) {
@@ -157,7 +140,6 @@ function calculatePerformanceMetrics($student_id) {
                         $total_grade += $performance['overall_grade'];
                         $subjects_with_data++;
                         
-                        // Count risk levels based on subject grade
                         $subject_grade = $performance['overall_grade'];
                         if ($subject_grade >= 80) {
                             $metrics['low_risk_count']++;
@@ -182,14 +164,10 @@ function calculatePerformanceMetrics($student_id) {
     return $metrics;
 }
 
-/**
- * Get unique professors count for the student
- */
 function getUniqueProfessors($student_id) {
     $professors = [];
     
     try {
-        // Get active subjects
         $active_subjects = supabaseFetch('student_subjects', ['student_id' => $student_id, 'deleted_at' => null]);
         if ($active_subjects && is_array($active_subjects)) {
             foreach ($active_subjects as $subject) {
@@ -199,7 +177,6 @@ function getUniqueProfessors($student_id) {
             }
         }
         
-        // Get archived subjects
         $archived_subjects = supabaseFetch('archived_subjects', ['student_id' => $student_id]);
         if ($archived_subjects && is_array($archived_subjects)) {
             foreach ($archived_subjects as $subject) {
@@ -216,9 +193,6 @@ function getUniqueProfessors($student_id) {
     return array_keys($professors);
 }
 
-/**
- * Calculate GWA from grade (Philippine system)
- */
 function calculateGWA($grade) {
     if ($grade >= 90) return 1.00;
     elseif ($grade >= 85) return 1.25;
@@ -232,9 +206,6 @@ function calculateGWA($grade) {
     else return 5.00;
 }
 
-/**
- * Get semester risk data for bar chart - USING SUBJECT GRADES
- */
 function getSemesterRiskData($student_id) {
     $data = [
         'first_semester' => [
@@ -259,7 +230,6 @@ function getSemesterRiskData($student_id) {
     ];
     
     try {
-        // Get ALL subjects (both active and archived)
         $all_subjects = supabaseFetch('student_subjects', [
             'student_id' => $student_id
         ]);
@@ -268,18 +238,15 @@ function getSemesterRiskData($student_id) {
         
         if ($all_subjects && is_array($all_subjects)) {
             foreach ($all_subjects as $subject_record) {
-                // Skip soft-deleted subjects
                 if (!empty($subject_record['deleted_at'])) {
                     continue;
                 }
                 
-                // Get subject info
                 $subject_data = supabaseFetch('subjects', ['id' => $subject_record['subject_id']]);
                 
                 if ($subject_data && count($subject_data) > 0) {
                     $subject_info = $subject_data[0];
                     
-                    // Check if subject is archived
                     $is_archived = false;
                     if (isset($subject_record['archived'])) {
                         if ($subject_record['archived'] === true || 
@@ -289,7 +256,6 @@ function getSemesterRiskData($student_id) {
                         }
                     }
                     
-                    // Get performance data for subject grade
                     $performance_data = supabaseFetch('subject_performance', ['student_subject_id' => $subject_record['id']]);
                     
                     $is_high_risk = false;
@@ -297,12 +263,10 @@ function getSemesterRiskData($student_id) {
                     $subject_grade = 0;
                     $risk_level = 'no-data';
                     
-                    // Use subject grade from performance data
                     if ($performance_data && count($performance_data) > 0) {
                         $performance = $performance_data[0];
                         $subject_grade = $performance['overall_grade'] ?? 0;
                         
-                        // Determine risk level based on SUBJECT GRADE only
                         if ($subject_grade > 0) {
                             if ($subject_grade >= 80) {
                                 $is_low_risk = true;
@@ -313,7 +277,6 @@ function getSemesterRiskData($student_id) {
                             }
                         }
                     } else {
-                        // If no performance data, try to calculate subject grade from scores
                         $calculated_grade = calculateSubjectGradeFromScores($subject_record['id']);
                         if ($calculated_grade > 0) {
                             $subject_grade = $calculated_grade;
@@ -327,7 +290,6 @@ function getSemesterRiskData($student_id) {
                         }
                     }
                     
-                    // Add to counts based on archived status
                     if ($is_archived) {
                         $data['total_archived_subjects']++;
                         if ($is_high_risk) {
@@ -337,7 +299,6 @@ function getSemesterRiskData($student_id) {
                             $data['total_low_risk']++;
                         }
                         
-                        // Categorize by semester for archived subjects only
                         $semester = strtolower($subject_info['semester']);
                         
                         if (strpos($semester, 'first') !== false || strpos($semester, '1') !== false) {
@@ -358,7 +319,6 @@ function getSemesterRiskData($student_id) {
                             }
                         }
                     } else {
-                        // Active subjects
                         $data['total_active_subjects']++;
                         if ($is_high_risk) {
                             $data['active_high_risk']++;
@@ -368,7 +328,6 @@ function getSemesterRiskData($student_id) {
                         }
                     }
                     
-                    // Add debug info for this subject
                     $data['debug_info']['subjects'][] = [
                         'subject_code' => $subject_info['subject_code'],
                         'archived' => $is_archived,
@@ -388,9 +347,7 @@ function getSemesterRiskData($student_id) {
     
     return $data;
 }
-/**
- * Calculate subject grade from scores if performance data is missing
- */
+
 function calculateSubjectGradeFromScores($student_subject_id) {
     try {
         $allScores = supabaseFetch('student_subject_scores', ['student_subject_id' => $student_subject_id]);
@@ -401,19 +358,16 @@ function calculateSubjectGradeFromScores($student_subject_id) {
         $midtermGrade = 0;
         $finalGrade = 0;
         
-        // Get midterm categories
         $midtermCategories = supabaseFetch('student_class_standing_categories', [
             'student_subject_id' => $student_subject_id,
             'term_type' => 'midterm'
         ]);
         
-        // Get final categories
         $finalCategories = supabaseFetch('student_class_standing_categories', [
             'student_subject_id' => $student_subject_id,
             'term_type' => 'final'
         ]);
         
-        // Calculate Midterm Grade
         if ($midtermCategories && count($midtermCategories) > 0) {
             $midtermClassStanding = 0;
             $midtermExamScore = 0;
@@ -455,7 +409,6 @@ function calculateSubjectGradeFromScores($student_subject_id) {
             $midtermGrade = $midtermClassStanding + $midtermExamScore;
         }
         
-        // Calculate Final Grade
         if ($finalCategories && count($finalCategories) > 0) {
             $finalClassStanding = 0;
             $finalExamScore = 0;
@@ -497,7 +450,6 @@ function calculateSubjectGradeFromScores($student_subject_id) {
             $finalGrade = $finalClassStanding + $finalExamScore;
         }
         
-        // Calculate Subject Grade
         $grades = array_filter([$midtermGrade, $finalGrade], function($grade) {
             return $grade > 0;
         });
@@ -1383,7 +1335,6 @@ function calculateSubjectGradeFromScores($student_subject_id) {
         </div>
 
         <div class="three-column-grid">
-            <!-- Active Subjects -->
             <div class="card">
                 <div class="card-header">
                     <div class="card-title">

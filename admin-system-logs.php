@@ -21,7 +21,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $filters['date_to'] = sanitizeInput($_POST['date_to']) . ' 12:00:00';
     }
 } elseif ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['clear_filters'])) {
-    // Clear filters
     $filters = [];
     $offset = 0;
 }
@@ -29,12 +28,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Get system logs
 $system_logs = getSystemLogs($filters, $limit, $offset);
 
-// Get total count for pagination
 $total_logs = countSystemLogs($filters);
 $total_pages = ceil($total_logs / $limit);
 $current_page = floor($offset / $limit) + 1;
 
-// Get admin info for sidebar
 $admin = getAdminByEmail($_SESSION['user_email']);
 ?>
 
@@ -592,7 +589,6 @@ $admin = getAdminByEmail($_SESSION['user_email']);
         </div>
 
         <div class="container">
-            <!-- Simplified Filters -->
             <form method="POST" class="filters-container">
                 <div class="filter-group">
                     <label for="user_type">User Type</label>
@@ -636,7 +632,6 @@ $admin = getAdminByEmail($_SESSION['user_email']);
                 </div>
             </form>
 
-            <!-- Logs Table -->
             <?php if (!empty($system_logs)): ?>
                 <div style="overflow-x: auto;">
                     <table class="logs-table">
@@ -669,7 +664,6 @@ $admin = getAdminByEmail($_SESSION['user_email']);
                     </table>
                 </div>
 
-                <!-- Pagination -->
                 <?php if ($total_pages > 1): ?>
                     <div class="pagination">
                         <?php if ($current_page > 1): ?>
@@ -701,7 +695,6 @@ $admin = getAdminByEmail($_SESSION['user_email']);
         </div>
     </div>
 
-    <!-- Logout Modal -->
     <div class="modal" id="logoutModal">
         <div class="modal-content" style="max-width: 450px; text-align: center;">
             <h3 style="color: var(--plp-green); font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem;">

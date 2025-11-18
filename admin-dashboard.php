@@ -5,7 +5,6 @@ requireAdminRole();
 $admin_id = $_SESSION['user_id'];
 $admin = getAdminByEmail($_SESSION['user_email']);
 
-// Initialize variables
 $admin = null;
 $total_students = 0;
 $total_subjects = 0;
@@ -14,21 +13,17 @@ $semester_risk_data = [];
 $error_message = '';
 
 try {
-    // Get admin info
     $admin = getAdminByEmail($_SESSION['user_email']);
     
     if (!$admin) {
         $error_message = 'Admin record not found.';
     } else {
-        // Get total students count
         $students = supabaseFetchAll('students');
         $total_students = $students ? count($students) : 0;
         
-        // Get total subjects count
         $subjects = supabaseFetchAll('subjects');
         $total_subjects = $subjects ? count($subjects) : 0;
         
-        // Get recent students (last 5)
         if ($students) {
             usort($students, function($a, $b) {
                 $dateA = isset($a['created_at']) ? strtotime($a['created_at']) : 0;
@@ -38,7 +33,6 @@ try {
             $recent_students = array_slice($students, 0, 3);
         }
 
-        // Get semester risk analysis data
         $semester_risk_data = getSemesterRiskAnalysis();
     }
 } catch (Exception $e) {
@@ -46,9 +40,6 @@ try {
     error_log("Error in admin-dashboard.php: " . $e->getMessage());
 }
 
-/**
- * Get semester risk analysis data
- */
 function getSemesterRiskAnalysis() {
     $data = [
         'first_semester' => [
@@ -75,7 +66,6 @@ function getSemesterRiskAnalysis() {
     ];
 
     try {
-        // Get all students
         $all_students = supabaseFetchAll('students');
         
         if ($all_students && is_array($all_students)) {
@@ -83,13 +73,11 @@ function getSemesterRiskAnalysis() {
                 $student_id = $student['id'];
                 $student_semester = strtolower($student['semester'] ?? '');
                 
-                // Initialize risk counts for this student
                 $student_high_risk = 0;
                 $student_low_risk = 0;
                 $student_moderate_risk = 0;
                 $student_has_data = false;
 
-                // Get all subjects for this student
                 $student_subjects = supabaseFetch('student_subjects', [
                     'student_id' => $student_id,
                     'deleted_at' => null
@@ -97,7 +85,6 @@ function getSemesterRiskAnalysis() {
 
                 if ($student_subjects && is_array($student_subjects)) {
                     foreach ($student_subjects as $subject_record) {
-                        // Get performance data
                         $performance_data = supabaseFetch('subject_performance', [
                             'student_subject_id' => $subject_record['id']
                         ]);
@@ -122,7 +109,6 @@ function getSemesterRiskAnalysis() {
                     }
                 }
 
-                // Determine overall risk for student (based on highest risk subject)
                 $student_overall_risk = 'no_data';
                 if ($student_has_data) {
                     if ($student_high_risk > 0) {
@@ -134,7 +120,6 @@ function getSemesterRiskAnalysis() {
                     }
                 }
 
-                // Categorize by semester
                 if (strpos($student_semester, 'first') !== false || strpos($student_semester, '1') !== false) {
                     $data['first_semester']['total_students']++;
                     $data['first_semester'][$student_overall_risk]++;
@@ -143,7 +128,6 @@ function getSemesterRiskAnalysis() {
                     $data['second_semester'][$student_overall_risk]++;
                 }
 
-                // Add to overall totals
                 $data['overall_totals']['total_students']++;
                 $data['overall_totals'][$student_overall_risk]++;
             }
@@ -856,7 +840,6 @@ function getSemesterRiskAnalysis() {
             </div>
         </div>
 
-        <!-- Statistics Cards -->
         <div class="dashboard-grid">
             <div class="stat-card">
                 <div class="stat-icon">
@@ -887,7 +870,6 @@ function getSemesterRiskAnalysis() {
             </div>
         </div>
 
-        <!-- Three Column Layout -->
         <div class="three-column-grid">
             <div class="card">
                 <div class="card-header">
@@ -923,7 +905,6 @@ function getSemesterRiskAnalysis() {
                 <?php endif; ?>
             </div>
 
-            <!-- First Semester Risk Analysis -->
             <div class="card">
                 <div class="card-header">
                     <div class="card-title">
@@ -967,7 +948,6 @@ function getSemesterRiskAnalysis() {
                 </div>
             </div>
 
-            <!-- Second Semester Risk Analysis -->
             <div class="card">
                 <div class="card-header">
                     <div class="card-title">
@@ -1052,9 +1032,7 @@ function getSemesterRiskAnalysis() {
             }
         });
 
-        // Add some interactive animations
         document.addEventListener('DOMContentLoaded', function() {
-            // Animate cards on load
             const cards = document.querySelectorAll('.card, .stat-card');
             cards.forEach((card, index) => {
                 card.style.opacity = '0';

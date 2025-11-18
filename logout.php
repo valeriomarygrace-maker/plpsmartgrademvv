@@ -1,7 +1,6 @@
 <?php
 session_start();
 
-// Log logout activity before destroying session
 if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
     $email = $_SESSION['user_email'] ?? '';
     $user_type = $_SESSION['user_type'] ?? '';

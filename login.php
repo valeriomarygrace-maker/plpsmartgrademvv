@@ -6,7 +6,6 @@ $success = '';
 $showSignupModal = false;
 $email = '';
 
-// Check if already logged in
 if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
     if ($_SESSION['user_type'] === 'admin') {
         header('Location: admin-dashboard.php');
@@ -25,11 +24,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && isset($_P
     if (!isValidPLPEmail($email)) {
         $error = 'Your email address is not valid.';
     } else {
-        // Check admin first
         $admin = getAdminByEmail($email);
         
         if ($admin) {
-            // Admin login
             if (verifyPassword($password, $admin['password'])) {
                 $_SESSION['logged_in'] = true;
                 $_SESSION['user_email'] = $email;
@@ -37,7 +34,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && isset($_P
                 $_SESSION['user_id'] = $admin['id'];
                 $_SESSION['user_name'] = $admin['fullname'];
                 
-                // Log the login activity
                 logSystemActivity($email, 'admin', 'login', 'Admin logged in successfully');
                 
                 header('Location: admin-dashboard.php');
@@ -46,7 +42,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && isset($_P
                 $error = 'Invalid password. Please try again.';
             }
         } else {
-            // Check student
             $student = getStudentByEmail($email);
             
             if ($student) {
@@ -121,7 +116,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
                 $success = 'Registration successful! ';
                 $showSignupModal = false;
                 
-                // Log the signup activity
                 logSystemActivity($email, 'student', 'signup', 'Student registered successfully');
             } else {
                 $error = 'Registration failed. Please try again.';
@@ -990,7 +984,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
     </div>
 
     <script>
-        // Password toggle functionality
         function setupPasswordToggle(toggleId, passwordId) {
             const toggle = document.getElementById(toggleId);
             const passwordInput = document.getElementById(passwordId);
@@ -1000,7 +993,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
                     const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
                     passwordInput.setAttribute('type', type);
                     
-                    // Toggle eye icon
                     const icon = this.querySelector('i');
                     if (type === 'text') {
                         icon.classList.remove('fa-eye');
@@ -1013,12 +1005,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             }
         }
 
-        // Initialize password toggles
         setupPasswordToggle('passwordToggle', 'password');
         setupPasswordToggle('signupPasswordToggle', 'signup_password');
         setupPasswordToggle('confirmPasswordToggle', 'confirm_password');
 
-        // Modal functionality
         const showSignupModalBtn = document.getElementById('showSignupModal');
         const signupModal = document.getElementById('signupModal');
         const closeSignupModal = document.getElementById('closeSignupModal');
@@ -1043,7 +1033,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup'])) {
             });
         }
         
-        // Close modal when clicking outside
         document.addEventListener('click', function(e) {
             if (e.target === signupModal) {
                 signupModal.classList.remove('active');

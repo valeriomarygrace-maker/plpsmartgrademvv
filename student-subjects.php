@@ -6,7 +6,6 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['user_type'] !== 'student') {
     exit;
 }
 
-// Initialize variables
 $success_message = '';
 $error_message = '';
 $student = null;
@@ -23,7 +22,6 @@ try {
     $error_message = 'Database error: ' . $e->getMessage();
 }
 
-// After line 4 (after session_start())
 $unread_count = 0;
 try {
     $unread_count = getUnreadMessageCount($_SESSION['user_id'], 'student');
@@ -31,7 +29,6 @@ try {
     $unread_count = 0;
 }
 
-// Initialize subjects if empty
 try {
     $check_subjects = supabaseFetch('subjects');
     $subject_count = $check_subjects ? count($check_subjects) : 0;
@@ -59,10 +56,8 @@ try {
         }
     }
 } catch (Exception $e) {
-    // Silently continue
 }
 
-// Get student's enrolled subjects (only non-archived)
 try {
     $subjects_result = supabaseFetch('student_subjects', [
         'student_id' => $student['id'],
@@ -87,7 +82,6 @@ try {
     $error_message = 'Database error: ' . $e->getMessage();
 }
 
-// Get available subjects for dropdown
 try {
     $semester_mapping = [
         '1st Semester' => 'First Semester',
@@ -120,7 +114,6 @@ try {
         }
     }
     
-    // Get enrolled subject IDs (including archived to prevent duplicates)
     $enrolled_subject_ids = [];
     $all_enrolled = supabaseFetch('student_subjects', ['student_id' => $student['id']]);
     if ($all_enrolled && is_array($all_enrolled)) {
@@ -155,14 +148,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_subject'])) {
         $error_message = 'Professor name is required.';
     } else {
         try {
-            // Check if subject was previously archived
             $existing_subject = supabaseFetch('student_subjects', [
                 'student_id' => $student['id'],
                 'subject_id' => $subject_id
             ]);
             
             if ($existing_subject && count($existing_subject) > 0) {
-                // Restore the archived subject
                 $existing = $existing_subject[0];
                 $update_data = [
                     'archived' => false,
@@ -179,7 +170,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_subject'])) {
                     $error_message = 'Failed to restore subject. Please try again.';
                 }
             } else {
-                // Add new subject
                 $insert_data = [
                     'student_id' => $student['id'],
                     'subject_id' => $subject_id,
@@ -208,7 +198,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_subject'])) {
     }
 }
 
-// Handle archive subject (replacing delete functionality)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
     $subject_record_id = $_POST['subject_record_id'];
     
@@ -235,7 +224,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_subject'])) {
     }
 }
 
-// Handle update subject
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
     $subject_record_id = $_POST['subject_record_id'];
     $professor_name = trim($_POST['professor_name']);
@@ -276,7 +264,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* Your existing CSS styles remain exactly the same */
         :root {
             --plp-green: #006341;
             --plp-green-light: #008856;
@@ -1268,7 +1255,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
         </div>
     </div>
 
-    <!-- Edit Subject Modal -->
     <div class="modal" id="editSubjectModal">
         <div class="modal-content">
             <h3 class="modal-title">
@@ -1301,7 +1287,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
         </div>
     </div>
 
-    <!-- Archive Confirmation Modal -->
     <div class="modal" id="archiveSubjectModal">
         <div class="archive-modal-content">
             <h3 class="modal-title">
@@ -1329,7 +1314,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
         </div>
     </div>
 
-    <!-- Add Subject Modal -->
     <div class="modal" id="addSubjectModal">
         <div class="modal-content">
             <h3 class="modal-title">
@@ -1497,7 +1481,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
 
         // Edit modal functions
         function openEditModal(subjectId, subjectInfo, professorName) {
-            // Prevent event from bubbling to the card click
             event.stopPropagation();
             
             document.getElementById('edit_subject_id').value = subjectId;
@@ -1506,9 +1489,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
             editSubjectModal.classList.add('show');
         }
 
-        // Archive modal functions
         function openArchiveModal(subjectId, subjectName) {
-            // Prevent event from bubbling to the card click
             event.stopPropagation();
             
             document.getElementById('archive_subject_id').value = subjectId;
@@ -1516,7 +1497,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
             archiveSubjectModal.classList.add('show');
         }
 
-        // Auto-hide success/error messages after 5 seconds
         setTimeout(() => {
             const alerts = document.querySelectorAll('.alert-success, .alert-error');
             alerts.forEach(alert => {
