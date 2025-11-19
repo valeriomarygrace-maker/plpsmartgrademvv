@@ -137,7 +137,6 @@ try {
     $available_subjects = [];
 }
 
-// Handle add subject
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_subject'])) {
     $subject_id = $_POST['subject_id'];
     $professor_name = trim($_POST['professor_name']);
@@ -1192,7 +1191,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
             <div class="card-header">
                 <div class="card-title">
                     <i class="fas fa-book"></i>
-                    My Enrolled Subjects
+                    Enrolled Subjects
                 </div>
                 <div class="card-actions">
                     <div class="subject-count">
@@ -1200,7 +1199,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
                         <?php echo count($subjects); ?> Subjects
                     </div>
                     <button type="button" class="btn btn-primary" id="addSubjectBtn">
-                        <i class="fas fa-plus"></i> Add New Subject
+                        <i class="fas fa-plus"></i> Add Subject
                     </button>
                 </div>
             </div>
@@ -1209,7 +1208,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
                 <div class="empty-state">
                     <i class="fas fa-book"></i>
                     <p>No subjects enrolled yet</p>
-                    <small>Click "Add New Subject" to enroll in your first subject</small>
+                    <small>Click "Add Subject" to enroll in your first subject</small>
                 </div>
             <?php else: ?>
                 <div class="subjects-grid">
@@ -1423,12 +1422,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
         const cancelLogout = document.getElementById('cancelLogout');
         const confirmLogout = document.getElementById('confirmLogout');
 
-        // Show modal when clicking add subject button
         addSubjectBtn.addEventListener('click', () => {
             addSubjectModal.classList.add('show');
         });
 
-        // Hide modal when clicking cancel
         cancelAddSubject.addEventListener('click', () => {
             addSubjectModal.classList.remove('show');
         });
@@ -1441,12 +1438,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
             archiveSubjectModal.classList.remove('show');
         });
 
-        // Confirm archive action
         confirmArchiveSubject.addEventListener('click', () => {
             archiveSubjectForm.submit();
         });
 
-        // Show modal when clicking logout button
         logoutBtn.addEventListener('click', (e) => {
             e.preventDefault();
             logoutModal.classList.add('show');
@@ -1508,7 +1503,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_subject'])) {
             });
         }, 5000);
 
-        // Close modal after successful form submission if there are no errors
         <?php if ($success_message && empty($error_message)): ?>
             document.addEventListener('DOMContentLoaded', function() {
                 const modals = [
